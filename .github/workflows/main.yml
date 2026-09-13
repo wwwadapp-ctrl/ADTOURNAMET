@@ -25,14 +25,38 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Extract Android project
+      - name: Find and extract Android project
+        shell: bash
         run: |
+          set -e
+          ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*.zip' -print -quit)"
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: Android project ZIP not found."
+            exit 1
+          fi
+
+          echo "Using ZIP: $ZIP_FILE"
+
           rm -rf android-project
-          mkdir android-project
-          unzip -q ad-tournament-foundation (1).zip -d android-project
+          mkdir -p android-project
+
+          unzip -q "$ZIP_FILE" -d android-project
+
+          SETTINGS_FILE="$(find android-project -name settings.gradle.kts -type f -print -quit)"
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "ERROR: settings.gradle.kts not found."
+            exit 1
+          fi
+
+          PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
+
+          echo "Project directory: $PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Create debug keystore
-        working-directory: android-project
+        working-directory: ${{ env.PROJECT_DIR }}
         run: |
           keytool -genkeypair \
             -v \
@@ -46,7 +70,7 @@ jobs:
             -dname "CN=Android Debug,O=Android,C=US"
 
       - name: Build Debug APK
-        working-directory: android-project
+        working-directory: ${{ env.PROJECT_DIR }}
         run: |
           gradle --no-daemon assembleDebug
 
@@ -54,4 +78,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AD-TOURNAMENT-debug-apk
-          path: android-project/app/build/outputs/apk/debug/*.apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
