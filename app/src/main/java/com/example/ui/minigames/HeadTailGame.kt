@@ -270,7 +270,8 @@ fun HeadTailGameScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding),
+                    .padding(padding)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Spacer(modifier = Modifier.height(10.dp))
@@ -280,7 +281,7 @@ fun HeadTailGameScreen(
                     "HEAD & TAIL",
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Black,
-                        fontSize = 34.sp,
+                        fontSize = 32.sp,
                         letterSpacing = 2.sp,
                         brush = Brush.verticalGradient(listOf(HTGoldLight, HTGold, HTAmber))
                     )
@@ -294,13 +295,13 @@ fun HeadTailGameScreen(
                     )
                 )
 
-                Spacer(modifier = Modifier.weight(0.1f))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Podium and Coin
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(280.dp),
+                        .height(200.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     // Glass Podium
@@ -326,22 +327,22 @@ fun HeadTailGameScreen(
                             color = HTGold
                         ),
                         modifier = Modifier
-                            .padding(vertical = 8.dp)
+                            .padding(vertical = 6.dp)
                             .alpha(tossingAlpha)
                     )
                 } else if (resultText != null) {
                     Text(
                         resultText!!,
                         color = Color.White,
-                        fontSize = 20.sp,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = 8.dp)
+                        modifier = Modifier.padding(vertical = 6.dp)
                     )
                 } else {
-                    Spacer(modifier = Modifier.height(40.dp))
+                    Spacer(modifier = Modifier.height(30.dp))
                 }
 
-                Spacer(modifier = Modifier.weight(0.1f))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Selection Cards
                 Row(
@@ -364,7 +365,7 @@ fun HeadTailGameScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Betting Console
                 CasinoBettingConsole(
@@ -501,14 +502,14 @@ private fun BalancePill(
 
 @Composable
 private fun PodiumStage() {
-    Canvas(modifier = Modifier.size(280.dp)) {
-        val center = Offset(size.width / 2, size.height / 2 + 40.dp.toPx())
+    Canvas(modifier = Modifier.size(200.dp)) {
+        val center = Offset(size.width / 2, size.height / 2 + 25.dp.toPx())
         
         // Bottom Rings
         repeat(3) { i ->
             drawCircle(
                 color = HTGold.copy(alpha = 0.3f - i * 0.1f),
-                radius = 120.dp.toPx() - (i * 8.dp.toPx()),
+                radius = 85.dp.toPx() - (i * 6.dp.toPx()),
                 center = center,
                 style = Stroke(width = 2.dp.toPx())
             )
@@ -517,14 +518,14 @@ private fun PodiumStage() {
         // Glass Surface
         drawCircle(
             brush = Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.15f), Color.Transparent)),
-            radius = 110.dp.toPx(),
+            radius = 80.dp.toPx(),
             center = center
         )
         
         // Inner detail
         drawCircle(
             color = HTGold.copy(alpha = 0.5f),
-            radius = 110.dp.toPx(),
+            radius = 80.dp.toPx(),
             center = center,
             style = Stroke(width = 1.dp.toPx())
         )
@@ -535,15 +536,15 @@ private fun PodiumStage() {
 private fun Coin3D(side: CoinSide, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .size(140.dp)
-            .shadow(24.dp, CircleShape, spotColor = HTGold),
+            .size(120.dp)
+            .shadow(20.dp, CircleShape, spotColor = HTGold),
         contentAlignment = Alignment.Center
     ) {
         // We simulate 3D thickness by drawing an offset background
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .offset(y = 4.dp)
+                .offset(y = 3.dp)
                 .background(Color(0xFF8B4513), CircleShape)
         )
 
@@ -554,7 +555,7 @@ private fun Coin3D(side: CoinSide, modifier: Modifier = Modifier) {
                     Brush.radialGradient(listOf(HTGoldLight, HTGold, HTAmber)),
                     CircleShape
                 )
-                .border(4.dp, Brush.linearGradient(listOf(HTGoldLight, HTAmber)), CircleShape),
+                .border(3.5.dp, Brush.linearGradient(listOf(HTGoldLight, HTAmber)), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             // Inner rim
@@ -569,19 +570,19 @@ private fun Coin3D(side: CoinSide, modifier: Modifier = Modifier) {
                 imageVector = if (side == CoinSide.HEAD) Icons.Default.Face else Icons.Default.Star,
                 contentDescription = null,
                 tint = Color(0xFF5D4037).copy(alpha = 0.85f),
-                modifier = Modifier.size(75.dp)
+                modifier = Modifier.size(62.dp)
             )
             
             // Specular Reflection
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(10.dp)
+                    .padding(8.dp)
                     .background(
                         Brush.radialGradient(
                             0.0f to Color.White.copy(alpha = 0.25f),
                             0.6f to Color.Transparent,
-                            center = Offset(30f, 30f)
+                            center = Offset(25f, 25f)
                         ),
                         CircleShape
                     )
@@ -602,9 +603,9 @@ private fun ChoiceCard(
     
     Surface(
         modifier = modifier
-            .height(145.dp)
+            .height(78.dp)
             .clickable { onClick(side) },
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(18.dp),
         color = bgColor,
         border = BorderStroke(if (isSelected) 2.5.dp else 1.dp, borderColor)
     ) {
@@ -613,44 +614,47 @@ private fun ChoiceCard(
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(10.dp),
-                shape = RoundedCornerShape(8.dp),
+                    .padding(6.dp),
+                shape = RoundedCornerShape(6.dp),
                 color = if (isSelected) HTGold else Color.White.copy(alpha = 0.2f)
             ) {
                 Text(
                     "1.9x",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                    fontSize = 10.sp,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    fontSize = 9.sp,
                     fontWeight = FontWeight.Black,
                     color = if (isSelected) Color.Black else Color.White
                 )
             }
 
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    if (side == CoinSide.HEAD) "HEAD" else "TAIL",
-                    color = Color.White,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 16.sp,
-                    letterSpacing = 1.sp
-                )
-                Text(
-                    if (side == CoinSide.HEAD) "হেড" else "টেল",
-                    color = if (isSelected) HTGold else Color.White.copy(alpha = 0.6f),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
-                )
-                Spacer(modifier = Modifier.height(14.dp))
                 Icon(
                     imageVector = if (side == CoinSide.HEAD) Icons.Default.Face else Icons.Default.Star,
                     contentDescription = null,
-                    tint = if (isSelected) HTGold else Color.White.copy(alpha = 0.4f),
-                    modifier = Modifier.size(52.dp)
+                    tint = if (isSelected) HTGold else Color.White.copy(alpha = 0.45f),
+                    modifier = Modifier.size(34.dp)
                 )
+                Column(verticalArrangement = Arrangement.Center) {
+                    Text(
+                        if (side == CoinSide.HEAD) "HEAD" else "TAIL",
+                        color = Color.White,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 15.sp,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        if (side == CoinSide.HEAD) "হেড" else "টেল",
+                        color = if (isSelected) HTGold else Color.White.copy(alpha = 0.65f),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                }
             }
         }
     }

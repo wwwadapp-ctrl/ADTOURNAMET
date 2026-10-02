@@ -416,10 +416,13 @@ fun DiceRollGameScreen(
             }
         ) { padding ->
             Column(
-                modifier = Modifier.fillMaxSize().padding(padding),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 
                 // --- GRAND CASINO TITLE & DYNAMIC STATUS ---
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -427,7 +430,7 @@ fun DiceRollGameScreen(
                         "EVEN & ODD",
                         style = MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = FontWeight.Black,
-                            fontSize = 32.sp,
+                            fontSize = 30.sp,
                             letterSpacing = 2.sp,
                             brush = Brush.verticalGradient(listOf(DiceGoldLight, MetallicGold, AmberGlow))
                         )
@@ -440,7 +443,7 @@ fun DiceRollGameScreen(
                             letterSpacing = 4.sp
                         )
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     
                     // Result / Dynamic Rolling Status
                     if (isRolling) {
@@ -478,12 +481,12 @@ fun DiceRollGameScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.weight(0.35f))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // --- 3D PODIUM STAGE WITH ISOMETRIC DICE & GLOWING AURA ---
                 Box(contentAlignment = Alignment.Center) {
                     // Podium Base Layers & Golden Vortex Aura
-                    Canvas(modifier = Modifier.size(320.dp)) {
+                    Canvas(modifier = Modifier.size(200.dp)) {
                         val center = this.center
                         // Radiant Ambient Glow Aura
                         drawCircle(
@@ -577,7 +580,7 @@ fun DiceRollGameScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.weight(0.55f))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // --- CHOICE CARDS (EVEN / ODD) ---
                 Row(
@@ -602,7 +605,7 @@ fun DiceRollGameScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Betting Console
                 CasinoBettingConsole(
@@ -613,7 +616,7 @@ fun DiceRollGameScreen(
                     onActionClick = { performRoll() }
                 )
                 
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
@@ -785,39 +788,35 @@ fun LuxuryChoiceCard(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(130.dp)
-                .clip(RoundedCornerShape(20.dp))
+                .height(76.dp)
+                .clip(RoundedCornerShape(16.dp))
                 .clickable(enabled = enabled) { onSelect(choice) },
             color = if (isSelected) Color(0xFF1A1A40) else Color.Black.copy(alpha = 0.4f),
             border = BorderStroke(if (isSelected) 2.5.dp else 1.dp, if (isSelected) MetallicGold else Color.White.copy(alpha = 0.1f)),
-            shape = RoundedCornerShape(20.dp)
+            shape = RoundedCornerShape(16.dp)
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 // 1.9x Badge
                 Surface(
-                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
                     color = MetallicGold,
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(6.dp)
                 ) {
                     Text(
                         "1.9x",
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, color = Color.Black, fontSize = 10.sp)
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp),
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, color = Color.Black, fontSize = 9.sp)
                     )
                 }
                 
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
-                        color = if (isSelected) MetallicGold else Color.White
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         if (choice == DiceChoice.EVEN) {
                             MiniCasinoDice(2)
                             MiniCasinoDice(4)
@@ -826,10 +825,16 @@ fun LuxuryChoiceCard(
                             MiniCasinoDice(3)
                         }
                     }
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
+                        color = if (isSelected) MetallicGold else Color.White,
+                        fontSize = 13.sp
+                    )
                 }
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text("Payout: 1.9x", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
 }

@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
@@ -99,7 +100,7 @@ fun MiniGamesSection(
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
-            modifier = Modifier.height(240.dp),
+            modifier = Modifier.height(265.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             userScrollEnabled = false
@@ -141,7 +142,7 @@ fun MiniGameCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(115.dp)
+            .height(126.dp)
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         color = Color.Transparent,
@@ -185,8 +186,10 @@ fun MiniGameCard(
                                 text = game.title,
                                 style = MaterialTheme.typography.labelLarge.copy(
                                     fontWeight = FontWeight.Black,
-                                    fontSize = 15.sp
+                                    fontSize = 13.5.sp
                                 ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 color = Color.White
                             )
                             Text(
@@ -194,7 +197,9 @@ fun MiniGameCard(
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontSize = 11.sp,
                                     color = (if (isRoyalWheel || isScratch) Color(0xFFFFD700) else Emerald400).copy(alpha = 0.8f)
-                                )
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                         
@@ -232,8 +237,8 @@ fun MiniGameCard(
                         isDiceRoll -> {
                             MiniDiceRollGraphic(
                                 modifier = Modifier
-                                    .size(85.dp)
-                                    .offset(x = 8.dp)
+                                    .size(68.dp)
+                                    .offset(x = 4.dp)
                             )
                         }
                         isHeadTail -> {
