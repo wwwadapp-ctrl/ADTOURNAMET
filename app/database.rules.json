@@ -1,0 +1,160 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+        ".write": "auth != null && (((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true) || (auth.uid == $uid && (!data.exists() || (data.child('status').val() != 'BLOCKED' && data.child('accountStatus').val() != 'BLOCKED'))))",
+        ".validate": "newData.hasChildren(['uid', 'mobileNumber']) && newData.child('uid').val() == auth.uid && !newData.hasChildren(['password', 'passwordHash', 'otp', 'salt', 'secret']) && (!data.exists() ? (((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true) || ((!newData.child('role').exists() || newData.child('role').val() == 'PLAYER') && (!newData.child('status').exists() || newData.child('status').val() == 'ACTIVE') && (!newData.child('accountStatus').exists() || newData.child('accountStatus').val() == 'ACTIVE') && (!newData.child('walletBalance').exists() || newData.child('walletBalance').val() == 0))) : (data.child('mobileNumber').val() == newData.child('mobileNumber').val() && (((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true) || (data.child('status').val() == newData.child('status').val() && data.child('accountStatus').val() == newData.child('accountStatus').val() && (!data.child('role').exists() || data.child('role').val() == newData.child('role').val()) && (!data.child('isBlocked').exists() || data.child('isBlocked').val() == newData.child('isBlocked').val()) && (!data.child('walletBalance').exists() || data.child('walletBalance').val() == newData.child('walletBalance').val()) && (!data.child('totalWinnings').exists() || data.child('totalWinnings').val() == newData.child('totalWinnings').val()) && (!data.child('totalMatches').exists() || data.child('totalMatches').val() == newData.child('totalMatches').val()) && (!data.child('wins').exists() || data.child('wins').val() == newData.child('wins').val()) && (!data.child('losses').exists() || data.child('losses').val() == newData.child('losses').val())))))"
+      }
+    },
+    "phoneIndex": {
+      "$phone": {
+        ".read": "auth != null && (data.val() == auth.uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+        ".write": "auth != null && (((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true) || (!data.exists() && newData.val() == auth.uid) || (data.val() == auth.uid && newData.val() == auth.uid))",
+        ".validate": "newData.val() == auth.uid"
+      }
+    },
+    "wallets": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+        ".write": "auth != null && (((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true) || (auth.uid == $uid && root.child('users').child(auth.uid).child('status').val() != 'BLOCKED' && root.child('users').child(auth.uid).child('accountStatus').val() != 'BLOCKED') || (!data.exists() && auth.uid == $uid && (!newData.child('availableBalance').exists() || newData.child('availableBalance').val() == 0) && (!newData.child('pendingBalance').exists() || newData.child('pendingBalance').val() == 0) && (!newData.child('totalDeposited').exists() || newData.child('totalDeposited').val() == 0) && (!newData.child('totalWithdrawn').exists() || newData.child('totalWithdrawn').val() == 0) && (!newData.child('totalWinnings').exists() || newData.child('totalWinnings').val() == 0) && (!newData.child('balance').exists() || newData.child('balance').val() == 0) && (!newData.child('winningBalance').exists() || newData.child('winningBalance').val() == 0) && (!newData.child('lockedBalance').exists() || newData.child('lockedBalance').val() == 0) && (!newData.child('bonusBalance').exists() || newData.child('bonusBalance').val() == 0)))"
+      }
+    },
+    "transactions": {
+      ".read": "auth != null && ((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+      ".indexOn": ["uid", "userId", "type", "status", "createdAt"],
+      "$transactionId": {
+        ".read": "auth != null && (data.child('uid').val() == auth.uid || data.child('userId').val() == auth.uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+        ".write": "auth != null && (auth.uid == newData.child('uid').val() || auth.uid == newData.child('userId').val() || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)"
+      }
+    },
+    "userTransactions": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+        ".write": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+        "$transactionId": {
+          ".read": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+          ".write": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)"
+        }
+      }
+    },
+    "userMatches": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+        ".write": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+        "$matchId": {
+          ".read": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+          ".write": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)"
+        }
+      }
+    },
+    "matches": {
+      ".read": "auth != null",
+      ".write": "auth != null && ((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+      "$matchId": {
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('status').val() != 'BLOCKED' && root.child('users').child(auth.uid).child('accountStatus').val() != 'BLOCKED' || ((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true))"
+      }
+    },
+    "matchPlayers": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() != 'BLOCKED' && root.child('users').child(auth.uid).child('accountStatus').val() != 'BLOCKED'",
+      "$matchId": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() != 'BLOCKED' && root.child('users').child(auth.uid).child('accountStatus').val() != 'BLOCKED'",
+        "$userId": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() != 'BLOCKED' && root.child('users').child(auth.uid).child('accountStatus').val() != 'BLOCKED'"
+        }
+      }
+    },
+    "results": {
+      ".read": "auth != null && ((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+      ".indexOn": ["matchId", "submittedByUserId", "claimedWinnerUserId", "status"],
+      "$resultId": {
+        ".read": "auth != null && (data.child('submittedByUserId').val() == auth.uid || data.child('claimedWinnerUserId').val() == auth.uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() != 'BLOCKED' && root.child('users').child(auth.uid).child('accountStatus').val() != 'BLOCKED' && (((!data.exists() || data.child('submittedByUserId').val() == auth.uid) && newData.child('submittedByUserId').val() == auth.uid && (newData.child('status').val() == 'PENDING_REVIEW' || newData.child('status').val() == 'PENDING')) || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)"
+      }
+    },
+    "deposits": {
+      ".read": "auth != null && ((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+      ".indexOn": ["uid", "userId", "status", "createdAt"],
+      "$depositId": {
+        ".read": "auth != null && (data.child('uid').val() == auth.uid || data.child('userId').val() == auth.uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() != 'BLOCKED' && root.child('users').child(auth.uid).child('accountStatus').val() != 'BLOCKED' && ((!data.exists() && (newData.child('uid').val() == auth.uid || newData.child('userId').val() == auth.uid) && (newData.child('status').val() == 'SUBMITTED' || newData.child('status').val() == 'PENDING')) || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)"
+      }
+    },
+    "userDeposits": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+        "$depositId": {
+          ".read": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+          ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() != 'BLOCKED' && root.child('users').child(auth.uid).child('accountStatus').val() != 'BLOCKED' && ((!data.exists() && auth.uid == $uid && (newData.child('uid').val() == auth.uid || newData.child('userId').val() == auth.uid) && (newData.child('status').val() == 'SUBMITTED' || newData.child('status').val() == 'PENDING')) || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)"
+        }
+      }
+    },
+    "withdrawals": {
+      ".read": "auth != null && ((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+      ".indexOn": ["uid", "userId", "status", "createdAt"],
+      "$withdrawalId": {
+        ".read": "auth != null && (data.child('uid').val() == auth.uid || data.child('userId').val() == auth.uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() != 'BLOCKED' && root.child('users').child(auth.uid).child('accountStatus').val() != 'BLOCKED' && ((!data.exists() && (newData.child('uid').val() == auth.uid || newData.child('userId').val() == auth.uid) && (newData.child('status').val() == 'REQUESTED' || newData.child('status').val() == 'PENDING')) || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)"
+      }
+    },
+    "userWithdrawals": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+        "$withdrawalId": {
+          ".read": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+          ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() != 'BLOCKED' && root.child('users').child(auth.uid).child('accountStatus').val() != 'BLOCKED' && ((!data.exists() && auth.uid == $uid && (newData.child('uid').val() == auth.uid || newData.child('userId').val() == auth.uid) && (newData.child('status').val() == 'REQUESTED' || newData.child('status').val() == 'PENDING')) || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)"
+        }
+      }
+    },
+    "notifications": {
+      ".read": "auth != null && ((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+      ".indexOn": ["userId", "uid", "createdAt"],
+      "$id": {
+        ".read": "auth != null && (data.child('uid').val() == auth.uid || data.child('userId').val() == auth.uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+        ".write": "auth != null && (data.child('uid').val() == auth.uid || data.child('userId').val() == auth.uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)"
+      }
+    },
+    "userNotifications": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+        "$notificationId": {
+          ".read": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+          ".write": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)"
+        }
+      }
+    },
+    "admins": {
+      "$adminUid": {
+        ".read": "auth != null && (auth.uid == $adminUid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+        ".write": "false"
+      }
+    },
+    "adminUsers": {
+      ".read": "auth != null && ((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+      ".write": "false",
+      "$adminUid": {
+        ".read": "auth != null && (auth.uid == $adminUid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+        ".write": "false"
+      }
+    },
+    "auditLogs": {
+      ".read": "auth != null && ((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
+      ".write": "auth != null && ((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)"
+    },
+    "appSettings": {
+      ".read": "true",
+      ".write": "auth != null && ((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)"
+    },
+    "userFcmTokens": {
+      "$uid": {
+        "$tokenId": {
+          ".read": "auth != null && (auth.uid === $uid || auth.uid === 'GuIxwtI4hLQIoKOOt3V2XKnFhiB2')",
+          ".write": "auth != null && (auth.uid === $uid || auth.uid === 'GuIxwtI4hLQIoKOOt3V2XKnFhiB2')"
+        }
+      }
+    }
+  }
+}

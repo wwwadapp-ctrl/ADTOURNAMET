@@ -1,0 +1,35 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- bKash Origami Bird Symbol -->
+    <!-- Head & Beak facet -->
+    <path
+        android:fillColor="#E2136E"
+        android:pathData="M37.5,6.5 L43.5,12.5 L36.5,14 L37.5,6.5 Z"/>
+    <!-- Upper Wing -->
+    <path
+        android:fillColor="#FF2B85"
+        android:pathData="M24,4 L36.5,14 L27,19.5 L24,4 Z"/>
+    <!-- Main Body / Forward facet -->
+    <path
+        android:fillColor="#E2136E"
+        android:pathData="M27,19.5 L36.5,14 L31,29 L23,24 Z"/>
+    <!-- Left Wing facet -->
+    <path
+        android:fillColor="#C20D5D"
+        android:pathData="M5,16 L24,17 L23,24 L5,16 Z"/>
+    <!-- Center Core facet -->
+    <path
+        android:fillColor="#E2136E"
+        android:pathData="M24,17 L27,19.5 L23,24 Z"/>
+    <!-- Lower Body / Tail section -->
+    <path
+        android:fillColor="#D81067"
+        android:pathData="M23,24 L31,29 L21,43 L17,35 Z"/>
+    <!-- Tail tip facet -->
+    <path
+        android:fillColor="#A00B4D"
+        android:pathData="M17,35 L21,43 L12,42 Z"/>
+</vector>

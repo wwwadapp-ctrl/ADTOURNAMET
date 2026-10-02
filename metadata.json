@@ -1,0 +1,6 @@
+{
+  "name": "AD Tournament",
+  "description": "AD Tournament gaming and tournament management platform for mobile players.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

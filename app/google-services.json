@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "991211090700",
+    "firebase_url": "https://adturnamet-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "adturnamet",
+    "storage_bucket": "adturnamet.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:991211090700:android:0ac6940a84e0f26631cf29",
+        "android_client_info": {
+          "package_name": "com.aistudio.adtournament.qvkx"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByArBjAiRitswanLhrXFUzg6jKjgaiJdg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
