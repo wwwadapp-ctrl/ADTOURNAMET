@@ -30,7 +30,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > release.jks
+          echo "$KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -di > release.jks
           BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
           APK_FILE=$(find app/build/outputs/apk/ -name "*.apk" | head -n 1)
           $BUILD_TOOLS_DIR/apksigner sign --ks release.jks \
