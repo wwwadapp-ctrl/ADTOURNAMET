@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Esports Shield Silhouette -->
+    <path
+        android:pathData="M54,22 L80,30 L79,56 C79,66 68,77 54,84 C40,77 29,66 29,56 L28,30 Z"
+        android:fillColor="#10172A"
+        android:strokeColor="#F59E0B"
+        android:strokeWidth="2.5" />
+
+    <!-- Inner Shield Accent Line -->
+    <path
+        android:pathData="M54,26 L76,33 L75,55 C75,63 65,73 54,79 C43,73 33,63 33,55 L32,33 Z"
+        android:fillColor="#00000000"
+        android:strokeColor="#06B6D4"
+        android:strokeWidth="1" />
+
+    <!-- Championship Trophy Cup -->
+    <!-- Handles -->
+    <path
+        android:pathData="M43,38 C36,38 36,48 43,50"
+        android:fillColor="#00000000"
+        android:strokeColor="#FBBF24"
+        android:strokeWidth="2" />
+    <path
+        android:pathData="M65,38 C72,38 72,48 65,50"
+        android:fillColor="#00000000"
+        android:strokeColor="#FBBF24"
+        android:strokeWidth="2" />
+
+    <!-- Cup Body -->
+    <path
+        android:pathData="M42,36 L66,36 L64,49 C63,54 59,57 54,57 C49,57 45,54 44,49 Z"
+        android:fillColor="#F59E0B" />
+
+    <!-- Trophy Rim Highlight -->
+    <path
+        android:pathData="M42,36 L66,36"
+        android:strokeColor="#FDE047"
+        android:strokeWidth="1.5" />
+
+    <!-- Trophy Stem & Base -->
+    <path
+        android:pathData="M52,57 L56,57 L56,61 L52,61 Z"
+        android:fillColor="#F59E0B" />
+    <path
+        android:pathData="M47,61 L61,61 L63,65 L45,65 Z"
+        android:fillColor="#D97706" />
+
+    <!-- Tournament Banner for AD Monogram -->
+    <path
+        android:pathData="M34,66 L74,66 L71,78 L54,80 L37,78 Z"
+        android:fillColor="#0B1120"
+        android:strokeColor="#F59E0B"
+        android:strokeWidth="1.5" />
+
+    <!-- Letter A in AD -->
+    <path
+        android:pathData="M42,76 L45.5,68 L47.5,68 L51,76 L48.8,76 L48.2,74 L44.8,74 L44.2,76 Z"
+        android:fillColor="#FDE047" />
+    <path
+        android:pathData="M45.5,72.2 L47.5,72.2 L46.5,69.8 Z"
+        android:fillColor="#0B1120" />
+
+    <!-- Letter D in AD -->
+    <path
+        android:pathData="M53,68 L58.5,68 C61.8,68 64,69.8 64,72 C64,74.2 61.8,76 58.5,76 L53,76 Z"
+        android:fillColor="#FDE047" />
+    <path
+        android:pathData="M55,70 L58,70 C59.8,70 61.8,70.8 61.8,72 C61.8,73.2 59.8,74 58,74 L55,74 Z"
+        android:fillColor="#0B1120" />
+
+    <!-- Star Accents -->
+    <!-- Center Star -->
+    <path
+        android:pathData="M54,26.5 L55,28.8 L57.5,28.8 L55.5,30.2 L56.3,32.5 L54,31.2 L51.7,32.5 L52.5,30.2 L50.5,28.8 L53,28.8 Z"
+        android:fillColor="#FDE047" />
+    <!-- Left Star -->
+    <path
+        android:pathData="M44,28.5 L44.8,30.3 L46.8,30.3 L45.2,31.5 L45.8,33.3 L44,32.2 L42.2,33.3 L42.8,31.5 L41.2,30.3 L43.2,30.3 Z"
+        android:fillColor="#FBBF24" />
+    <!-- Right Star -->
+    <path
+        android:pathData="M64,28.5 L64.8,30.3 L66.8,30.3 L65.2,31.5 L65.8,33.3 L64,32.2 L62.2,33.3 L62.8,31.5 L61.2,30.3 L63.2,30.3 Z"
+        android:fillColor="#FBBF24" />
+
+</vector>
