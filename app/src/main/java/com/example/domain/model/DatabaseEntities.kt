@@ -4,7 +4,8 @@ import com.google.firebase.database.IgnoreExtraProperties
 
 enum class AccountStatus {
   ACTIVE,
-  BLOCKED
+  BLOCKED,
+  BANNED
 }
 
 @IgnoreExtraProperties
@@ -30,7 +31,11 @@ data class UserEntity(
   val phoneNumber: String = mobileNumber,
   val avatarUrl: String = profilePhotoUrl ?: profilePhoto,
   val isBlocked: Boolean = status.equals(AccountStatus.BLOCKED.name, ignoreCase = true) ||
-      accountStatus.equals(AccountStatus.BLOCKED.name, ignoreCase = true),
+      accountStatus.equals(AccountStatus.BLOCKED.name, ignoreCase = true) ||
+      status.equals(AccountStatus.BANNED.name, ignoreCase = true) ||
+      accountStatus.equals(AccountStatus.BANNED.name, ignoreCase = true),
+  @get:com.google.firebase.database.Exclude
+  val blocked: Any? = false,
   val createdAt: Long = joinDate,
   // Raw fields from Firebase (stored strictly as Paisa/Minor Units)
   val walletBalance: Double = 0.0,
@@ -43,9 +48,21 @@ data class UserEntity(
   val effectiveName: String get() = name.ifEmpty { fullName.ifEmpty { displayName.ifEmpty { "Player" } } }
   val effectiveMobile: String get() = mobileNumber.ifEmpty { phoneNumber }
   val effectivePhoto: String get() = profilePhotoUrl ?: profilePhoto.ifEmpty { avatarUrl }
+  
+  private val isBlockedDynamic: Boolean 
+    get() = when (val b = blocked) {
+      is Boolean -> b
+      is String -> b.equals("true", ignoreCase = true) || b == "1"
+      is Number -> b.toInt() == 1
+      else -> false
+    }
+
   val isAccountBlocked: Boolean get() = isBlocked ||
+      isBlockedDynamic ||
       status.equals(AccountStatus.BLOCKED.name, ignoreCase = true) ||
-      accountStatus.equals(AccountStatus.BLOCKED.name, ignoreCase = true)
+      status.equals(AccountStatus.BANNED.name, ignoreCase = true) ||
+      accountStatus.equals(AccountStatus.BLOCKED.name, ignoreCase = true) ||
+      accountStatus.equals(AccountStatus.BANNED.name, ignoreCase = true)
 
   // Derived properties that always return BDT (Taka) by dividing minor units by 100.0
   val walletBalanceAmount: Double get() = walletBalance / 100.0

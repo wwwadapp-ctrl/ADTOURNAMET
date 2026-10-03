@@ -613,16 +613,27 @@ class FirebaseMatchRepository(private val customDatabase: FirebaseDatabase? = nu
 
     val userMutex = userMatchJoinMutexes.getOrPut(effectiveUid) { Mutex() }
     return userMutex.withLock {
-      val isUserBlocked = LocalDataStore.localUsers[effectiveUid]?.isAccountBlocked == true ||
-          LocalDataStore.localUsers[userId]?.isAccountBlocked == true
-      if (isUserBlocked) {
-        return@withLock Resource.Error(AppError.InvalidInput(reason = "Your account is blocked. Cannot join tournament."))
-      }
-
       val database = customDatabase ?: FirebaseManager.getDatabase()
       val now = System.currentTimeMillis()
 
       if (database != null) {
+        // Authoritative block check: Fetch fresh user record from RTDB
+        val userSnap = try {
+          database.getReference(FirebaseConfig.NODE_USERS).child(effectiveUid).get().awaitTask(4_000L)
+        } catch (_: Exception) { null }
+        
+        val isUserBlocked = userSnap?.let {
+          it.child("isBlocked").getValue(Boolean::class.java) == true ||
+          it.child("blocked").getValue(Boolean::class.java) == true ||
+          it.child("status").getValue(String::class.java)?.equals("BANNED", ignoreCase = true) == true ||
+          it.child("status").getValue(String::class.java)?.equals("BLOCKED", ignoreCase = true) == true
+        } ?: (LocalDataStore.localUsers[effectiveUid]?.isAccountBlocked == true ||
+             LocalDataStore.localUsers[userId]?.isAccountBlocked == true)
+
+        if (isUserBlocked) {
+          return@withLock Resource.Error(AppError.InvalidInput(reason = "Your account is banned/suspended. Cannot join tournament matches."))
+        }
+
         AppLogger.i(tag, "Executing client-side atomic match join for matchId=$matchId, effectiveUid=$effectiveUid, userId=$userId")
         try {
           // 1. Fetch current match details
@@ -4533,10 +4544,41 @@ class FirebaseAuthRepository(
     observedUid = uid
     userNodeListener = object : ValueEventListener {
       override fun onDataChange(snapshot: DataSnapshot) {
-        val entity = snapshot.getValue(UserEntity::class.java)
-        if (entity != null) {
-          _currentUserState.value = entity
-          sessionManager?.saveSession(entity)
+        val blockedRaw = snapshot.child("blocked").value
+        val isBlockedRaw = snapshot.child("isBlocked").value
+        val statusRaw = snapshot.child("status").getValue(String::class.java).orEmpty()
+
+        val isBannedOrBlocked = when (blockedRaw) {
+          is Boolean -> blockedRaw
+          is String -> blockedRaw.equals("true", ignoreCase = true) || blockedRaw == "1"
+          is Number -> blockedRaw.toInt() == 1
+          else -> false
+        } || when (isBlockedRaw) {
+          is Boolean -> isBlockedRaw
+          is String -> isBlockedRaw.equals("true", ignoreCase = true) || isBlockedRaw == "1"
+          is Number -> isBlockedRaw.toInt() == 1
+          else -> false
+        } || statusRaw.equals("BANNED", ignoreCase = true) || statusRaw.equals("BLOCKED", ignoreCase = true)
+
+        if (isBannedOrBlocked) {
+          // Explicit cleanup before sign out to prevent re-entrant events
+          observedUid?.let { curUid ->
+            FirebaseManager.getNodeReference(FirebaseConfig.NODE_USERS)?.child(curUid)
+              ?.removeEventListener(userNodeListener!!)
+          }
+          observedUid = null
+          signOutSync()
+        } else {
+          val entity = try {
+            snapshot.getValue(UserEntity::class.java)
+          } catch (e: Exception) {
+            AppLogger.e(tag, "Failed to parse user entity: ${e.message}")
+            null
+          }
+          if (entity != null) {
+            _currentUserState.value = entity
+            sessionManager?.saveSession(entity)
+          }
         }
       }
 
@@ -4665,7 +4707,7 @@ class FirebaseAuthRepository(
 
     if (user.isAccountBlocked) {
       signOutSync()
-      return Resource.Error(AppError.InvalidInput(reason = "This account is suspended/blocked. You cannot log in or participate."))
+      return Resource.Error(AppError.InvalidInput(reason = "This account has been banned/suspended by administrator."))
     }
 
     sessionManager?.saveSession(user)
@@ -5009,6 +5051,12 @@ class FirebaseAuthRepository(
 
   private fun signOutSync() {
     try {
+      observedUid?.let { uid ->
+        FirebaseManager.getNodeReference(FirebaseConfig.NODE_USERS)?.child(uid)
+          ?.removeEventListener(userNodeListener!!)
+      }
+      observedUid = null
+      
       if (FirebaseManager.isAvailable()) {
         FirebaseAuth.getInstance().signOut()
       }

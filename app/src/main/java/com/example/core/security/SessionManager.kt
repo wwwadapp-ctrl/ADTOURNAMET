@@ -30,9 +30,13 @@ class SessionManager(context: Context) {
 
   fun getSessionUser(): UserEntity? {
     val userId = prefs.getString(KEY_USER_ID, null) ?: return null
-    val isBlocked = prefs.getBoolean(KEY_IS_BLOCKED, false)
+    val isBlocked = try {
+      prefs.getBoolean(KEY_IS_BLOCKED, false)
+    } catch (_: Exception) {
+      false
+    }
     val status = prefs.getString(KEY_ACCOUNT_STATUS, AccountStatus.ACTIVE.name) ?: AccountStatus.ACTIVE.name
-    if (isBlocked || status.equals(AccountStatus.BLOCKED.name, ignoreCase = true)) {
+    if (isBlocked || status.equals(AccountStatus.BLOCKED.name, ignoreCase = true) || status.equals(AccountStatus.BANNED.name, ignoreCase = true)) {
       clearSession()
       return null
     }
@@ -61,7 +65,7 @@ class SessionManager(context: Context) {
       displayName = fullName,
       phoneNumber = mobileNumber,
       avatarUrl = profilePhoto,
-      isBlocked = false,
+      isBlocked = isBlocked,
       createdAt = joinDate,
     )
   }

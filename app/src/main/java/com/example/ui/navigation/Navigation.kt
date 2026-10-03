@@ -170,6 +170,12 @@ fun AppNavigation(
 
   val currentUser by authViewModel.currentUser.collectAsState()
 
+  LaunchedEffect(currentUser?.isAccountBlocked) {
+    if (currentUser?.isAccountBlocked == true) {
+      container.authRepository.signOut()
+    }
+  }
+
   val navBackStackEntry by navController.currentBackStackEntryAsState()
   val currentRoute = navBackStackEntry?.destination?.route
 
@@ -199,13 +205,17 @@ fun AppNavigation(
           UserNotificationManager.stopListening()
 
           // Force immediate navigation to Login and clear backstack
-          val currentRoute = navController.currentDestination?.route
-          val authRoutes = listOf(Destinations.LOGIN, Destinations.REGISTER, Destinations.SPLASH, Destinations.FORGOT_PASSWORD)
-          if (currentRoute !in authRoutes) {
-            navController.navigate(Destinations.LOGIN) {
-              popUpTo(0) { inclusive = true }
-              launchSingleTop = true
+          try {
+            val currentDestination = navController.currentDestination
+            val authRoutes = listOf(Destinations.LOGIN, Destinations.REGISTER, Destinations.SPLASH, Destinations.FORGOT_PASSWORD)
+            if (currentDestination != null && currentDestination.route !in authRoutes) {
+              navController.navigate(Destinations.LOGIN) {
+                popUpTo(Destinations.LOGIN) { inclusive = true }
+                launchSingleTop = true
+              }
             }
+          } catch (e: Exception) {
+            // Prevent crash if NavGraph has not been set yet or route is invalid
           }
         }
       }
