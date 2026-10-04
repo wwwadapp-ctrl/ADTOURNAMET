@@ -1,7 +1,6 @@
 package com.example.ui.home
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -63,6 +62,9 @@ import com.example.ui.components.*
 import com.example.ui.theme.*
 import com.example.ui.minigames.*
 import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 enum class GuideType {
   DEPOSIT,
@@ -209,6 +211,7 @@ fun HomeScreen(
             }
             Spacer(modifier = Modifier.width(8.dp))
             Column {
+              HeaderLuxuryDigitalClock()
               Text(
                 text = "AD TOURNAMENT",
                 style = MaterialTheme.typography.titleMedium.copy(
@@ -534,6 +537,64 @@ fun HomeScreen(
           onScratchCardClick()
       }
       null -> {}
+    }
+  }
+}
+
+@Composable
+fun HeaderLuxuryDigitalClock() {
+  var timeText by remember { mutableStateOf("") }
+  val timeFormat = remember { SimpleDateFormat("hh:mm:ss a", Locale.getDefault()) }
+
+  LaunchedEffect(Unit) {
+    while (true) {
+      timeText = timeFormat.format(Date())
+      delay(1000L)
+    }
+  }
+
+  val infiniteTransition = rememberInfiniteTransition(label = "LivePulse")
+  val pulseAlpha by infiniteTransition.animateFloat(
+    initialValue = 0.4f,
+    targetValue = 1f,
+    animationSpec = infiniteRepeatable(
+      animation = tween(800),
+      repeatMode = RepeatMode.Reverse
+    ),
+    label = "PulseAlpha"
+  )
+
+  Surface(
+    shape = RoundedCornerShape(6.dp),
+    color = Slate950.copy(alpha = 0.88f),
+    border = BorderStroke(
+      1.dp,
+      Brush.horizontalGradient(listOf(Gold400, Cyan400, Gold400))
+    ),
+    modifier = Modifier.padding(bottom = 3.dp)
+  ) {
+    Row(
+      modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.5.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+      Box(
+        modifier = Modifier
+          .size(6.dp)
+          .clip(CircleShape)
+          .background(Gold400.copy(alpha = pulseAlpha))
+          .border(0.5.dp, Gold400.copy(alpha = 0.3f), CircleShape)
+      )
+      Text(
+        text = timeText,
+        style = MaterialTheme.typography.labelSmall.copy(
+          fontWeight = FontWeight.Black,
+          letterSpacing = 1.sp,
+          fontSize = 12.sp,
+        ),
+        color = Gold400,
+        maxLines = 1
+      )
     }
   }
 }
