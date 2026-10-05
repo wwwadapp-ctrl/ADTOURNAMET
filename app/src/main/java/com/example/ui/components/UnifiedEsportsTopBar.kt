@@ -4,12 +4,15 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,8 +28,12 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
@@ -38,7 +45,6 @@ import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UnifiedEsportsTopBar(
     currentUser: UserEntity?,
@@ -55,53 +61,115 @@ fun UnifiedEsportsTopBar(
     val isAdmin = currentUser?.role?.equals("ADMIN", ignoreCase = true) == true ||
             currentUser?.role?.equals("SUPER_ADMIN", ignoreCase = true) == true
 
-    val formattedBalance = remember(wallet?.balance, wallet?.availableBalance) {
-        val bal = wallet?.let { w ->
-            if (w.availableAmount > 0.0) w.availableAmount else w.availableBalance / 100.0
-        } ?: 0.0
-        "৳ ${"%.2f".format(bal)}"
+    val liveBalance = wallet?.let { w ->
+        if (w.availableAmount > 0.0) w.availableAmount else w.availableBalance / 100.0
+    } ?: 0.0
+    val bonusBalance = wallet?.let { w ->
+        if (w.bonusAmount > 0.0) w.bonusAmount else w.bonusBalance / 100.0
+    } ?: 0.0
+
+    val formattedBalance = remember(liveBalance) {
+        "৳ ${"%.2f".format(liveBalance)}"
     }
-    val formattedBonus = remember(wallet?.bonusBalance, wallet?.bonusAmount) {
-        val bonus = wallet?.let { w ->
-            if (w.bonusAmount > 0.0) w.bonusAmount else w.bonusBalance / 100.0
-        } ?: 0.0
-        "🎁 ৳ ${"%.2f".format(bonus)}"
+    val formattedBonus = remember(bonusBalance) {
+        "🎁 ৳ ${"%.2f".format(bonusBalance)}"
     }
 
-    Box(modifier = modifier.fillMaxWidth()) {
-        TopAppBar(
-            navigationIcon = navigationIcon ?: {},
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Left: Circular Neon Logo (36.dp total size)
-                    LogoWithNeonRing(size = 36.dp)
-                    
+    Surface(
+        color = NavySurface,
+        modifier = modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // Tier 1 — Branded Esports Subtitle Strip (~22.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                // Left cyber divider
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(1.dp)
+                        .background(Brush.horizontalGradient(listOf(Color.Transparent, Gold400.copy(alpha = 0.5f))))
+                )
+
+                // Centered Subtitle
+                Text(
+                    text = "১v১ এস্পোর্টস ব্যাটল",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Gold400,
+                    letterSpacing = 0.5.sp,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+
+                // Right cyber divider
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(1.dp)
+                        .background(Brush.horizontalGradient(listOf(Gold400.copy(alpha = 0.5f), Color.Transparent)))
+                )
+            }
+
+            // Tier 2 — Main Action Row (~52.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Left Cluster (Trophy + Clock + Title)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (navigationIcon != null) {
+                        navigationIcon()
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+
+                    // Circular Neon Trophy Logo: Size = 40.dp with 2.dp dual-tone neon sweep gradient border
+                    LogoWithNeonRing(size = 40.dp)
+
                     Spacer(modifier = Modifier.width(8.dp))
-                    
-                    // Left: Clock & Title Stack
-                    Column(modifier = Modifier.width(IntrinsicSize.Min)) {
+
+                    // Clock + Title Stack
+                    Column(modifier = Modifier.width(IntrinsicSize.Max)) {
+                        // Live Digital Clock
                         HeaderLuxuryDigitalClock()
+
+                        Spacer(modifier = Modifier.height(3.dp))
+
+                        // Brand Title (ZERO Truncation)
                         Text(
                             text = "AD TOURNAMENT",
-                            style = MaterialTheme.typography.titleMedium.copy(
+                            style = TextStyle(
+                                fontSize = 13.5.sp,
                                 fontWeight = FontWeight.Black,
-                                letterSpacing = 0.4.sp,
-                                fontSize = 12.sp,
+                                color = Color.White,
+                                letterSpacing = 0.5.sp
                             ),
-                            color = Color.White,
                             maxLines = 1,
                             softWrap = false,
+                            overflow = TextOverflow.Visible
                         )
                     }
                 }
-            },
-            actions = {
+
+                // Right Cluster (Wallet + Bell + Avatar)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(end = 12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Wallet Balance Pill
+                    // Wallet Capsule
                     Surface(
                         shape = RoundedCornerShape(20.dp),
                         color = Slate900,
@@ -112,7 +180,7 @@ fun UnifiedEsportsTopBar(
                             .testTag("top_bar_wallet_chip"),
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
@@ -134,39 +202,71 @@ fun UnifiedEsportsTopBar(
                                         text = formattedBalance,
                                         style = MaterialTheme.typography.labelMedium.copy(
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 10.sp,
+                                            fontSize = 11.sp,
                                         ),
                                         color = Gold400,
                                         maxLines = 1,
                                     )
-                                    Text(
-                                        text = formattedBonus,
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 8.sp,
-                                        ),
-                                        color = Cyan400,
-                                        maxLines = 1,
-                                    )
+                                    if (bonusBalance > 0.0) {
+                                        Text(
+                                            text = formattedBonus,
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 8.sp,
+                                            ),
+                                            color = Cyan400,
+                                            maxLines = 1,
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
 
-                    // Notification Bell (size 32.dp)
-                    PremiumNotificationBellButton(
-                        unreadCount = unreadNotificationsCount,
+                    // Notification Bell (size = 36.dp)
+                    Surface(
                         onClick = onNotificationClick,
-                        contentDescription = strings.notificationsTitle,
-                        modifier = Modifier.size(32.dp)
-                    )
+                        shape = CircleShape,
+                        color = MidnightNavyCard,
+                        border = BorderStroke(
+                            0.8.dp,
+                            if (unreadNotificationsCount > 0) Rose600.copy(alpha = 0.5f) else MidnightNavyBorder
+                        ),
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("top_bar_notification_button"),
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = strings.notificationsTitle,
+                                tint = if (unreadNotificationsCount > 0) Gold400 else Slate300,
+                                modifier = Modifier.size(19.dp),
+                            )
+                            if (unreadNotificationsCount > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 5.dp, end = 5.dp)
+                                        .size(7.dp)
+                                        .clip(CircleShape)
+                                        .background(Rose600)
+                                        .border(1.dp, MidnightNavyCard, CircleShape)
+                                        .testTag("notification_unread_dot"),
+                                    )
+                            }
+                        }
+                    }
 
-                    // Profile Avatar (size 34.dp)
+                    // Profile Avatar (size = 38.dp)
                     key(currentUser?.effectivePhoto) {
                         EsportsAvatar(
                             photoUrl = currentUser?.effectivePhoto,
                             name = currentUser?.effectiveName ?: "Player",
-                            size = 34.dp,
+                            size = 38.dp,
                             modifier = Modifier.testTag("top_bar_profile_button"),
                             onClick = onProfileClick
                         )
@@ -187,30 +287,13 @@ fun UnifiedEsportsTopBar(
                         }
                     }
                 }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = NavySurface,
-            ),
-        )
-
-        // Center Section: Top Subtitle (Bengali) - Absolute Top Center
-        Text(
-            text = strings.appTagline,
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp,
-                fontSize = 10.sp,
-            ),
-            color = Gold400,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 2.dp)
-        )
+            }
+        }
     }
 }
 
 @Composable
-private fun LogoWithNeonRing(size: androidx.compose.ui.unit.Dp = 40.dp) {
+private fun LogoWithNeonRing(size: Dp = 40.dp) {
     val infiniteTransition = rememberInfiniteTransition(label = "LogoPulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.98f,
@@ -266,10 +349,11 @@ private fun LogoWithNeonRing(size: androidx.compose.ui.unit.Dp = 40.dp) {
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                Icon(
+                    imageVector = Icons.Default.EmojiEvents,
                     contentDescription = "AD TOURNAMENT",
-                    modifier = Modifier.size(size * 0.7f),
+                    tint = Gold400,
+                    modifier = Modifier.size(22.dp),
                 )
             }
         }
@@ -277,7 +361,7 @@ private fun LogoWithNeonRing(size: androidx.compose.ui.unit.Dp = 40.dp) {
 }
 
 @Composable
-fun HeaderLuxuryDigitalClock() {
+fun HeaderLuxuryDigitalClock(modifier: Modifier = Modifier) {
     var timeText by remember { mutableStateOf("") }
     val timeFormat = remember { SimpleDateFormat("hh:mm:ss a", Locale.getDefault()) }
 
@@ -300,20 +384,19 @@ fun HeaderLuxuryDigitalClock() {
     )
 
     Surface(
-        shape = RoundedCornerShape(3.dp),
+        shape = RoundedCornerShape(4.dp),
         color = NavyCard,
         border = BorderStroke(
             1.dp,
-            Gold400.copy(alpha = 0.6f)
+            Gold400.copy(alpha = 0.7f)
         ),
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = 2.dp)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.5.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.Center
         ) {
             Box(
                 modifier = Modifier
@@ -321,15 +404,18 @@ fun HeaderLuxuryDigitalClock() {
                     .clip(CircleShape)
                     .background(Emerald500.copy(alpha = pulseAlpha))
             )
+            Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = timeText,
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 8.sp,
+                style = TextStyle(
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    fontFamily = FontFamily.Monospace,
+                    textAlign = TextAlign.Center
                 ),
                 color = Gold400,
-                maxLines = 1
+                maxLines = 1,
+                softWrap = false
             )
         }
     }
