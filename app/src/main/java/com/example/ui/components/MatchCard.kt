@@ -175,7 +175,7 @@ fun MatchCard(
         isJoined = isJoined,
         isWinner = isUserWinner,
         isLoser = isUserLoser,
-        modifier = Modifier.padding(end = 104.dp)
+        modifier = Modifier.padding(end = 116.dp)
       )
     }
 

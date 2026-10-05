@@ -1,6 +1,7 @@
 {
   "rules": {
     "users": {
+      ".indexOn": ["referralCode"],
       "$uid": {
         ".read": "auth != null && (auth.uid == $uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)",
         ".write": "auth != null && (((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true) || (auth.uid == $uid && (!data.exists() || (data.child('status').val() != 'BLOCKED' && data.child('accountStatus').val() != 'BLOCKED'))))",
