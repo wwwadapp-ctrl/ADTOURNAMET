@@ -512,6 +512,7 @@ fun AppNavigation(
         )
         WalletScreen(
           viewModel = walletViewModel,
+          currentUser = currentUser,
           onNavigateBack = { navController.popBackStack() },
           onNavigateToDeposit = { navController.navigate(Destinations.DEPOSIT) },
           onNavigateToWithdraw = { navController.navigate(Destinations.WITHDRAW) },
@@ -529,11 +530,38 @@ fun AppNavigation(
       }
 
       // 8. PRIMARY TAB: MATCHES SCREEN
-      composable(Destinations.MATCHES) {
+      composable(Destinations.MATCHES) { backStackEntry ->
+        val walletViewModel: WalletViewModel = viewModel(
+          viewModelStoreOwner = backStackEntry,
+          key = "WalletViewModel_Matches_$activeUserId",
+          factory = remember(activeUserId) {
+            WalletViewModel.Factory(container.walletRepository, activeUserId, authRepository = container.authRepository)
+          }
+        )
+        val walletUiState by walletViewModel.uiState.collectAsState()
+
         MatchesScreen(
           userId = activeUserId,
+          currentUser = currentUser,
+          wallet = walletUiState.wallet,
+          unreadNotificationsCount = unreadNotificationsCount,
           onNavigateToMatchDetails = { matchId -> navController.navigate(Destinations.matchDetail(matchId)) },
           onHistoryClick = { navController.navigate(Destinations.HISTORY) },
+          onWalletClick = {
+            navController.navigate(Destinations.WALLET) {
+              popUpTo(Destinations.HOME) { saveState = true }
+              launchSingleTop = true
+              restoreState = true
+            }
+          },
+          onNotificationClick = { navController.navigate(Destinations.NOTIFICATIONS) },
+          onProfileClick = {
+            navController.navigate(Destinations.PROFILE) {
+              popUpTo(Destinations.HOME) { saveState = true }
+              launchSingleTop = true
+              restoreState = true
+            }
+          },
           matchRepository = container.matchRepository,
         )
       }
@@ -678,21 +706,39 @@ fun AppNavigation(
       }
 
       // 15. MATCH HISTORY SCREEN
-      composable(Destinations.HISTORY) {
+      composable(Destinations.HISTORY) { backStackEntry ->
         val historyResource by remember(activeUserId) {
           container.matchRepository.getMatchHistory(activeUserId)
         }.collectAsStateWithLifecycle(initialValue = com.example.core.error.Resource.Loading)
 
         val historyMatches = (historyResource as? com.example.core.error.Resource.Success)?.data.orEmpty()
 
+        val walletViewModel: WalletViewModel = viewModel(
+          viewModelStoreOwner = backStackEntry,
+          key = "WalletViewModel_History_$activeUserId",
+          factory = remember(activeUserId) {
+            WalletViewModel.Factory(container.walletRepository, activeUserId, authRepository = container.authRepository)
+          }
+        )
+        val walletUiState by walletViewModel.uiState.collectAsState()
+
         HistoryScreen(
           matches = historyMatches,
+          currentUser = currentUser,
+          wallet = walletUiState.wallet,
           currentUserId = activeUserId,
           onMatchClick = { matchId ->
             navController.navigate(Destinations.matchDetail(matchId))
           },
           onBackClick = {
             navController.popBackStack()
+          },
+          onWalletClick = {
+            navController.navigate(Destinations.WALLET) {
+              popUpTo(Destinations.HOME) { saveState = true }
+              launchSingleTop = true
+              restoreState = true
+            }
           },
           onNotificationClick = {
             navController.navigate(Destinations.NOTIFICATIONS)

@@ -153,88 +153,53 @@ fun HeadTailGameScreen(
             isRolling = true
             resultText = null
             val betAmount = selectedBetAmount.toDouble()
-            val database = FirebaseManager.getDatabase() ?: return@launch
 
-            // 1. Zero-Loss Distribution
-            val adminCut = betAmount * 0.10
-            val poolAddition = betAmount * 0.90
-
-            val distributionSuccess = suspendCancellableCoroutine<Boolean> { continuation ->
-                val updates = mapOf(
-                    "gameWallets/$uid/balance" to ServerValue.increment(-betAmount),
-                    "miniGames/vault/adminProfit" to ServerValue.increment(adminCut),
-                    "miniGames/vault/reservePool" to ServerValue.increment(poolAddition)
-                )
-                database.reference.updateChildren(updates) { error, _ ->
-                    continuation.resume(error == null)
-                }
-            }
-
-            if (!distributionSuccess) {
-                isRolling = false
-                Toast.makeText(context, "ট্রানজেকশন ব্যর্থ হয়েছে", Toast.LENGTH_SHORT).show()
-                return@launch
-            }
-
-            // 2. Determine Outcome
-            val potentialWin = betAmount * 1.9
-            val canWin = potentialWin <= currentReservePool
-            val random = SecureRandom()
-            val isUserWin = if (!canWin) false else random.nextBoolean()
-            
-            val finalSide = if (isUserWin) selectedSide else {
-                if (selectedSide == CoinSide.HEAD) CoinSide.TAIL else CoinSide.HEAD
-            }
-
-            // 3. Animation (1.8s)
-            val animationJob = launch {
-                // High-speed rotation
-                repeat(18) { i ->
-                    currentCoinSide = if (i % 2 == 0) CoinSide.HEAD else CoinSide.TAIL
-                    launch { coinTranslationY.animateTo(-150f, tween(100, easing = LinearEasing)) }
-                    launch { coinRotationX.animateTo(i * 360f, tween(100, easing = LinearEasing)) }
-                    delay(100)
-                }
-            }
-            
-            delay(1800)
-            animationJob.cancel()
-            
-            // Settle
-            currentCoinSide = finalSide
-            launch { coinTranslationY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
-            launch { coinRotationX.animateTo(if (finalSide == CoinSide.HEAD) 0f else 180f, spring()) }
-            
-            isRolling = false
-            resultText = "ফলফল: ${if (finalSide == CoinSide.HEAD) "হেড" else "টেল"}"
-
-            // 4. Resolve Win
-            val winAmount = if (isUserWin) potentialWin else 0.0
-            if (winAmount > 0) {
-                val winUpdates = mapOf(
-                    "gameWallets/$uid/balance" to ServerValue.increment(winAmount),
-                    "miniGames/vault/reservePool" to ServerValue.increment(-winAmount)
-                )
-                database.reference.updateChildren(winUpdates)
-            }
-
-            // 5. Log History
-            val historyRef = database.reference.child("miniGames/history").child(uid).push()
-            val historyRecord = mapOf(
-                "historyId" to (historyRef.key ?: ""),
-                "gameType" to "HEAD_TAIL",
-                "betAmount" to betAmount,
-                "multiplier" to "1.9x",
-                "winAmount" to winAmount,
-                "status" to if (winAmount > 0) "WIN" else "LOSS",
-                "timestamp" to ServerValue.TIMESTAMP
+            // 1. Authoritative Engine Execution
+            val result = MiniGameCoreEngine.playHeadTail(
+                uid = uid,
+                stakeAmount = betAmount,
+                choice = selectedSide.name, // "HEAD" or "TAIL"
+                availableReservePool = currentReservePool
             )
-            historyRef.setValue(historyRecord)
 
-            lastWinAmount = winAmount
-            isLastWin = winAmount > 0
-            delay(500)
-            showWinDialog = true
+            result.onSuccess { gameResult ->
+                val finalSide = if (gameResult.coinSide == "HEAD") CoinSide.HEAD else CoinSide.TAIL
+
+                // 2. Animation (1.8s)
+                val animationJob = launch {
+                    // High-speed rotation
+                    repeat(18) { i ->
+                        currentCoinSide = if (i % 2 == 0) CoinSide.HEAD else CoinSide.TAIL
+                        launch { coinTranslationY.animateTo(-150f, tween(100, easing = LinearEasing)) }
+                        launch { coinRotationX.animateTo(i * 360f, tween(100, easing = LinearEasing)) }
+                        delay(100)
+                    }
+                }
+                
+                delay(1800)
+                animationJob.cancel()
+                
+                // 3. Settle conclusively to pre-determined side
+                currentCoinSide = finalSide
+                launch { coinTranslationY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
+                launch { coinRotationX.animateTo(if (finalSide == CoinSide.HEAD) 0f else 180f, spring()) }
+                
+                isRolling = false
+                resultText = "ফলফল: ${if (finalSide == CoinSide.HEAD) "হেড" else "টেল"}"
+
+                // 4. Visual Resolution (Financials already committed by Engine)
+                lastWinAmount = gameResult.winAmount
+                isLastWin = gameResult.isWin
+                delay(500)
+                showWinDialog = true
+            }.onFailure { error ->
+                isRolling = false
+                Toast.makeText(
+                    context, 
+                    error.message ?: "ট্রানজেকশন ব্যর্থ হয়েছে", 
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     }
 

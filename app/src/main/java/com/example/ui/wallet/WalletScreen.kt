@@ -26,9 +26,13 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.i18n.LocalAppStrings
+import com.example.domain.model.UserEntity
+import com.example.domain.model.WalletEntity
 import com.example.ui.components.PremiumNotificationBellButton
 import com.example.ui.components.StatusBadge
+import com.example.ui.components.UnifiedEsportsTopBar
 import com.example.ui.theme.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -37,6 +41,7 @@ import java.util.Locale
 @Composable
 fun WalletScreen(
   viewModel: WalletViewModel,
+  currentUser: UserEntity?,
   onNavigateBack: () -> Unit,
   onNavigateToDeposit: () -> Unit,
   onNavigateToWithdraw: () -> Unit,
@@ -96,74 +101,13 @@ fun WalletScreen(
 
   Scaffold(
     topBar = {
-      TopAppBar(
-        title = {
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-              shape = RoundedCornerShape(8.dp),
-              color = Slate900,
-              border = BorderStroke(1.dp, Gold400.copy(alpha = 0.7f)),
-              modifier = Modifier.size(38.dp),
-            ) {
-              Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-              ) {
-                Image(
-                  painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                  contentDescription = "AD TOURNAMENT",
-                  modifier = Modifier.size(34.dp),
-                )
-              }
-            }
-            Spacer(modifier = Modifier.width(10.dp))
-            Column {
-              Text(
-                text = "AD TOURNAMENT",
-                style = MaterialTheme.typography.titleMedium.copy(
-                  fontWeight = FontWeight.Black,
-                  letterSpacing = 1.sp,
-                  fontSize = 15.sp,
-                ),
-                color = Color.White,
-              )
-              Text(
-                text = "1v1 ESPORTS BATTLES",
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = FontWeight.Bold,
-                  letterSpacing = 0.5.sp,
-                  fontSize = 10.sp,
-                ),
-                color = Gold400,
-              )
-            }
-          }
-        },
-        actions = {
-          // Premium Unified Notification Bell Button
-          PremiumNotificationBellButton(
-            unreadCount = unreadNotificationsCount,
-            onClick = onNotificationClick,
-            testTag = "wallet_notification_button",
-            contentDescription = "Notifications",
-          )
-
-          Spacer(modifier = Modifier.width(4.dp))
-
-          // Profile button
-          IconButton(
-            onClick = onProfileClick,
-            modifier = Modifier.testTag("wallet_profile_button"),
-          ) {
-            Icon(
-              imageVector = Icons.Default.Person,
-              contentDescription = "Profile",
-              tint = Gold400,
-              modifier = Modifier.size(26.dp),
-            )
-          }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = NavySurface),
+      UnifiedEsportsTopBar(
+        currentUser = currentUser,
+        wallet = wallet,
+        unreadNotificationsCount = unreadNotificationsCount,
+        onWalletClick = {}, // Already on Wallet screen
+        onNotificationClick = onNotificationClick,
+        onProfileClick = onProfileClick,
       )
     },
     containerColor = DeepNavyBg,

@@ -26,11 +26,10 @@ import com.example.core.error.Resource
 import com.example.domain.model.GameType
 import com.example.domain.model.MatchEntity
 import com.example.domain.model.MatchStatus
+import com.example.domain.model.UserEntity
+import com.example.domain.model.WalletEntity
 import com.example.domain.repository.MatchRepository
-import com.example.ui.components.EmptyState
-import com.example.ui.components.ErrorState
-import com.example.ui.components.LoadingState
-import com.example.ui.components.MatchCard
+import com.example.ui.components.*
 import com.example.ui.theme.*
 import com.example.core.i18n.LocalAppStrings
 import com.example.core.i18n.AppStrings
@@ -71,11 +70,17 @@ fun getFilterLabel(filter: GameFilter, strings: AppStrings): String {
 @Composable
 fun MatchesScreen(
   userId: String,
+  currentUser: UserEntity?,
+  wallet: WalletEntity?,
+  unreadNotificationsCount: Int = 0,
   onNavigateToMatchDetails: (String) -> Unit,
+  onWalletClick: () -> Unit = {},
+  onNotificationClick: () -> Unit = {},
+  onProfileClick: () -> Unit = {},
+  onHistoryClick: () -> Unit = {},
   matchRepository: MatchRepository,
   modifier: Modifier = Modifier,
   initialTab: MatchesTab = MatchesTab.AVAILABLE,
-  onHistoryClick: () -> Unit = {},
   viewModel: MatchesViewModel = viewModel(
     key = "MatchesViewModel_${userId}_${initialTab.name}",
     factory = MatchesViewModel.Factory(matchRepository, userId, initialTab),
@@ -88,24 +93,13 @@ fun MatchesScreen(
 
   Scaffold(
     topBar = {
-      TopAppBar(
-        title = {
-          Column {
-            Text(
-              text = strings.matchesHeaderTitle,
-              style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-              color = Color.White,
-            )
-            Text(
-              text = strings.matchesHeaderSubtitle,
-              style = MaterialTheme.typography.labelSmall,
-              color = Slate400,
-            )
-          }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-          containerColor = NavySurface,
-        ),
+      UnifiedEsportsTopBar(
+        currentUser = currentUser,
+        wallet = wallet,
+        unreadNotificationsCount = unreadNotificationsCount,
+        onWalletClick = onWalletClick,
+        onNotificationClick = onNotificationClick,
+        onProfileClick = onProfileClick,
       )
     },
     containerColor = DeepNavyBg,

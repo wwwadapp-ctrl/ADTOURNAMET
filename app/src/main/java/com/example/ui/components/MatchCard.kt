@@ -17,10 +17,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -30,6 +35,7 @@ import com.example.core.i18n.LocalAppStrings
 import com.example.domain.model.MatchEntity
 import com.example.domain.model.MatchStatus
 import com.example.ui.theme.*
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -96,20 +102,20 @@ fun MatchCard(
     borderColor = borderColor,
     backgroundContent = {
       if (isLudo) {
-        Ludo3DWatermark(
+        AnimatedLudoAsset(
           modifier = Modifier
             .align(Alignment.TopEnd)
             .padding(top = 4.dp, end = 4.dp),
-          size = 110.dp,
-          alpha = 0.16f,
+          size = 100.dp,
+          alpha = 0.92f,
         )
       } else {
-        Carrom3DWatermark(
+        AnimatedCarromAsset(
           modifier = Modifier
             .align(Alignment.TopEnd)
             .padding(top = 4.dp, end = 4.dp),
-          size = 110.dp,
-          alpha = 0.16f,
+          size = 100.dp,
+          alpha = 0.92f,
         )
       }
     },
@@ -169,6 +175,7 @@ fun MatchCard(
         isJoined = isJoined,
         isWinner = isUserWinner,
         isLoser = isUserLoser,
+        modifier = Modifier.padding(end = 116.dp)
       )
     }
 
@@ -400,15 +407,7 @@ fun MatchCard(
               "Upcoming"
             }
           }
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Schedule, contentDescription = null, tint = Slate400, modifier = Modifier.size(16.dp))
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-              text = if (isRunning) "${strings.labelStartsAt} $timeFormatted" else "${strings.labelStartsAt} $timeFormatted",
-              style = MaterialTheme.typography.bodySmall,
-              color = Slate400,
-            )
-          }
+          MatchCountdownTimer(match.scheduledTime)
           when {
             isJoined -> {
               TournamentButton(
@@ -464,6 +463,94 @@ fun MatchCard(
 }
 
 @Composable
+fun MatchCountdownTimer(scheduledTimeMs: Long) {
+  val strings = LocalAppStrings.current
+  var timeRemaining by remember(scheduledTimeMs) { mutableStateOf(scheduledTimeMs - System.currentTimeMillis()) }
+  val timeFormat = remember { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
+  val scheduledTimeStr = remember(scheduledTimeMs) {
+    if (scheduledTimeMs > 0) timeFormat.format(Date(scheduledTimeMs)) else "Upcoming"
+  }
+
+  LaunchedEffect(scheduledTimeMs) {
+    while (true) {
+      timeRemaining = scheduledTimeMs - System.currentTimeMillis()
+      delay(1000L)
+    }
+  }
+
+  val countdownText = remember(timeRemaining) {
+    if (timeRemaining <= 0) {
+      "00:00:00"
+    } else {
+      val hours = (timeRemaining / (1000 * 60 * 60)) % 24
+      val minutes = (timeRemaining / (1000 * 60)) % 60
+      val seconds = (timeRemaining / 1000) % 60
+      if (hours > 0) {
+        "%02d:%02d:%02d".format(hours, minutes, seconds)
+      } else {
+        "%02d:%02d".format(minutes, seconds)
+      }
+    }
+  }
+
+  val isExpired = timeRemaining <= 0
+  val labelText = if (strings is com.example.core.i18n.BengaliStrings) "বাকি" else "Left"
+
+  Surface(
+    shape = RoundedCornerShape(8.dp),
+    color = Slate950.copy(alpha = 0.88f),
+    border = if (isExpired) {
+      BorderStroke(1.dp, Color(0xFFEF4444))
+    } else {
+      BorderStroke(1.dp, Brush.horizontalGradient(listOf(Gold400, Cyan400)))
+    },
+    modifier = Modifier.testTag("match_time_hud_capsule")
+  ) {
+    Row(
+      modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+      Icon(
+        imageVector = Icons.Default.Schedule,
+        contentDescription = null,
+        tint = if (isExpired) Color(0xFFEF4444) else Cyan400,
+        modifier = Modifier.size(13.dp)
+      )
+
+      Text(
+        text = scheduledTimeStr,
+        style = MaterialTheme.typography.labelSmall.copy(
+          fontWeight = FontWeight.Bold,
+          fontSize = 10.5.sp
+        ),
+        color = Slate300,
+        maxLines = 1
+      )
+
+      // Vertical Micro-Divider
+      Box(
+        modifier = Modifier
+          .width(1.dp)
+          .height(10.dp)
+          .background(Color.White.copy(alpha = 0.22f))
+      )
+
+      Text(
+        text = "$labelText $countdownText",
+        style = MaterialTheme.typography.labelSmall.copy(
+          fontWeight = FontWeight.Black,
+          fontSize = 11.sp,
+          letterSpacing = 0.5.sp
+        ),
+        color = if (isExpired) Color(0xFFEF4444) else Gold400,
+        maxLines = 1
+      )
+    }
+  }
+}
+
+@Composable
 fun MatchStatusBadge(
   status: String,
   joinedPlayersCount: Int,
@@ -471,6 +558,7 @@ fun MatchStatusBadge(
   isJoined: Boolean = false,
   isWinner: Boolean = false,
   isLoser: Boolean = false,
+  modifier: Modifier = Modifier,
 ) {
   val isFull = joinedPlayersCount >= maxPlayers || status.equals(MatchStatus.FULL.name, ignoreCase = true)
   val isRunning = status.equals(MatchStatus.RUNNING.name, ignoreCase = true)
@@ -524,6 +612,7 @@ fun MatchStatusBadge(
     color = bgColor,
     shape = RoundedCornerShape(12.dp),
     border = BorderStroke(0.8.dp, textColor.copy(alpha = 0.6f)),
+    modifier = modifier
   ) {
     Text(
       text = label,

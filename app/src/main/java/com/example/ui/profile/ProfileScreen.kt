@@ -8,11 +8,17 @@ import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.Animatable
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -25,9 +31,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipboardManager
@@ -42,32 +54,12 @@ import androidx.compose.ui.unit.sp
 import com.example.core.i18n.AppLanguage
 import com.example.core.i18n.LocalAppStrings
 import com.example.domain.model.UserEntity
-import com.example.ui.components.LoadingState
-import com.example.ui.components.TournamentButton
-import com.example.ui.components.TournamentButtonVariant
-import com.example.ui.components.TournamentCard
-import com.example.ui.components.TournamentTextField
+import com.example.ui.components.*
 import com.example.ui.theme.*
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
-private data class AvatarPreset(
-  val id: String,
-  val label: String,
-  val icon: ImageVector,
-  val gradient: List<Color>,
-)
-
-private val avatarPresets = listOf(
-  AvatarPreset("preset://dragon", "Dragon", Icons.Default.EmojiEvents, listOf(Color(0xFFE53935), Color(0xFFFFB300))),
-  AvatarPreset("preset://cyber", "Cyber", Icons.Default.SportsEsports, listOf(Color(0xFF7C4DFF), Color(0xFF00E5FF))),
-  AvatarPreset("preset://ninja", "Ninja", Icons.Default.Bolt, listOf(Color(0xFF00B0FF), Color(0xFF1DE9B6))),
-  AvatarPreset("preset://crown", "Crown", Icons.Default.Star, listOf(Color(0xFFFFD700), Color(0xFFFF6D00))),
-  AvatarPreset("preset://sniper", "Sniper", Icons.Default.Security, listOf(Color(0xFF00E676), Color(0xFF00B0FF))),
-  AvatarPreset("preset://shield", "Knight", Icons.Default.Shield, listOf(Color(0xFF90A4AE), Color(0xFF37474F))),
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -155,11 +147,15 @@ fun ProfileScreen(
     }
   }
 
-  val joinDateFormatted = remember(currentUser?.joinDate, currentUser?.createdAt, currentLanguage) {
-    val date = if ((currentUser?.joinDate ?: 0L) > 0L) currentUser?.joinDate else currentUser?.createdAt
-    if (date != null && date > 0L) {
+  val joinDateFormatted = remember(uiState.resolvedJoinDate, currentLanguage) {
+    val date = uiState.resolvedJoinDate
+    if (date > 0L) {
       val locale = if (currentLanguage == AppLanguage.BN) Locale("bn", "BD") else Locale.ENGLISH
-      SimpleDateFormat("MMMM yyyy", locale).format(Date(date))
+      val formatted = SimpleDateFormat("d MMMM yyyy", locale).format(Date(date))
+      if (currentLanguage == AppLanguage.BN) {
+        // Only translate ASCII digits to avoid re-translating existing Bengali digits (Unicode arithmetic fix)
+        formatted.map { if (it in '0'..'9') '০' + (it - '0') else it }.joinToString("")
+      } else formatted
     } else {
       strings.statRecentlyJoined
     }
@@ -251,7 +247,7 @@ fun ProfileScreen(
                   .clickable { showAvatarDialog = true }
                   .testTag("profile_avatar_badge"),
               ) {
-                EsportsAvatarView(
+                EsportsAvatar(
                   photoUrl = currentUser.effectivePhoto,
                   name = currentUser.effectiveName,
                   size = 84.dp,
@@ -386,16 +382,23 @@ fun ProfileScreen(
               color = Gold400,
             )
             Spacer(modifier = Modifier.height(10.dp))
-            val totalMatches = currentUser.totalMatches
-            val wins = currentUser.wins
-            val losses = currentUser.losses
-            val winRate = if (totalMatches > 0) ((wins.toDouble() / totalMatches) * 100).toInt() else 0
+            val totalMatches = uiState.totalMatches
+            val wins = uiState.wins
+            val losses = uiState.losses
+            val winRate = uiState.winRate
             Row(
               modifier = Modifier.fillMaxWidth(),
               horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
               StatBox(title = strings.statMatches, value = "$totalMatches", subtitle = strings.statMatchesSub, modifier = Modifier.weight(1f))
-              StatBox(title = strings.statWins, value = "$wins", subtitle = strings.winRateSubtitle(winRate), color = Emerald500, modifier = Modifier.weight(1f))
+              StatBox(
+                title = strings.statWins,
+                value = "$wins",
+                subtitle = strings.winRateSubtitle(winRate),
+                color = Emerald500,
+                glowColor = Emerald500,
+                modifier = Modifier.weight(1f)
+              )
               StatBox(title = strings.statLosses, value = "$losses", subtitle = strings.statLossesSub, color = Rose500, modifier = Modifier.weight(1f))
             }
             Spacer(modifier = Modifier.height(10.dp))
@@ -408,6 +411,7 @@ fun ProfileScreen(
                 value = "৳ ${"%.2f".format(currentUser.getDisplayTotalWinnings())}",
                 subtitle = strings.statAllTimeRewards,
                 color = Gold400,
+                glowColor = Gold400,
                 modifier = Modifier.weight(1f),
               )
               StatBox(
@@ -439,34 +443,18 @@ fun ProfileScreen(
               modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
             )
 
-            // AI Support & Admin Live Chat Cards
-            Row(
+            // AI Support Card (Full Width)
+            SupportActionCard(
+              title = strings.aiSupportTitle,
+              subtitle = strings.aiSupportSubtitle,
+              icon = Icons.Default.Bolt,
+              iconTint = Cyan400,
+              iconBg = Cyan400.copy(alpha = 0.15f),
               modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-              SupportActionCard(
-                title = strings.aiSupportTitle,
-                subtitle = strings.aiSupportSubtitle,
-                icon = Icons.Default.Bolt,
-                iconTint = Cyan400,
-                iconBg = Cyan400.copy(alpha = 0.15f),
-                modifier = Modifier.weight(1f),
-                onClick = {
-                  onNavigateToAiSupport()
-                },
-              )
-              SupportActionCard(
-                title = strings.liveAdminChatTitle,
-                subtitle = strings.liveAdminChatSubtitle,
-                icon = Icons.Default.SupportAgent,
-                iconTint = Emerald400,
-                iconBg = Emerald400.copy(alpha = 0.15f),
-                modifier = Modifier.weight(1f),
-                onClick = {
-                  onNavigateToSupport()
-                },
-              )
-            }
+              onClick = {
+                onNavigateToAiSupport()
+              },
+            )
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -514,84 +502,6 @@ fun ProfileScreen(
                 }
               },
             )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // FAQ & Tournament Rules
-            SupportChannelItem(
-              title = strings.supportFaq,
-              subtitle = strings.rulesTitle,
-              icon = Icons.Default.Help,
-              iconTint = Gold400,
-              isAvailable = true,
-              onClick = onNavigateToRules,
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Support Tickets & Disputes
-            SupportChannelItem(
-              title = strings.supportTicketsTitle,
-              subtitle = strings.supportTicketsSubtitle,
-              icon = Icons.Default.History,
-              iconTint = Purple400,
-              isAvailable = true,
-              onClick = onNavigateToSupport,
-            )
-          }
-        }
-
-        // 4. MATCH HISTORY SHORTCUT
-        item {
-          TournamentCard(
-            modifier = Modifier
-              .fillMaxWidth()
-              .clickable { onHistoryClick() }
-              .testTag("profile_history_card"),
-            backgroundColor = NavyCard,
-            borderColor = CardBorder,
-          ) {
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.SpaceBetween,
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                  modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(Gold400.copy(alpha = 0.15f)),
-                  contentAlignment = Alignment.Center,
-                ) {
-                  Icon(
-                    imageVector = Icons.Default.History,
-                    contentDescription = null,
-                    tint = Gold400,
-                    modifier = Modifier.size(22.dp),
-                  )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                  Text(
-                    text = strings.matchHistoryMenu,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White,
-                  )
-                  Text(
-                    text = strings.matchHistoryMenuSub,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Slate400,
-                  )
-                }
-              }
-              Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = strings.matchHistoryMenu,
-                tint = Slate400,
-                modifier = Modifier.size(20.dp),
-              )
-            }
           }
         }
 
@@ -724,6 +634,10 @@ fun ProfileScreen(
 
         // 7. SIGN OUT BUTTON
         item {
+          val interactionSource = remember { MutableInteractionSource() }
+          val isPressed by interactionSource.collectIsPressedAsState()
+          val pressScale by animateFloatAsState(if (isPressed) 0.97f else 1f, label = "LogoutPress")
+
           TournamentButton(
             text = strings.signOutButton,
             onClick = { showSignOutDialog = true },
@@ -731,7 +645,16 @@ fun ProfileScreen(
             leadingIcon = {
               Icon(Icons.Default.Logout, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
             },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+              .fillMaxWidth()
+              .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+              }
+              .border(
+                BorderStroke(1.dp, Brush.linearGradient(listOf(Rose500.copy(alpha = 0.5f), Color.Transparent))),
+                shape = RoundedCornerShape(12.dp)
+              ),
             testTag = "profile_logout_button",
           )
         }
@@ -934,76 +857,6 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun EsportsAvatarView(
-  photoUrl: String?,
-  name: String,
-  size: Dp = 80.dp,
-  modifier: Modifier = Modifier,
-) {
-  val preset = remember(photoUrl) {
-    if (photoUrl?.startsWith("preset://") == true) {
-      avatarPresets.firstOrNull { it.id == photoUrl }
-    } else null
-  }
-
-  val bitmap = remember(photoUrl) {
-    if (photoUrl?.startsWith("data:image/") == true) {
-      try {
-        val base64 = photoUrl.substringAfter("base64,")
-        val bytes = Base64.decode(base64, Base64.DEFAULT)
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-      } catch (_: Exception) {
-        null
-      }
-    } else null
-  }
-
-  Box(
-    modifier = modifier
-      .size(size)
-      .clip(CircleShape)
-      .background(
-        Brush.linearGradient(
-          preset?.gradient ?: listOf(Indigo600, Purple600)
-        )
-      ),
-    contentAlignment = Alignment.Center,
-  ) {
-    if (bitmap != null) {
-      Image(
-        bitmap = bitmap,
-        contentDescription = "Profile Photo",
-        modifier = Modifier.fillMaxSize(),
-        contentScale = ContentScale.Crop,
-      )
-    } else if (preset != null) {
-      Icon(
-        imageVector = preset.icon,
-        contentDescription = preset.label,
-        tint = Color.White,
-        modifier = Modifier.size(size * 0.55f),
-      )
-    } else {
-      val firstLetter = name.trim().take(1).uppercase()
-      if (firstLetter.isNotBlank()) {
-        Text(
-          text = firstLetter,
-          style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
-          color = Gold400,
-        )
-      } else {
-        Icon(
-          imageVector = Icons.Default.Person,
-          contentDescription = "Avatar",
-          tint = Gold400,
-          modifier = Modifier.size(size * 0.55f),
-        )
-      }
-    }
-  }
-}
-
-@Composable
 private fun AvatarPresetItem(
   preset: AvatarPreset,
   isSelected: Boolean,
@@ -1043,20 +896,71 @@ private fun SupportActionCard(
   modifier: Modifier = Modifier,
   onClick: () -> Unit,
 ) {
+  val infiniteTransition = rememberInfiniteTransition(label = "AISupportGlow")
+  val haloScale by infiniteTransition.animateFloat(
+    initialValue = 1f,
+    targetValue = 1.6f,
+    animationSpec = infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Restart),
+    label = "HaloScale"
+  )
+  val haloAlpha by infiniteTransition.animateFloat(
+    initialValue = 0.4f,
+    targetValue = 0f,
+    animationSpec = infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Restart),
+    label = "HaloAlpha"
+  )
+
+  val interactionSource = remember { MutableInteractionSource() }
+  val isPressed by interactionSource.collectIsPressedAsState()
+  val pressScale by animateFloatAsState(if (isPressed) 0.96f else 1f, label = "PressScale")
+
   TournamentCard(
-    modifier = modifier.clickable { onClick() },
+    modifier = modifier
+      .graphicsLayer {
+        scaleX = pressScale
+        scaleY = pressScale
+      }
+      .clickable(interactionSource = interactionSource, indication = null) { onClick() },
     backgroundColor = NavyCard,
-    borderColor = CardBorder,
+    borderColor = Cyan400.copy(alpha = 0.6f),
+    backgroundContent = {
+       Box(
+         modifier = Modifier
+           .fillMaxSize()
+           .background(
+             Brush.linearGradient(
+               colors = listOf(Indigo900.copy(alpha = 0.15f), Color.Transparent),
+               start = Offset(0f, 0f),
+               end = Offset(1000f, 1000f)
+             )
+           )
+       )
+    }
   ) {
     Column {
       Box(
-        modifier = Modifier
-          .size(36.dp)
-          .clip(CircleShape)
-          .background(iconBg),
-        contentAlignment = Alignment.Center,
+        modifier = Modifier.size(36.dp),
+        contentAlignment = Alignment.Center
       ) {
-        Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
+        // Pulsing Energy Halo
+        Canvas(modifier = Modifier.fillMaxSize()) {
+          drawCircle(
+            brush = Brush.radialGradient(
+              colors = listOf(Cyan400.copy(alpha = haloAlpha), Color.Transparent),
+              radius = (size.minDimension / 2) * haloScale
+            )
+          )
+        }
+        
+        Box(
+          modifier = Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(iconBg),
+          contentAlignment = Alignment.Center,
+        ) {
+          Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
+        }
       }
       Spacer(modifier = Modifier.height(10.dp))
       Text(
@@ -1084,10 +988,18 @@ private fun SupportChannelItem(
   isAvailable: Boolean,
   onClick: () -> Unit,
 ) {
+  val interactionSource = remember { MutableInteractionSource() }
+  val isPressed by interactionSource.collectIsPressedAsState()
+  val pressScale by animateFloatAsState(if (isPressed) 0.97f else 1f, label = "PressScale")
+
   TournamentCard(
     modifier = Modifier
       .fillMaxWidth()
-      .clickable(enabled = isAvailable) { onClick() },
+      .graphicsLayer {
+        scaleX = pressScale
+        scaleY = pressScale
+      }
+      .clickable(enabled = isAvailable, interactionSource = interactionSource, indication = null) { onClick() },
     backgroundColor = NavyCard,
     borderColor = CardBorder,
   ) {
@@ -1153,13 +1065,47 @@ private fun StatBox(
   value: String,
   subtitle: String,
   color: Color = Color.White,
+  glowColor: Color? = null,
   modifier: Modifier = Modifier,
 ) {
+  val infiniteTransition = rememberInfiniteTransition(label = "StatGlow")
+  val glowAlpha by infiniteTransition.animateFloat(
+    initialValue = 0.04f,
+    targetValue = 0.14f,
+    animationSpec = infiniteRepeatable(tween(2500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+    label = "GlowAlpha"
+  )
+
+  val entranceScale = remember { androidx.compose.animation.core.Animatable(0.9f) }
+  LaunchedEffect(value) {
+    entranceScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+  }
+
   Surface(
     color = NavyCard,
     shape = RoundedCornerShape(12.dp),
-    border = BorderStroke(1.dp, CardBorder),
-    modifier = modifier,
+    border = BorderStroke(
+      width = 1.dp,
+      brush = Brush.linearGradient(
+        listOf(CardBorder, CardBorder.copy(alpha = 0.2f), CardBorder)
+      )
+    ),
+    modifier = modifier
+      .graphicsLayer {
+        scaleX = entranceScale.value
+        scaleY = entranceScale.value
+      }
+      .drawBehind {
+        if (glowColor != null) {
+          drawCircle(
+            brush = Brush.radialGradient(
+              colors = listOf(glowColor.copy(alpha = glowAlpha), Color.Transparent),
+              radius = size.maxDimension * 0.9f,
+              center = Offset(size.width / 2, size.height)
+            )
+          )
+        }
+      },
   ) {
     Column(
       modifier = Modifier.padding(12.dp),

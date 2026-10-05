@@ -137,46 +137,18 @@ fun ScratchCardGameScreen(
         }
     }
 
-    // Instant Result Trigger & Win/Loss Resolution
+    // Instant Result Trigger (UI Only - Financials handled by Engine in buyTicket)
     fun revealCard() {
         if (!isTicketPurchased || isRevealed) return
         isRevealed = true
 
         scope.launch {
-            val database = FirebaseManager.getDatabase()
-            val betAmount = selectedBetAmount.toDouble()
-
-            if (database != null && uid.isNotBlank()) {
-                if (winAmount > 0) {
-                    val updates = mapOf(
-                        "gameWallets/$uid/balance" to ServerValue.increment(winAmount),
-                        "miniGames/vault/reservePool" to ServerValue.increment(-winAmount)
-                    )
-                    database.reference.updateChildren(updates)
-                }
-
-                // Log History Ledger Entry
-                val historyRef = database.reference.child("miniGames/history").child(uid).push()
-                val historyRecord = mapOf(
-                    "historyId" to (historyRef.key ?: ""),
-                    "gameType" to "SCRATCH_CARD",
-                    "betAmount" to betAmount,
-                    "multiplier" to "${resultMultiplier}x",
-                    "multiplierVal" to resultMultiplier,
-                    "winAmount" to winAmount,
-                    "netProfit" to (winAmount - betAmount),
-                    "status" to if (winAmount > 0) "WIN" else "LOSS",
-                    "timestamp" to ServerValue.TIMESTAMP
-                )
-                historyRef.setValue(historyRecord)
-            }
-
             delay(400)
             showWinDialog = true
         }
     }
 
-    // Buy New Ticket
+    // Buy New Ticket (Authoritative execution via MiniGameCoreEngine)
     fun buyTicket() {
         if (isTicketPurchased && !isRevealed) return
         if (gameWalletBalance < selectedBetAmount) {
@@ -186,41 +158,29 @@ fun ScratchCardGameScreen(
 
         scope.launch {
             val betAmount = selectedBetAmount.toDouble()
-            val database = FirebaseManager.getDatabase() ?: return@launch
+            
+            // Execute authoritative transaction
+            val result = MiniGameCoreEngine.playScratchCard(
+                uid = uid,
+                stakeAmount = betAmount,
+                availableReservePool = reservePool
+            )
 
-            // 1. Zero-Loss Distribution (10% admin profit, 90% reserve pool)
-            val adminCut = betAmount * 0.10
-            val poolAddition = betAmount * 0.90
+            result.onSuccess { gameResult ->
+                // Authoritative Outcome Sync
+                resultMultiplier = gameResult.multiplier.toInt()
+                winAmount = gameResult.winAmount
 
-            val success = suspendCancellableCoroutine<Boolean> { continuation ->
-                val updates = mapOf(
-                    "gameWallets/$uid/balance" to ServerValue.increment(-betAmount),
-                    "miniGames/vault/adminProfit" to ServerValue.increment(adminCut),
-                    "miniGames/vault/reservePool" to ServerValue.increment(poolAddition)
-                )
-                database.reference.updateChildren(updates) { err, _ -> continuation.resume(err == null) }
+                // Reset Scratch UI State
+                scratchPath.value = Path()
+                revealedCells.fill(false)
+                revealedCellCount = 0
+                dragPointCount = 0
+                isRevealed = false
+                isTicketPurchased = true
+            }.onFailure { error ->
+                Toast.makeText(context, error.message ?: "ট্রানজেকশন ব্যর্থ হয়েছে", Toast.LENGTH_SHORT).show()
             }
-
-            if (!success) {
-                Toast.makeText(context, "ট্রানজেকশন ব্যর্থ হয়েছে", Toast.LENGTH_SHORT).show()
-                return@launch
-            }
-
-            // 2. Determine Outcome (Zero-Loss Safe)
-            val possibleMultipliers = listOf(0, 0, 1, 1, 2, 5).filter { 
-                it == 0 || (betAmount * it) <= (reservePool + poolAddition)
-            }
-            val random = SecureRandom()
-            resultMultiplier = if (possibleMultipliers.isEmpty()) 0 else possibleMultipliers[random.nextInt(possibleMultipliers.size)]
-            winAmount = betAmount * resultMultiplier
-
-            // 3. Reset Scratch State
-            scratchPath.value = Path()
-            revealedCells.fill(false)
-            revealedCellCount = 0
-            dragPointCount = 0
-            isRevealed = false
-            isTicketPurchased = true
         }
     }
 
@@ -241,7 +201,7 @@ fun ScratchCardGameScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 96.dp),
+                .padding(top = 150.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Grand Casino Title

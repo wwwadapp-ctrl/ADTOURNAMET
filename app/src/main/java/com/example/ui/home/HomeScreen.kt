@@ -1,7 +1,6 @@
 package com.example.ui.home
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -63,6 +62,9 @@ import com.example.ui.components.*
 import com.example.ui.theme.*
 import com.example.ui.minigames.*
 import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 enum class GuideType {
   DEPOSIT,
@@ -187,154 +189,14 @@ fun HomeScreen(
 
   Scaffold(
     topBar = {
-      TopAppBar(
-        title = {
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-              shape = RoundedCornerShape(8.dp),
-              color = Slate900,
-              border = BorderStroke(1.dp, Gold400.copy(alpha = 0.7f)),
-              modifier = Modifier.size(36.dp),
-            ) {
-              Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-              ) {
-                Image(
-                  painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                  contentDescription = "AD TOURNAMENT",
-                  modifier = Modifier.size(32.dp),
-                )
-              }
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-              Text(
-                text = "AD TOURNAMENT",
-                style = MaterialTheme.typography.titleMedium.copy(
-                  fontWeight = FontWeight.Black,
-                  letterSpacing = 0.8.sp,
-                  fontSize = 14.sp,
-                ),
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-              )
-              Text(
-                text = strings.appTagline,
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = FontWeight.Bold,
-                  letterSpacing = 0.4.sp,
-                  fontSize = 9.5.sp,
-                ),
-                color = Gold400,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-              )
-            }
-          }
-        },
-        actions = {
-          // Sleek esports-styled Wallet Balance chip
-          Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = Slate900,
-            border = BorderStroke(1.dp, Gold400.copy(alpha = 0.65f)),
-            modifier = Modifier
-              .clip(RoundedCornerShape(20.dp))
-              .clickable(onClick = onWalletClick)
-              .testTag("top_bar_wallet_chip"),
-          ) {
-            Row(
-              modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-              Icon(
-                imageVector = Icons.Default.AccountBalanceWallet,
-                contentDescription = "Wallet Balance",
-                tint = Gold400,
-                modifier = Modifier.size(15.dp),
-              )
-              Column(horizontalAlignment = Alignment.Start) {
-                if (wallet == null) {
-                  CircularProgressIndicator(
-                    modifier = Modifier.size(14.dp),
-                    color = Gold400,
-                    strokeWidth = 2.dp
-                  )
-                } else {
-                  Text(
-                    text = formattedBalance,
-                    style = MaterialTheme.typography.labelMedium.copy(
-                      fontWeight = FontWeight.Bold,
-                      fontSize = 11.sp,
-                      letterSpacing = 0.2.sp,
-                    ),
-                    color = Gold400,
-                    maxLines = 1,
-                  )
-                  Text(
-                    text = formattedBonus,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                      fontWeight = FontWeight.Bold,
-                      fontSize = 9.sp,
-                      letterSpacing = 0.1.sp,
-                    ),
-                    color = Cyan400,
-                    maxLines = 1,
-                  )
-                }
-              }
-            }
-          }
-
-          Spacer(modifier = Modifier.width(4.dp))
-
-          // Premium Notification Bell Icon with subtle shake on new notifications
-          PremiumNotificationBellButton(
-            unreadCount = unreadNotificationsCount,
-            onClick = onNotificationClick,
-            contentDescription = strings.notificationsTitle,
-          )
-
-          Spacer(modifier = Modifier.width(4.dp))
-
-          // Profile icon
-          IconButton(
-            onClick = onProfileClick,
-            modifier = Modifier
-              .size(38.dp)
-              .testTag("home_profile_button"),
-          ) {
-            Icon(
-              imageVector = Icons.Default.Notifications,
-              contentDescription = strings.notificationsTitle,
-              tint = Gold400,
-              modifier = Modifier.size(24.dp),
-            )
-          }
-
-          // Admin icon (if admin)
-          if (isAdmin) {
-            IconButton(
-              onClick = onAdminClick,
-              modifier = Modifier
-                .size(38.dp)
-                .testTag("home_admin_button"),
-            ) {
-              Icon(
-                imageVector = Icons.Default.Settings,
-                contentDescription = strings.adminPanel,
-                tint = Cyan400,
-                modifier = Modifier.size(22.dp),
-              )
-            }
-          }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-          containerColor = NavySurface,
-        ),
+      UnifiedEsportsTopBar(
+        currentUser = currentUser,
+        wallet = wallet,
+        unreadNotificationsCount = unreadNotificationsCount,
+        onWalletClick = onWalletClick,
+        onNotificationClick = onNotificationClick,
+        onProfileClick = onProfileClick,
+        onAdminClick = if (isAdmin) onAdminClick else null,
       )
     },
     containerColor = DeepNavyBg,

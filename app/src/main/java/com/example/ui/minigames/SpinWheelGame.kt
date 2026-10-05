@@ -193,113 +193,62 @@ fun SpinWheelScreen(
         label = "ledAlpha"
     )
 
+    val context = LocalContext.current
+
     fun performBetAndSpin() {
         if (isSpinning) return
-        if (gameBalance < selectedBetAmount) return
+        if (gameBalance < selectedBetAmount) {
+            Toast.makeText(context, "অপর্যাপ্ত ব্যালেন্স", Toast.LENGTH_SHORT).show()
+            return
+        }
 
         scope.launch {
-            isSpinning = true
-            
             val betAmount = selectedBetAmount.toDouble()
-            val database = FirebaseManager.getDatabase() ?: return@launch
             
-            // 1. Calculate splits (10% admin, 90% pool)
-            val adminCut = betAmount * 0.10
-            val poolAddition = betAmount * 0.90
-            
-            // 2. Atomic Bet Deduction & Distribution
-            val distributionSuccess = suspendCancellableCoroutine<Boolean> { continuation ->
-                val updates = mapOf(
-                    "gameWallets/$uid/balance" to ServerValue.increment(-betAmount),
-                    "miniGames/vault/adminProfit" to ServerValue.increment(adminCut),
-                    "miniGames/vault/reservePool" to ServerValue.increment(poolAddition)
-                )
-                database.reference.updateChildren(updates) { error, _ ->
-                    continuation.resume(error == null)
-                }
-            }
+            // 1. Authoritative Engine Execution
+            val result = MiniGameCoreEngine.playSpinWheel(
+                uid = uid,
+                stakeAmount = betAmount,
+                availableReservePool = currentReservePool,
+                slices = wheelSlices.map { it.multiplier.toDouble() }
+            )
 
-            if (!distributionSuccess) {
+            result.onSuccess { gameResult ->
+                isSpinning = true
+                
+                // 2. Animation Target Calculation
+                val winnerIndex = gameResult.winnerIndex
+                val sliceAngle = 360f / 24f
+                val random = SecureRandom()
+                
+                val currentRotationOffset = animatedRotation.value % 360f
+                val winnerSliceCenterAngle = winnerIndex * sliceAngle + sliceAngle / 2
+                val desiredFinalAngle = (270f - winnerSliceCenterAngle + 360f) % 360f
+                
+                val rotations = 360f * (7 + random.nextInt(3)) 
+                val targetTotalRotation = animatedRotation.value + rotations + (desiredFinalAngle - currentRotationOffset + 360f) % 360f
+
+                // 3. Trigger 6-Second Spin Animation
+                animatedRotation.animateTo(
+                    targetValue = targetTotalRotation,
+                    animationSpec = tween(
+                        durationMillis = 6000,
+                        easing = FastOutSlowInEasing
+                    )
+                )
+
+                // 4. Visual Resolution (Financials already committed by Engine)
+                lastWinAmount = gameResult.winAmount
+                lastWinMultiplier = gameResult.multiplier.toInt()
+                showWinDialog = true
                 isSpinning = false
-                return@launch
+            }.onFailure { error ->
+                Toast.makeText(
+                    context, 
+                    error.message ?: "ট্রানজেকশন ব্যর্থ হয়েছে", 
+                    Toast.LENGTH_SHORT
+                ).show()
             }
-
-            // 3. ZERO-LOSS Outcome Selection (Safety Guard)
-            // Filter indices where (betAmount * multiplier) <= currentReservePool
-            val affordableIndices = wheelSlices.indices.filter { i ->
-                (betAmount * wheelSlices[i].multiplier) <= currentReservePool
-            }
-            // Fallback to x0 sectors if pool is extremely low
-            val availableIndices = if (affordableIndices.isNotEmpty()) affordableIndices else wheelSlices.indices.filter { wheelSlices[it].multiplier == 0 }
-            
-            val random = SecureRandom()
-            val totalWeights = availableIndices.sumOf { wheelSlices[it].weight }
-            val roll = random.nextDouble() * totalWeights
-            
-            var cumulativeWeight = 0.0
-            var winnerIndex = availableIndices.first()
-            for (index in availableIndices) {
-                cumulativeWeight += wheelSlices[index].weight
-                if (roll <= cumulativeWeight) {
-                    winnerIndex = index
-                    break
-                }
-            }
-            
-            val winnerSlice = wheelSlices[winnerIndex]
-            val sliceAngle = 360f / 24f
-            
-            val currentRotationOffset = animatedRotation.value % 360f
-            val winnerSliceCenterAngle = winnerIndex * sliceAngle + sliceAngle / 2
-            val desiredFinalAngle = (270f - winnerSliceCenterAngle + 360f) % 360f
-            
-            val rotations = 360f * (7 + random.nextInt(3)) 
-            val targetTotalRotation = animatedRotation.value + rotations + (desiredFinalAngle - currentRotationOffset + 360f) % 360f
-
-            // 4. Animation
-            animatedRotation.animateTo(
-                targetValue = targetTotalRotation,
-                animationSpec = tween(
-                    durationMillis = 6000,
-                    easing = FastOutSlowInEasing
-                )
-            )
-
-            // 5. Winning Resolution (Prize Payout from Reserve Pool)
-            val winAmount = betAmount * winnerSlice.multiplier
-            if (winAmount > 0) {
-                val winUpdates = mapOf(
-                    "gameWallets/$uid/balance" to ServerValue.increment(winAmount),
-                    "miniGames/vault/reservePool" to ServerValue.increment(-winAmount)
-                )
-                database.reference.updateChildren(winUpdates)
-            }
-            
-            // 6. Log History (Asynchronous)
-            val historyRef = database.reference.child("miniGames/history").child(uid).push()
-            val historyRecord = mapOf(
-                "historyId" to (historyRef.key ?: ""),
-                "betAmount" to betAmount.toDouble(),
-                "multiplier" to "${winnerSlice.multiplier}x",
-                "multiplierVal" to winnerSlice.multiplier.toDouble(),
-                "winAmount" to winAmount.toDouble(),
-                "netProfit" to (winAmount - betAmount).toDouble(),
-                "status" to if (winAmount > 0) "WIN" else "LOSS",
-                "timestamp" to ServerValue.TIMESTAMP
-            )
-            
-            historyRef.setValue(historyRecord)
-                .addOnSuccessListener {
-                    Log.d("SpinHistory", "Spin successfully logged: ${historyRef.key}")
-                }
-                .addOnFailureListener { error ->
-                    Log.e("SpinHistory", "Failed to log spin history: ${error.message}")
-                }
-            
-            lastWinAmount = winAmount
-            lastWinMultiplier = winnerSlice.multiplier
-            showWinDialog = true
-            isSpinning = false
         }
     }
 
