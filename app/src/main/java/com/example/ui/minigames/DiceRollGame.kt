@@ -153,64 +153,134 @@ fun DiceRollGameScreen(
         }
 
         scope.launch {
+            isRolling = true
             val betAmount = selectedBetAmount.toDouble()
-            
-            // 1. Authoritative Engine Execution
-            val result = MiniGameCoreEngine.playDiceRoll(
-                uid = uid,
-                stakeAmount = betAmount,
-                choice = selectedChoice.name, // "EVEN" or "ODD"
-                availableReservePool = currentReservePool
-            )
+            val database = FirebaseManager.getDatabase() ?: return@launch
 
-            result.onSuccess { gameResult ->
-                isRolling = true
-                val d1 = gameResult.dice1
-                val d2 = gameResult.dice2
+            // 1. Zero-Loss Distribution
+            val adminCut = betAmount * 0.10
+            val poolAddition = betAmount * 0.90
 
-                // 2. Authentic Casino Tumbling Animation (1.8 Seconds)
-                val animationJob = launch {
-                    repeat(30) { i ->
-                        dice1Result = (1..6).random()
-                        dice2Result = (1..6).random()
-                        
-                        val hopTarget = if (i < 24) -50f else -18f
-                        launch { 
-                            diceTranslationY.animateTo(
-                                if (i % 2 == 0) hopTarget else 0f, 
-                                tween(60, easing = FastOutLinearInEasing)
-                            ) 
-                        }
-                        launch { diceZRotation.animateTo(if (i % 2 == 0) 20f else -20f, tween(60)) }
-                        launch { diceScale.animateTo(if (i % 2 == 0) 1.15f else 0.95f, tween(60)) }
-                        delay(60)
-                    }
+            val distributionSuccess = suspendCancellableCoroutine<Boolean> { continuation ->
+                val updates = mapOf(
+                    "gameWallets/$uid/balance" to ServerValue.increment(-betAmount),
+                    "miniGames/vault/adminProfit" to ServerValue.increment(adminCut),
+                    "miniGames/vault/reservePool" to ServerValue.increment(poolAddition)
+                )
+                database.reference.updateChildren(updates) { error, _ ->
+                    continuation.resume(error == null)
                 }
-
-                delay(1800)
-                animationJob.cancel()
-
-                // 3. Settle conclusively to pre-determined faces
-                dice1Result = d1
-                dice2Result = d2
-                
-                launch { diceTranslationY.animateTo(0f, spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioMediumBouncy)) }
-                launch { diceZRotation.animateTo(0f, spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioMediumBouncy)) }
-                launch { diceScale.animateTo(1f, spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioMediumBouncy)) }
-
-                val totalSum = d1 + d2
-                val isEven = (totalSum % 2 == 0)
-                rollResultText = "Roll Result: $totalSum (${if (isEven) "Even" else "Odd"})"
-                isRolling = false
-
-                // 4. Visual Resolution (Financials already committed by Engine)
-                lastWinAmount = gameResult.winAmount
-                isLastWin = gameResult.isWin
-                delay(350)
-                showWinDialog = true
-            }.onFailure { error ->
-                Toast.makeText(context, error.message ?: "ট্রানজেকশন ব্যর্থ হয়েছে", Toast.LENGTH_SHORT).show()
             }
+
+            if (!distributionSuccess) {
+                isRolling = false
+                Toast.makeText(context, "ট্রানজেকশন ব্যর্থ হয়েছে", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            // 2. Pre-determine Outcome (Zero-Loss Guard)
+            val potentialWin = betAmount * 1.9
+            val canWin = potentialWin <= currentReservePool
+            val random = SecureRandom()
+            val forceLoss = !canWin
+            val isUserWin = if (forceLoss) false else random.nextBoolean()
+            
+            val finalSum = if (isUserWin) {
+                if (selectedChoice == DiceChoice.EVEN) listOf(2, 4, 6, 8, 10, 12).random()
+                else listOf(3, 5, 7, 9, 11).random()
+            } else {
+                if (selectedChoice == DiceChoice.EVEN) listOf(3, 5, 7, 9, 11).random()
+                else listOf(2, 4, 6, 8, 10, 12).random()
+            }
+
+            val (d1, d2) = when {
+                finalSum == 2 -> 1 to 1
+                finalSum == 12 -> 6 to 6
+                else -> {
+                    var v1 = (1..6).random()
+                    var v2 = finalSum - v1
+                    while (v2 < 1 || v2 > 6) {
+                        v1 = (1..6).random()
+                        v2 = finalSum - v1
+                    }
+                    v1 to v2
+                }
+            }
+
+            // 3. Authentic Casino Tumbling Animation (1.8 Seconds)
+            val animationJob = launch {
+                // 30 cycles * 60ms = 1800ms
+                repeat(30) { i ->
+                    // High-speed face cycling
+                    dice1Result = (1..6).random()
+                    dice2Result = (1..6).random()
+                    
+                    // Vertical hop & bounce (-50dp to 0dp)
+                    val hopTarget = if (i < 24) -50f else -18f
+                    launch { 
+                        diceTranslationY.animateTo(
+                            if (i % 2 == 0) hopTarget else 0f, 
+                            tween(60, easing = FastOutLinearInEasing)
+                        ) 
+                    }
+
+                    // Dynamic Z-wobble (+/- 20 degrees)
+                    launch { diceZRotation.animateTo(if (i % 2 == 0) 20f else -20f, tween(60)) }
+                    
+                    // Squash & stretch scale (0.95f to 1.15f)
+                    launch { diceScale.animateTo(if (i % 2 == 0) 1.15f else 0.95f, tween(60)) }
+                    
+                    delay(60)
+                }
+            }
+
+            // Wait the full 1.8 seconds (1800ms)
+            delay(1800)
+            animationJob.cancel()
+
+            // Settle conclusively to pre-determined faces
+            dice1Result = d1
+            dice2Result = d2
+            
+            // Decisive physical landing with spring
+            launch { diceTranslationY.animateTo(0f, spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioMediumBouncy)) }
+            launch { diceZRotation.animateTo(0f, spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioMediumBouncy)) }
+            launch { diceScale.animateTo(1f, spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioMediumBouncy)) }
+
+            val totalSum = d1 + d2
+            val isEven = (totalSum % 2 == 0)
+            rollResultText = "Roll Result: $totalSum (${if (isEven) "Even" else "Odd"})"
+            isRolling = false
+
+            // 4. Resolve Win & Distribution
+            val winAmount = if (isUserWin) potentialWin else 0.0
+            if (winAmount > 0) {
+                val winUpdates = mapOf(
+                    "gameWallets/$uid/balance" to ServerValue.increment(winAmount),
+                    "miniGames/vault/reservePool" to ServerValue.increment(-winAmount)
+                )
+                database.reference.updateChildren(winUpdates)
+            }
+
+            // 5. Log History (Asynchronous)
+            val historyRef = database.reference.child("miniGames/history").child(uid).push()
+            val historyRecord = mapOf(
+                "historyId" to (historyRef.key ?: ""),
+                "gameType" to "DICE",
+                "betAmount" to betAmount,
+                "multiplier" to "1.9x",
+                "multiplierVal" to 1.9,
+                "winAmount" to winAmount,
+                "netProfit" to (winAmount - betAmount),
+                "status" to if (winAmount > 0) "WIN" else "LOSS",
+                "timestamp" to ServerValue.TIMESTAMP
+            )
+            historyRef.setValue(historyRecord)
+
+            lastWinAmount = winAmount
+            isLastWin = winAmount > 0
+            delay(350) // Brief pause to visually absorb the settled dice result
+            showWinDialog = true
         }
     }
 

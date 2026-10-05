@@ -96,14 +96,33 @@ class WalletViewModel(
         if (walletRes is Resource.Success) {
           val wallet = walletRes.data
           // 1. Primary: Use wallet.availableAmount (or availableBalance converted to Taka)
-          val mainBal: Double = wallet?.let { w ->
-            if (w.availableAmount > 0.0) w.availableAmount else w.availableBalance / 100.0
-          } ?: 0.0
+          val mainBal: Double = when {
+              (wallet?.availableAmount ?: 0.0) > 0.0 -> {
+                  wallet?.availableAmount ?: 0.0
+              }
+              (wallet?.availableBalance ?: 0L) > 0L -> {
+                  (wallet?.availableBalance ?: 0L) / 100.0
+              }
+              // Fallback if availableBalance is 0 but balance/winningBalance exists
+              ((wallet?.balance ?: 0.0) + (wallet?.winningBalance ?: 0.0)) > 0.0 -> {
+                  ((wallet?.balance ?: 0.0) + (wallet?.winningBalance ?: 0.0)) / 100.0
+              }
+              // Fallback to user profile balance if wallet is not yet populated
+              else -> {
+                  user?.walletBalanceAmount ?: 0.0
+              }
+          }
 
           // 2. Bonus Balance Calculation:
-          val bonusBal: Double = wallet?.let { w ->
-            if (w.bonusAmount > 0.0) w.bonusAmount else w.bonusBalance / 100.0
-          } ?: 0.0
+          val bonusBal: Double = when {
+              (wallet?.bonusAmount ?: 0.0) > 0.0 -> {
+                  wallet?.bonusAmount ?: 0.0
+              }
+              (wallet?.bonusBalance ?: 0L.toDouble()) > 0.0 -> {
+                  (wallet?.bonusBalance ?: 0.0) / 100.0
+              }
+              else -> 0.0
+          }
 
           _uiState.value = _uiState.value.copy(
             wallet = wallet,

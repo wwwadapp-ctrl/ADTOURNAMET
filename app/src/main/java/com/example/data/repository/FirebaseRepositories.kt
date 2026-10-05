@@ -1820,6 +1820,7 @@ class FirebaseWalletRepository : WalletRepository {
 
   override suspend fun checkAndClaimReferralBonus(userId: String): Resource<Unit> {
     val database = FirebaseManager.getDatabase() ?: return Resource.Error(AppError.FirebaseUnavailable())
+    val now = System.currentTimeMillis()
     
     return try {
       val userSnapshot = database.getReference(FirebaseConfig.NODE_USERS).child(userId).get().awaitTask()
@@ -1828,20 +1829,62 @@ class FirebaseWalletRepository : WalletRepository {
       val walletSnapshot = database.getReference(FirebaseConfig.NODE_WALLETS).child(userId).get().awaitTask()
       val wallet = walletSnapshot.getValue(WalletEntity::class.java) ?: return Resource.Success(Unit)
       
-      // Client-side verification: check if user is eligible for referral bonus check.
+      // Eligibility: referredBy exists, bonus not yet claimed, and has a deposit (mainBalance or totalDeposited >= ৳100)
+      val mainBalance = wallet.availableBalance
+      val totalDeposited = wallet.totalDeposited
+      
       // 10000 Paisa = 100 Taka
-      val hasMetDepositThreshold = wallet.availableBalance >= 10000 || wallet.totalDeposited >= 10000
-      
-      if (!user.firstDepositBonusClaimed && hasMetDepositThreshold) {
-        // Authoritative referral processing is handled by Admin during deposit approval.
-        // This client call simply serves as a manual trigger/sync to ensure the flag is marked.
+      val isEligible = user.referredBy.isNotBlank() && 
+          !user.firstDepositBonusClaimed && 
+          (mainBalance >= 10000 || totalDeposited >= 10000)
+          
+      if (isEligible) {
+        val updates = hashMapOf<String, Any>()
+        
+        // 1. Mark as claimed for current user
+        updates["${FirebaseConfig.NODE_USERS}/$userId/firstDepositBonusClaimed"] = true
+        
+        // 2. Find and Reward Referrer
+        val referrerUid = user.referredBy
+        val referrerWalletSnapshot = database.getReference(FirebaseConfig.NODE_WALLETS).child(referrerUid).get().awaitTask()
+        val referrerWallet = referrerWalletSnapshot.getValue(WalletEntity::class.java)
+        
+        if (referrerWallet != null) {
+          // Deduct 4000 from lockedBonus, Add 4000 to bonusBalance
+          val newLockedBonus = (referrerWallet.lockedBonus - 4000.0).coerceAtLeast(0.0)
+          val newBonus = referrerWallet.bonusBalance + 4000.0
+          
+          updates["${FirebaseConfig.NODE_WALLETS}/$referrerUid/lockedBonus"] = newLockedBonus
+          updates["${FirebaseConfig.NODE_WALLETS}/$referrerUid/bonusBalance"] = newBonus
+          updates["${FirebaseConfig.NODE_WALLETS}/$referrerUid/updatedAt"] = now
+          
+          // Log referrer's bonus transaction
+          val bonusTxnId = "TXN_BONUS_UNLOCK_${now}_${userId.takeLast(4)}"
+          val bonusTxn = TransactionEntity(
+            transactionId = bonusTxnId,
+            uid = referrerUid,
+            amount = 4000L,
+            type = "REFERRAL_BONUS_UNLOCK",
+            status = TransactionStatus.COMPLETED.name,
+            description = "রেফারেল বোনাস আনলক হয়েছে (ইউজার ${user.effectiveName})",
+            createdAt = now,
+            processedAt = now
+          )
+          updates["${FirebaseConfig.NODE_USER_TRANSACTIONS}/$referrerUid/$bonusTxnId"] = bonusTxn
+        }
+        
+        database.reference.updateChildren(updates).awaitTask()
+        Resource.Success(Unit)
+      } else if (!user.firstDepositBonusClaimed && (mainBalance >= 10000 || totalDeposited >= 10000)) {
+        // Even if not referred, mark as claimed to stop checking
         database.getReference(FirebaseConfig.NODE_USERS).child(userId).child("firstDepositBonusClaimed").setValue(true).awaitTask()
+        Resource.Success(Unit)
+      } else {
+        Resource.Success(Unit)
       }
-      
-      Resource.Success(Unit)
     } catch (e: Exception) {
-      AppLogger.e("WalletRepository", "checkAndClaimReferralBonus sync failed: ${e.message}")
-      Resource.Error(AppError.ServerError(e.message ?: "Referral sync failed"))
+      AppLogger.e("WalletRepository", "checkAndClaimReferralBonus failed: ${e.message}")
+      Resource.Error(AppError.ServerError(e.message ?: "Referral bonus claim failed"))
     }
   }
 
@@ -2882,56 +2925,52 @@ class FirebaseAdminRepository(
             ),
           )
 
-          // First Deposit Bonus & Authoritative Referral Reward Logic (Minimum ৳100 deposit)
+          // First Deposit Bonus & Referral Logic
           try {
             val userSnapshot = database.getReference(FirebaseConfig.NODE_USERS).child(deposit.uid).get().awaitTask()
             val user = userSnapshot.getValue(UserEntity::class.java)
             
-            if (user != null && !user.firstDepositBonusClaimed && deposit.amount >= 10000) {
-              // 1. Mark first deposit bonus as processed for the depositor
+            if (user != null && !user.firstDepositBonusClaimed && user.referredBy.isNotBlank()) {
+              // 1. Mark first deposit bonus as claimed for the user
               updates["${FirebaseConfig.NODE_USERS}/${deposit.uid}/firstDepositBonusClaimed"] = true
               
-              if (user.referredBy.isNotBlank()) {
-                // 2. Authoritatively Reward Referrer
-                val referrerUid = user.referredBy
-                val referrerWalletSnapshot = database.getReference(FirebaseConfig.NODE_WALLETS).child(referrerUid).get().awaitTask()
-                val referrerWallet = referrerWalletSnapshot.getValue(WalletEntity::class.java)
+              // 2. Find and Reward Referrer (referredBy is now Referrer UID)
+              val referrerUid = user.referredBy
+              val referrerWalletSnapshot = database.getReference(FirebaseConfig.NODE_WALLETS).child(referrerUid).get().awaitTask()
+              val referrerWallet = referrerWalletSnapshot.getValue(WalletEntity::class.java)
+              
+              if (referrerWallet != null) {
+                // Deduct 4000 from lockedBonus, Add 4000 to bonus
+                val newLockedBonus = (referrerWallet.lockedBonus - 4000.0).coerceAtLeast(0.0)
+                val newBonus = referrerWallet.bonusBalance + 4000.0
                 
-                if (referrerWallet != null) {
-                  // Reward: Unlock ৳40 (4000 paisa) from locked pool to usable bonus pool
-                  val newLockedBonus = (referrerWallet.lockedBonus - 4000.0).coerceAtLeast(0.0)
-                  val newBonus = referrerWallet.bonusBalance + 4000.0
-                  
-                  val updatedReferrerWallet = referrerWallet.copy(
-                    lockedBonus = newLockedBonus,
-                    bonusBalance = newBonus,
-                    updatedAt = now
-                  )
-                  updates["${FirebaseConfig.NODE_WALLETS}/$referrerUid"] = updatedReferrerWallet
-                  
-                  // Authoritatively increment Referrer's count
-                  updates["${FirebaseConfig.NODE_USERS}/$referrerUid/totalRefers"] = ServerValue.increment(1)
-                  
-                  // Log referral reward transaction in both ledger and user history
-                  val bonusTxnId = "TXN_BONUS_UNLOCK_${now}_${deposit.uid.takeLast(4)}"
-                  val bonusTxn = TransactionEntity(
-                    transactionId = bonusTxnId,
-                    uid = referrerUid,
-                    userId = referrerUid,
-                    amount = 4000L,
-                    type = "REFERRAL_BONUS_UNLOCK",
-                    status = TransactionStatus.COMPLETED.name,
-                    description = "রেফারেল বোনাস আনলক হয়েছে (ইউজার ${user.effectiveName}-এর ১ম ডিপোজিট)",
-                    createdAt = now,
-                    processedAt = now
-                  )
-                  updates["${FirebaseConfig.NODE_TRANSACTIONS}/$bonusTxnId"] = bonusTxn
-                  updates["${FirebaseConfig.NODE_USER_TRANSACTIONS}/$referrerUid/$bonusTxnId"] = bonusTxn
-                }
+                val updatedReferrerWallet = referrerWallet.copy(
+                  lockedBonus = newLockedBonus,
+                  bonusBalance = newBonus,
+                  updatedAt = now
+                )
+                updates["${FirebaseConfig.NODE_WALLETS}/$referrerUid"] = updatedReferrerWallet
+                
+                // Log referral reward transaction
+                val bonusTxnId = "TXN_BONUS_UNLOCK_${now}_${deposit.uid.takeLast(4)}"
+                val bonusTxn = TransactionEntity(
+                  transactionId = bonusTxnId,
+                  uid = referrerUid,
+                  amount = 4000L,
+                  type = "REFERRAL_BONUS_UNLOCK",
+                  status = TransactionStatus.COMPLETED.name,
+                  description = "Referral bonus unlocked for user ${user.effectiveName}'s first deposit",
+                  createdAt = now,
+                  processedAt = now
+                )
+                updates["${FirebaseConfig.NODE_USER_TRANSACTIONS}/$referrerUid/$bonusTxnId"] = bonusTxn
               }
+            } else if (user != null && !user.firstDepositBonusClaimed) {
+              // Even if not referred, mark first deposit claimed
+              updates["${FirebaseConfig.NODE_USERS}/${deposit.uid}/firstDepositBonusClaimed"] = true
             }
           } catch (e: Exception) {
-            AppLogger.w("FirebaseAdminRepository", "Failed to process authoritative referral reward: ${e.message}")
+            AppLogger.w("FirebaseAdminRepository", "Failed to process referral bonus: ${e.message}")
           }
 
           database.reference.updateChildren(updates).awaitTask()

@@ -33,9 +33,6 @@
 -keep interface com.example.domain.model.** { *; }
 -keep enum com.example.domain.model.** { *; }
 
-# Preserve mini-game logic, engines, and result data models (Firebase Serialization)
--keep class com.example.ui.minigames.** { *; }
-
 # Preserve all core data models, repositories, and config
 -keep class com.example.core.config.** { *; }
 -keep class com.example.core.finance.** { *; }
