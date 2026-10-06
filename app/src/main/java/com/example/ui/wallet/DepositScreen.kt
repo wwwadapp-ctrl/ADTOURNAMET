@@ -38,9 +38,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
-import com.example.domain.model.UserEntity
-import com.example.domain.model.WalletEntity
-import com.example.ui.components.UnifiedEsportsTopBar
+import com.example.ui.components.PremiumNotificationBellButton
 import com.example.ui.components.TournamentButton
 import com.example.ui.components.TournamentButtonVariant
 import com.example.ui.components.TournamentCard
@@ -55,14 +53,10 @@ private val NagadOrange = Color(0xFFF7941D)
 @Composable
 fun DepositScreen(
   viewModel: WalletViewModel,
-  currentUser: UserEntity? = null,
-  wallet: WalletEntity? = null,
-  unreadNotificationsCount: Int = 0,
-  onWalletClick: () -> Unit = {},
+  onNavigateBack: () -> Unit,
   onNotificationClick: () -> Unit = {},
   onProfileClick: () -> Unit = {},
-  onAdminClick: (() -> Unit)? = null,
-  onNavigateBack: () -> Unit,
+  unreadNotificationsCount: Int = 0,
   modifier: Modifier = Modifier,
 ) {
   val strings = LocalAppStrings.current
@@ -120,14 +114,82 @@ fun DepositScreen(
 
   Scaffold(
     topBar = {
-      UnifiedEsportsTopBar(
-        currentUser = currentUser,
-        wallet = wallet,
-        unreadNotificationsCount = unreadNotificationsCount,
-        onWalletClick = onWalletClick,
-        onNotificationClick = onNotificationClick,
-        onProfileClick = onProfileClick,
-        onAdminClick = onAdminClick
+      TopAppBar(
+        navigationIcon = {
+          IconButton(onClick = onNavigateBack) {
+            Icon(
+              imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+              contentDescription = "Back",
+              tint = Color.White,
+            )
+          }
+        },
+        title = {
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+              shape = RoundedCornerShape(8.dp),
+              color = Slate900,
+              border = BorderStroke(1.dp, Gold400.copy(alpha = 0.7f)),
+              modifier = Modifier.size(36.dp),
+            ) {
+              Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+              ) {
+                Image(
+                  painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                  contentDescription = "AD TOURNAMENT",
+                  modifier = Modifier.size(32.dp),
+                )
+              }
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+              Text(
+                text = "AD TOURNAMENT",
+                style = MaterialTheme.typography.titleMedium.copy(
+                  fontWeight = FontWeight.Black,
+                  letterSpacing = 1.sp,
+                  fontSize = 14.sp,
+                ),
+                color = Color.White,
+              )
+              Text(
+                text = "1v1 ESPORTS BATTLES",
+                style = MaterialTheme.typography.labelSmall.copy(
+                  fontWeight = FontWeight.Bold,
+                  letterSpacing = 0.5.sp,
+                  fontSize = 10.sp,
+                ),
+                color = Gold400,
+              )
+            }
+          }
+        },
+        actions = {
+          // Premium Unified Notification Bell Button
+          PremiumNotificationBellButton(
+            unreadCount = unreadNotificationsCount,
+            onClick = onNotificationClick,
+            testTag = "deposit_notification_button",
+            contentDescription = "Notifications",
+          )
+
+          Spacer(modifier = Modifier.width(4.dp))
+
+          IconButton(
+            onClick = onProfileClick,
+            modifier = Modifier.testTag("deposit_profile_button"),
+          ) {
+            Icon(
+              imageVector = Icons.Default.Person,
+              contentDescription = "Profile",
+              tint = Gold400,
+              modifier = Modifier.size(26.dp),
+            )
+          }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = NavySurface),
       )
     },
     containerColor = DeepNavyBg,

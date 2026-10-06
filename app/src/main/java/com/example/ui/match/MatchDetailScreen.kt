@@ -26,9 +26,6 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.core.i18n.LocalAppStrings
 import com.example.domain.model.MatchStatus
-import com.example.domain.model.UserEntity
-import com.example.domain.model.WalletEntity
-import com.example.ui.components.UnifiedEsportsTopBar
 import com.example.ui.components.MatchStatusBadge
 import com.example.ui.components.TournamentButton
 import com.example.ui.components.TournamentButtonVariant
@@ -42,13 +39,6 @@ import java.util.Locale
 @Composable
 fun MatchDetailScreen(
   viewModel: MatchDetailViewModel,
-  currentUser: UserEntity? = null,
-  wallet: WalletEntity? = null,
-  unreadNotificationsCount: Int = 0,
-  onWalletClick: () -> Unit = {},
-  onNotificationClick: () -> Unit = {},
-  onProfileClick: () -> Unit = {},
-  onAdminClick: (() -> Unit)? = null,
   onNavigateBack: () -> Unit,
   onViewRoomCode: (String) -> Unit = {},
   onSubmitProof: (String) -> Unit = {},
@@ -116,14 +106,20 @@ fun MatchDetailScreen(
 
   Scaffold(
     topBar = {
-      UnifiedEsportsTopBar(
-        currentUser = currentUser,
-        wallet = wallet,
-        unreadNotificationsCount = unreadNotificationsCount,
-        onWalletClick = onWalletClick,
-        onNotificationClick = onNotificationClick,
-        onProfileClick = onProfileClick,
-        onAdminClick = onAdminClick,
+      TopAppBar(
+        title = {
+          Text(
+            text = match?.matchNumber ?: (if (isBN) "ম্যাচ বিস্তারিত" else "Match Details"),
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            color = Color.White,
+          )
+        },
+        navigationIcon = {
+          IconButton(onClick = onNavigateBack) {
+            Icon(Icons.Default.ArrowBack, contentDescription = if (isBN) "ফিরে যান" else "Back", tint = Color.White)
+          }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = NavySurface),
       )
     },
     containerColor = DeepNavyBg,

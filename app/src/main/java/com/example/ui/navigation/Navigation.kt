@@ -210,7 +210,7 @@ fun AppNavigation(
             val authRoutes = listOf(Destinations.LOGIN, Destinations.REGISTER, Destinations.SPLASH, Destinations.FORGOT_PASSWORD)
             if (currentDestination != null && currentDestination.route !in authRoutes) {
               navController.navigate(Destinations.LOGIN) {
-                popUpTo(0) { inclusive = true }
+                popUpTo(Destinations.LOGIN) { inclusive = true }
                 launchSingleTop = true
               }
             }
@@ -293,7 +293,6 @@ fun AppNavigation(
 
   Scaffold(
     containerColor = DeepNavyBg,
-    contentWindowInsets = WindowInsets(0, 0, 0, 0),
     bottomBar = {
       if (isBottomNavVisible) {
         Surface(
@@ -320,10 +319,10 @@ fun AppNavigation(
                   if (currentRoute != item.route) {
                     navController.navigate(item.route) {
                       popUpTo(Destinations.HOME) {
-                        saveState = false
+                        saveState = true
                       }
                       launchSingleTop = true
-                      restoreState = false
+                      restoreState = true
                     }
                   }
                 },
@@ -466,16 +465,16 @@ fun AppNavigation(
           onMatchClick = { matchId -> navController.navigate(Destinations.matchDetail(matchId)) },
           onAllMatchesClick = {
             navController.navigate(Destinations.MATCHES) {
-              popUpTo(Destinations.HOME) { saveState = false }
+              popUpTo(Destinations.HOME) { saveState = true }
               launchSingleTop = true
-              restoreState = false
+              restoreState = true
             }
           },
           onWalletClick = {
             navController.navigate(Destinations.WALLET) {
-              popUpTo(Destinations.HOME) { saveState = false }
+              popUpTo(Destinations.HOME) { saveState = true }
               launchSingleTop = true
-              restoreState = false
+              restoreState = true
             }
           },
           onDepositClick = { navController.navigate(Destinations.DEPOSIT) },
@@ -483,9 +482,9 @@ fun AppNavigation(
           onNotificationClick = { navController.navigate(Destinations.NOTIFICATIONS) },
           onProfileClick = {
             navController.navigate(Destinations.PROFILE) {
-              popUpTo(Destinations.HOME) { saveState = false }
+              popUpTo(Destinations.HOME) { saveState = true }
               launchSingleTop = true
-              restoreState = false
+              restoreState = true
             }
           },
           onRulesClick = { navController.navigate(Destinations.RULES) },
@@ -521,12 +520,11 @@ fun AppNavigation(
           onNotificationClick = { navController.navigate(Destinations.NOTIFICATIONS) },
           onProfileClick = {
             navController.navigate(Destinations.PROFILE) {
-              popUpTo(Destinations.HOME) { saveState = false }
+              popUpTo(Destinations.HOME) { saveState = true }
               launchSingleTop = true
-              restoreState = false
+              restoreState = true
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           unreadNotificationsCount = unreadNotificationsCount,
         )
       }
@@ -551,56 +549,27 @@ fun AppNavigation(
           onHistoryClick = { navController.navigate(Destinations.HISTORY) },
           onWalletClick = {
             navController.navigate(Destinations.WALLET) {
-              popUpTo(Destinations.HOME) { saveState = false }
+              popUpTo(Destinations.HOME) { saveState = true }
               launchSingleTop = true
-              restoreState = false
+              restoreState = true
             }
           },
           onNotificationClick = { navController.navigate(Destinations.NOTIFICATIONS) },
           onProfileClick = {
             navController.navigate(Destinations.PROFILE) {
-              popUpTo(Destinations.HOME) { saveState = false }
+              popUpTo(Destinations.HOME) { saveState = true }
               launchSingleTop = true
-              restoreState = false
+              restoreState = true
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           matchRepository = container.matchRepository,
         )
       }
 
       // 9. PRIMARY TAB: NOTIFICATIONS SCREEN
-      composable(Destinations.NOTIFICATIONS) { backStackEntry ->
-        val walletViewModel: WalletViewModel = viewModel(
-          viewModelStoreOwner = backStackEntry,
-          key = "WalletViewModel_Notifications_$activeUserId",
-          factory = remember(activeUserId) {
-            WalletViewModel.Factory(container.walletRepository, activeUserId, authRepository = container.authRepository)
-          }
-        )
-        val walletUiState by walletViewModel.uiState.collectAsState()
-
+      composable(Destinations.NOTIFICATIONS) {
         NotificationsScreen(
           userId = activeUserId,
-          currentUser = currentUser,
-          wallet = walletUiState.wallet,
-          unreadNotificationsCount = unreadNotificationsCount,
-          onWalletClick = {
-            navController.navigate(Destinations.WALLET) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
-          onNotificationClick = { /* Already on notifications */ },
-          onProfileClick = {
-            navController.navigate(Destinations.PROFILE) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           onNavigateBack = { navController.popBackStack() },
           notificationRepository = container.notificationRepository,
           onNavigateToTarget = { target ->
@@ -636,13 +605,7 @@ fun AppNavigation(
           onNavigateToRules = { navController.navigate(Destinations.RULES) },
           onNavigateToAiSupport = { navController.navigate(Destinations.AI_SUPPORT) },
           onSignedOut = {
-            // Force immediate clean navigation to Login with complete backstack purge
-            try {
-              navController.navigate(Destinations.LOGIN) {
-                popUpTo(0) { inclusive = true }
-                launchSingleTop = true
-              }
-            } catch (_: Exception) {}
+            // Handled by AuthStateListener in AppNavigation for atomic consistency
           },
         )
       }
@@ -664,35 +627,8 @@ fun AppNavigation(
             isAdmin = isAdmin,
           )
         )
-        val walletViewModel: WalletViewModel = viewModel(
-          key = "WalletViewModel_MatchDetail_${matchId}_$activeUserId",
-          factory = remember(activeUserId) {
-            WalletViewModel.Factory(container.walletRepository, activeUserId, authRepository = container.authRepository)
-          }
-        )
-        val walletUiState by walletViewModel.uiState.collectAsState()
-
         MatchDetailScreen(
           viewModel = detailViewModel,
-          currentUser = currentUser,
-          wallet = walletUiState.wallet,
-          unreadNotificationsCount = unreadNotificationsCount,
-          onWalletClick = {
-            navController.navigate(Destinations.WALLET) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
-          onNotificationClick = { navController.navigate(Destinations.NOTIFICATIONS) },
-          onProfileClick = {
-            navController.navigate(Destinations.PROFILE) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           onNavigateBack = { navController.popBackStack() },
           onViewRoomCode = { /* Handled in-screen */ },
           onSubmitProof = { /* Handled in-screen */ },
@@ -707,30 +643,18 @@ fun AppNavigation(
             WalletViewModel.Factory(container.walletRepository, activeUserId, container.settingsRepository, authRepository = container.authRepository)
           }
         )
-        val walletUiState by walletViewModel.uiState.collectAsState()
-
         DepositScreen(
           viewModel = walletViewModel,
-          currentUser = currentUser,
-          wallet = walletUiState.wallet,
-          unreadNotificationsCount = unreadNotificationsCount,
-          onWalletClick = {
-            navController.navigate(Destinations.WALLET) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
+          onNavigateBack = { navController.popBackStack() },
           onNotificationClick = { navController.navigate(Destinations.NOTIFICATIONS) },
           onProfileClick = {
             navController.navigate(Destinations.PROFILE) {
-              popUpTo(Destinations.HOME) { saveState = false }
+              popUpTo(Destinations.HOME) { saveState = true }
               launchSingleTop = true
-              restoreState = false
+              restoreState = true
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
-          onNavigateBack = { navController.popBackStack() },
+          unreadNotificationsCount = unreadNotificationsCount,
         )
       }
 
@@ -742,30 +666,19 @@ fun AppNavigation(
             WalletViewModel.Factory(container.walletRepository, activeUserId, authRepository = container.authRepository)
           }
         )
-        val walletUiState by walletViewModel.uiState.collectAsState()
-
         WithdrawScreen(
           viewModel = walletViewModel,
           currentUser = currentUser,
-          wallet = walletUiState.wallet,
-          unreadNotificationsCount = unreadNotificationsCount,
-          onWalletClick = {
-            navController.navigate(Destinations.WALLET) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
+          onNavigateBack = { navController.popBackStack() },
           onNotificationClick = { navController.navigate(Destinations.NOTIFICATIONS) },
           onProfileClick = {
             navController.navigate(Destinations.PROFILE) {
-              popUpTo(Destinations.HOME) { saveState = false }
+              popUpTo(Destinations.HOME) { saveState = true }
               launchSingleTop = true
-              restoreState = false
+              restoreState = true
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
-          onNavigateBack = { navController.popBackStack() },
+          unreadNotificationsCount = unreadNotificationsCount,
         )
       }
 
@@ -777,30 +690,18 @@ fun AppNavigation(
             WalletViewModel.Factory(container.walletRepository, activeUserId, authRepository = container.authRepository)
           }
         )
-        val walletUiState by walletViewModel.uiState.collectAsState()
-
         TransactionsScreen(
           viewModel = walletViewModel,
-          currentUser = currentUser,
-          wallet = walletUiState.wallet,
-          unreadNotificationsCount = unreadNotificationsCount,
-          onWalletClick = {
-            navController.navigate(Destinations.WALLET) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
+          onNavigateBack = { navController.popBackStack() },
           onNotificationClick = { navController.navigate(Destinations.NOTIFICATIONS) },
           onProfileClick = {
             navController.navigate(Destinations.PROFILE) {
-              popUpTo(Destinations.HOME) { saveState = false }
+              popUpTo(Destinations.HOME) { saveState = true }
               launchSingleTop = true
-              restoreState = false
+              restoreState = true
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
-          onNavigateBack = { navController.popBackStack() },
+          unreadNotificationsCount = unreadNotificationsCount,
         )
       }
 
@@ -834,9 +735,9 @@ fun AppNavigation(
           },
           onWalletClick = {
             navController.navigate(Destinations.WALLET) {
-              popUpTo(Destinations.HOME) { saveState = false }
+              popUpTo(Destinations.HOME) { saveState = true }
               launchSingleTop = true
-              restoreState = false
+              restoreState = true
             }
           },
           onNotificationClick = {
@@ -844,121 +745,39 @@ fun AppNavigation(
           },
           onProfileClick = {
             navController.navigate(Destinations.PROFILE) {
-              popUpTo(Destinations.HOME) { saveState = false }
+              popUpTo(Destinations.HOME) { saveState = true }
               launchSingleTop = true
-              restoreState = false
+              restoreState = true
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           unreadNotificationsCount = unreadNotificationsCount,
         )
       }
 
       // 16. SUPPORT SCREEN
       composable(Destinations.SUPPORT) {
-        val walletViewModel: WalletViewModel = viewModel(
-          key = "WalletViewModel_Support_$activeUserId",
-          factory = remember(activeUserId) {
-            WalletViewModel.Factory(container.walletRepository, activeUserId, authRepository = container.authRepository)
-          }
-        )
-        val walletUiState by walletViewModel.uiState.collectAsState()
-
         SupportScreen(
-          currentUser = currentUser,
-          wallet = walletUiState.wallet,
-          unreadNotificationsCount = unreadNotificationsCount,
-          onWalletClick = {
-            navController.navigate(Destinations.WALLET) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
-          onNotificationClick = { navController.navigate(Destinations.NOTIFICATIONS) },
-          onProfileClick = {
-            navController.navigate(Destinations.PROFILE) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           onNavigateBack = { navController.popBackStack() },
         )
       }
 
       // 17. RULES SCREEN
       composable(Destinations.RULES) {
-        val walletViewModel: WalletViewModel = viewModel(
-          key = "WalletViewModel_Rules_$activeUserId",
-          factory = remember(activeUserId) {
-            WalletViewModel.Factory(container.walletRepository, activeUserId, authRepository = container.authRepository)
-          }
-        )
-        val walletUiState by walletViewModel.uiState.collectAsState()
-
         RulesScreen(
-          currentUser = currentUser,
-          wallet = walletUiState.wallet,
-          unreadNotificationsCount = unreadNotificationsCount,
-          onWalletClick = {
-            navController.navigate(Destinations.WALLET) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
-          onNotificationClick = { navController.navigate(Destinations.NOTIFICATIONS) },
-          onProfileClick = {
-            navController.navigate(Destinations.PROFILE) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           onNavigateBack = { navController.popBackStack() },
         )
       }
 
       // 18. SUPER ADMIN DASHBOARD
-      composable(Destinations.ADMIN) { backStackEntry ->
+      composable(Destinations.ADMIN) {
         val adminViewModel: AdminViewModel = viewModel(
           key = "AdminViewModel_$activeUserId",
           factory = remember(activeUserId) {
             AdminViewModel.Factory(container.adminRepository, activeUserId, container.settingsRepository)
           }
         )
-        val walletViewModel: WalletViewModel = viewModel(
-          viewModelStoreOwner = backStackEntry,
-          key = "WalletViewModel_Admin_$activeUserId",
-          factory = remember(activeUserId) {
-            WalletViewModel.Factory(container.walletRepository, activeUserId, authRepository = container.authRepository)
-          }
-        )
-        val walletUiState by walletViewModel.uiState.collectAsState()
-
         AdminScreen(
           viewModel = adminViewModel,
-          currentUser = currentUser,
-          wallet = walletUiState.wallet,
-          unreadNotificationsCount = unreadNotificationsCount,
-          onWalletClick = {
-            navController.navigate(Destinations.WALLET) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
-          onNotificationClick = { navController.navigate(Destinations.NOTIFICATIONS) },
-          onProfileClick = {
-            navController.navigate(Destinations.PROFILE) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
           onNavigateBack = { navController.popBackStack() },
         )
       }
@@ -974,36 +793,9 @@ fun AppNavigation(
             )
           }
         )
-        val walletViewModel: WalletViewModel = viewModel(
-          key = "WalletViewModel_Refer_$activeUserId",
-          factory = remember(activeUserId) {
-            WalletViewModel.Factory(container.walletRepository, activeUserId, authRepository = container.authRepository)
-          }
-        )
-        val walletUiState by walletViewModel.uiState.collectAsState()
-
         com.example.ui.referral.ReferAndEarnScreen(
           navController = navController,
-          viewModel = referViewModel,
-          currentUser = currentUser,
-          wallet = walletUiState.wallet,
-          unreadNotificationsCount = unreadNotificationsCount,
-          onWalletClick = {
-            navController.navigate(Destinations.WALLET) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
-          onNotificationClick = { navController.navigate(Destinations.NOTIFICATIONS) },
-          onProfileClick = {
-            navController.navigate(Destinations.PROFILE) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
+          viewModel = referViewModel
         )
       }
 
@@ -1032,29 +824,12 @@ fun AppNavigation(
           appSettings = appSettings,
           currentUser = currentUser,
           wallet = walletUiState.wallet,
-          unreadNotificationsCount = unreadNotificationsCount,
-          onWalletClick = {
-            navController.navigate(Destinations.WALLET) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
-          onNotificationClick = { navController.navigate(Destinations.NOTIFICATIONS) },
-          onProfileClick = {
-            navController.navigate(Destinations.PROFILE) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           onNavigateBack = { navController.popBackStack() },
           onNavigateToMatches = {
             navController.navigate(Destinations.MATCHES) {
-              popUpTo(Destinations.HOME) { saveState = false }
+              popUpTo(Destinations.HOME) { saveState = true }
               launchSingleTop = true
-              restoreState = false
+              restoreState = true
             }
           }
         )

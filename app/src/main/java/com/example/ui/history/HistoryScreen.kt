@@ -55,7 +55,6 @@ fun HistoryScreen(
   onWalletClick: () -> Unit = {},
   onNotificationClick: () -> Unit = {},
   onProfileClick: () -> Unit = {},
-  onAdminClick: (() -> Unit)? = null,
   unreadNotificationsCount: Int = 0,
   modifier: Modifier = Modifier,
   viewModel: HistoryViewModel = viewModel()
@@ -103,7 +102,6 @@ fun HistoryScreen(
         onWalletClick = onWalletClick,
         onNotificationClick = onNotificationClick,
         onProfileClick = onProfileClick,
-        onAdminClick = onAdminClick,
       )
     },
     containerColor = DeepNavyBg,

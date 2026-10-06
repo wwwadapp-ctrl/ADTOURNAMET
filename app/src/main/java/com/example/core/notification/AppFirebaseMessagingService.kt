@@ -9,7 +9,7 @@ import com.google.firebase.messaging.RemoteMessage
  *
  * FCM Foundation:
  * - Safely receives FCM messages and token refreshes.
- * - Delegates incoming push payloads to UserNotificationManager for system tray, sound, and vibration.
+ * - Room Code notification creation is NOT implemented here yet.
  * - Does not duplicate messages into Notification Center.
  * - Does not execute financial, match, or database write operations.
  */
@@ -25,32 +25,8 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
 
   override fun onMessageReceived(remoteMessage: RemoteMessage) {
     super.onMessageReceived(remoteMessage)
+    // Foundation step: Safely handle incoming message without Room Code or duplicate injection
     AppLogger.d(TAG, "FCM message received safely from: ${remoteMessage.from}")
-
-    val title = remoteMessage.notification?.title
-      ?: remoteMessage.data["title"]
-      ?: "AD TOURNAMENT"
-
-    val body = remoteMessage.notification?.body
-      ?: remoteMessage.data["message"]
-      ?: remoteMessage.data["body"]
-      ?: ""
-
-    if (body.isNotBlank() || remoteMessage.notification?.title != null) {
-      val targetScreen = remoteMessage.data["targetScreen"] ?: "notifications"
-      val notifId = remoteMessage.data["id"]
-        ?: remoteMessage.data["notificationId"]
-        ?: remoteMessage.messageId
-        ?: System.currentTimeMillis().toString()
-
-      UserNotificationManager.showSystemNotification(
-        context = applicationContext,
-        title = title,
-        message = body,
-        notificationId = notifId,
-        targetScreen = targetScreen
-      )
-    }
   }
 
   companion object {

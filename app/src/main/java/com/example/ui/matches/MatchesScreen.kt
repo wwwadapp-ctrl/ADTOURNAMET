@@ -77,7 +77,6 @@ fun MatchesScreen(
   onWalletClick: () -> Unit = {},
   onNotificationClick: () -> Unit = {},
   onProfileClick: () -> Unit = {},
-  onAdminClick: (() -> Unit)? = null,
   onHistoryClick: () -> Unit = {},
   matchRepository: MatchRepository,
   modifier: Modifier = Modifier,
@@ -101,7 +100,6 @@ fun MatchesScreen(
         onWalletClick = onWalletClick,
         onNotificationClick = onNotificationClick,
         onProfileClick = onProfileClick,
-        onAdminClick = onAdminClick,
       )
     },
     containerColor = DeepNavyBg,

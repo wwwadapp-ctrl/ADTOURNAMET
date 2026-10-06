@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.core.error.Resource
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import com.example.domain.model.AppSettingsEntity
 import com.example.domain.model.DepositEntity
@@ -85,14 +84,8 @@ class WalletViewModel(
         _uiState.value = _uiState.value.copy(isLoading = true)
       }
       
-      // Auto-unlock referral bonus in detached background coroutine so it never blocks or delays wallet observation
-      if (userId.isNotBlank()) {
-        viewModelScope.launch(Dispatchers.IO) {
-          try {
-            walletRepository.checkAndClaimReferralBonus(userId)
-          } catch (_: Exception) {}
-        }
-      }
+      // Auto-unlock referral bonus if eligible
+      walletRepository.checkAndClaimReferralBonus(userId)
       
       val walletFlow = walletRepository.getWallet(userId)
       val userFlow = authRepository?.getCurrentUser() ?: flowOf(null)
@@ -102,28 +95,14 @@ class WalletViewModel(
       }.collect { (walletRes, user) ->
         if (walletRes is Resource.Success) {
           val wallet = walletRes.data
-          // 1. Primary: Use wallet.availableAmount (or availableBalance converted to Taka), with fallback to w.balance or user.walletBalance
+          // 1. Primary: Use wallet.availableAmount (or availableBalance converted to Taka)
           val mainBal: Double = wallet?.let { w ->
-            if (w.availableAmount > 0.0) {
-              w.availableAmount
-            } else if (w.availableBalance > 0L) {
-              w.availableBalance / 100.0
-            } else if (w.balance > 0.0) {
-              if (w.balance >= 100.0 && w.balance % 1.0 == 0.0) w.balance / 100.0 else w.balance
-            } else {
-              0.0
-            }
-          } ?: (user?.walletBalance ?: 0.0)
+            if (w.availableAmount > 0.0) w.availableAmount else w.availableBalance / 100.0
+          } ?: 0.0
 
           // 2. Bonus Balance Calculation:
           val bonusBal: Double = wallet?.let { w ->
-            if (w.bonusAmount > 0.0) {
-              w.bonusAmount
-            } else if (w.bonusBalance > 0.0) {
-              if (w.bonusBalance >= 100.0 && w.bonusBalance % 1.0 == 0.0) w.bonusBalance / 100.0 else w.bonusBalance
-            } else {
-              0.0
-            }
+            if (w.bonusAmount > 0.0) w.bonusAmount else w.bonusBalance / 100.0
           } ?: 0.0
 
           _uiState.value = _uiState.value.copy(

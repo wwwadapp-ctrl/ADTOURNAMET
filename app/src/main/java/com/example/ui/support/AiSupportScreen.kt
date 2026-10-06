@@ -31,7 +31,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.components.UnifiedEsportsTopBar
 import com.example.domain.model.AppSettingsEntity
 import com.example.domain.model.UserEntity
 import com.example.domain.model.WalletEntity
@@ -61,11 +60,6 @@ fun AiSupportScreen(
     appSettings: AppSettingsEntity? = null,
     currentUser: UserEntity? = null,
     wallet: WalletEntity? = null,
-    unreadNotificationsCount: Int = 0,
-    onWalletClick: () -> Unit = {},
-    onNotificationClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {},
-    onAdminClick: (() -> Unit)? = null,
     onNavigateBack: () -> Unit = {},
     onNavigateToMatches: () -> Unit = {},
     userName: String = currentUser?.effectiveName?.takeIf { it.isNotBlank() } ?: "দেলোয়ার",
@@ -454,14 +448,117 @@ fun AiSupportScreen(
 
     Scaffold(
         topBar = {
-            UnifiedEsportsTopBar(
-                currentUser = currentUser,
-                wallet = wallet,
-                unreadNotificationsCount = unreadNotificationsCount,
-                onWalletClick = onWalletClick,
-                onNotificationClick = onNotificationClick,
-                onProfileClick = onProfileClick,
-                onAdminClick = onAdminClick
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF111827))
+                                .border(
+                                    1.5.dp,
+                                    Brush.linearGradient(listOf(Color(0xFFF59E0B), Color(0xFFB45309))),
+                                    CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🤖", fontSize = 22.sp)
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                "এআই লাইভ সাপোর্ট",
+                                color = Color.White,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                                val pulseScale by infiniteTransition.animateFloat(
+                                    initialValue = 0.8f,
+                                    targetValue = 1.25f,
+                                    animationSpec = infiniteRepeatable(
+                                        tween(1200, easing = LinearEasing),
+                                        repeatMode = RepeatMode.Reverse
+                                    ),
+                                    label = "scale"
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .graphicsLayer {
+                                            scaleX = if (isBotTyping) 1f else pulseScale
+                                            scaleY = if (isBotTyping) 1f else pulseScale
+                                        }
+                                        .clip(CircleShape)
+                                        .background(if (isBotTyping) Color(0xFFF59E0B) else Color(0xFF10B981))
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    if (isBotTyping) "টাইপ করছেন..." else "ONLINE • ২৪/৭ স্মার্ট সহকারী",
+                                    color = if (isBotTyping) Color(0xFFF59E0B) else Color(0xFF34D399),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                },
+                navigationIcon = {
+                    Box(
+                        modifier = Modifier
+                            .padding(start = 12.dp)
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF131D33))
+                            .border(1.dp, Color(0xFF223152), RoundedCornerShape(12.dp))
+                            .clickable { onNavigateBack() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                },
+                actions = {
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF131D33))
+                            .border(1.dp, Color(0xFF223152), RoundedCornerShape(12.dp))
+                            .clickable {
+                                messages.clear()
+                                isBotTyping = true
+                                coroutineScope.launch {
+                                    delay(1000L)
+                                    val newGreeting = randomGreetings.random()
+                                    messages.add(
+                                        SupportMessage(
+                                            isUser = false,
+                                            text = newGreeting,
+                                            actionType = InlineActionType.MAIN_MENU
+                                        )
+                                    )
+                                    isBotTyping = false
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Clear Chat",
+                            tint = Color(0xFF94A3B8),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF070B14))
             )
         },
         bottomBar = {

@@ -24,11 +24,8 @@ import com.example.core.error.Resource
 import com.example.core.i18n.LocalAppStrings
 import com.example.data.repository.LocalDataStore
 import com.example.domain.model.NotificationEntity
-import com.example.domain.model.UserEntity
-import com.example.domain.model.WalletEntity
 import com.example.domain.repository.NotificationRepository
 import com.example.ui.components.TournamentCard
-import com.example.ui.components.UnifiedEsportsTopBar
 import com.example.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -37,13 +34,6 @@ import java.util.Locale
 @Composable
 fun NotificationsScreen(
   userId: String,
-  currentUser: UserEntity?,
-  wallet: WalletEntity?,
-  unreadNotificationsCount: Int,
-  onWalletClick: () -> Unit,
-  onNotificationClick: () -> Unit,
-  onProfileClick: () -> Unit,
-  onAdminClick: (() -> Unit)? = null,
   onNavigateBack: () -> Unit,
   notificationRepository: NotificationRepository,
   modifier: Modifier = Modifier,
@@ -65,56 +55,57 @@ fun NotificationsScreen(
   val hasUnread = notifications.any { !it.effectiveRead }
   var selectedNotification by remember { mutableStateOf<NotificationEntity?>(null) }
 
-  Scaffold(
-    topBar = {
-      UnifiedEsportsTopBar(
-        currentUser = currentUser,
-        wallet = wallet,
-        unreadNotificationsCount = unreadNotificationsCount,
-        onWalletClick = onWalletClick,
-        onNotificationClick = onNotificationClick,
-        onProfileClick = onProfileClick,
-        onAdminClick = onAdminClick
-      )
-    },
-    containerColor = DeepNavyBg,
-    modifier = modifier.fillMaxSize().testTag("notifications_screen"),
-  ) { innerPadding ->
-    Column(
+  Column(
+    modifier = modifier
+      .fillMaxSize()
+      .background(DeepNavyBg)
+      .testTag("notifications_screen"),
+  ) {
+    // Header
+    Row(
       modifier = Modifier
-        .fillMaxSize()
-        .padding(innerPadding),
+        .fillMaxWidth()
+        .padding(horizontal = 16.dp, vertical = 14.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-      // Mark All Read strip
-      if (hasUnread) {
-        Row(
-          modifier = Modifier
-            .fillMaxWidth()
-            .background(NavySurface.copy(alpha = 0.5f))
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-          horizontalArrangement = Arrangement.End,
-          verticalAlignment = Alignment.CenterVertically
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.weight(1f, fill = false),
+      ) {
+        IconButton(
+          onClick = onNavigateBack,
+          modifier = Modifier.testTag("notifications_back_button"),
         ) {
-          TextButton(
-            onClick = { viewModel.markAllAsRead() },
-            modifier = Modifier.testTag("mark_all_read_button"),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-          ) {
-            Icon(
-              imageVector = Icons.Default.DoneAll,
-              contentDescription = null,
-              tint = Gold400,
-              modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-              text = "সব পঠিত",
-              style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-              color = Gold400,
-            )
-          }
+          Icon(
+            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = "Back",
+            tint = Color.White,
+          )
+        }
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+          text = strings.notificationsTitle,
+          style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black, letterSpacing = 0.5.sp),
+          color = Color.White,
+        )
+      }
+
+      if (hasUnread) {
+        TextButton(
+          onClick = {
+            viewModel.markAllAsRead()
+          },
+          modifier = Modifier.testTag("mark_all_read_button"),
+        ) {
+          Text(
+            text = "সব পঠিত",
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+            color = Gold400,
+          )
         }
       }
+    }
 
     when {
       isLoading -> {
@@ -269,7 +260,6 @@ fun NotificationsScreen(
       )
     }
   }
-}
 }
 
 @Composable
