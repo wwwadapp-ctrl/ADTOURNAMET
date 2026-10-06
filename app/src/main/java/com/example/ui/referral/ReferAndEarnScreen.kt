@@ -30,29 +30,37 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.domain.model.UserEntity
+import com.example.domain.model.WalletEntity
+import com.example.ui.components.UnifiedEsportsTopBar
+import com.example.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReferAndEarnScreen(
     navController: NavController,
-    viewModel: ReferAndEarnViewModel
+    viewModel: ReferAndEarnViewModel,
+    currentUser: UserEntity? = null,
+    wallet: WalletEntity? = null,
+    unreadNotificationsCount: Int = 0,
+    onWalletClick: () -> Unit = {},
+    onNotificationClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    onAdminClick: (() -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("রেফার করুন ও ইনকাম করুন", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
+            UnifiedEsportsTopBar(
+                currentUser = currentUser,
+                wallet = wallet,
+                unreadNotificationsCount = unreadNotificationsCount,
+                onWalletClick = onWalletClick,
+                onNotificationClick = onNotificationClick,
+                onProfileClick = onProfileClick,
+                onAdminClick = onAdminClick
             )
         }
     ) { paddingValues ->
@@ -64,11 +72,23 @@ fun ReferAndEarnScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .background(DeepNavyBg)
                     .padding(paddingValues)
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Page Identity Title
+                Text(
+                    text = "রেফার করুন ও ইনকাম করুন",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp,
+                    ),
+                    color = Color.White,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                )
+
                 // Hero Banner
                 HeroBanner()
 

@@ -48,6 +48,7 @@ fun WalletScreen(
   onNavigateToTransactions: () -> Unit,
   onNotificationClick: () -> Unit = {},
   onProfileClick: () -> Unit = {},
+  onAdminClick: (() -> Unit)? = null,
   unreadNotificationsCount: Int = 0,
   modifier: Modifier = Modifier,
 ) {
@@ -108,6 +109,7 @@ fun WalletScreen(
         onWalletClick = {}, // Already on Wallet screen
         onNotificationClick = onNotificationClick,
         onProfileClick = onProfileClick,
+        onAdminClick = onAdminClick,
       )
     },
     containerColor = DeepNavyBg,
@@ -193,14 +195,22 @@ fun WalletScreen(
                 )
               }
               Spacer(modifier = Modifier.height(8.dp))
-              Text(
-                text = "৳ ${"%.2f".format(uiState.mainBalance)}",
-                style = MaterialTheme.typography.displaySmall.copy(
-                  fontWeight = FontWeight.Black,
-                  letterSpacing = (-0.5).sp,
-                ),
-                color = Color.White,
-              )
+              if (uiState.isLoading && uiState.wallet == null) {
+                CircularProgressIndicator(
+                  modifier = Modifier.size(24.dp).padding(vertical = 2.dp),
+                  color = Gold400,
+                  strokeWidth = 2.dp,
+                )
+              } else {
+                Text(
+                  text = "৳ ${"%.2f".format(uiState.mainBalance)}",
+                  style = MaterialTheme.typography.displaySmall.copy(
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = (-0.5).sp,
+                  ),
+                  color = Color.White,
+                )
+              }
             }
 
             // 3D-Styled Gold Coin / Wallet Emblem Accent with gentle multi-layer radial glow
@@ -347,14 +357,22 @@ fun WalletScreen(
                 )
               }
               Spacer(modifier = Modifier.height(8.dp))
-              Text(
-                text = "৳ ${"%.2f".format(uiState.bonusBalance)}",
-                style = MaterialTheme.typography.titleLarge.copy(
-                  fontWeight = FontWeight.Black,
-                  letterSpacing = (-0.5).sp,
-                ),
-                color = Color.White,
-              )
+              if (uiState.isLoading && uiState.wallet == null) {
+                CircularProgressIndicator(
+                  modifier = Modifier.size(20.dp).padding(vertical = 2.dp),
+                  color = Cyan400,
+                  strokeWidth = 2.dp,
+                )
+              } else {
+                Text(
+                  text = "৳ ${"%.2f".format(uiState.bonusBalance)}",
+                  style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = (-0.5).sp,
+                  ),
+                  color = Color.White,
+                )
+              }
               Spacer(modifier = Modifier.height(4.dp))
               Text(
                 text = "প্রতিটি ম্যাচে ১০% বোনাস ব্যবহার করা যাবে",
