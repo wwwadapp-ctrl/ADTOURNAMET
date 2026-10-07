@@ -4617,49 +4617,44 @@ class FirebaseSettingsRepository : SettingsRepository {
     val listener = object : ValueEventListener {
       override fun onDataChange(snapshot: DataSnapshot) {
         val parsed = try {
-          val entity = snapshot.getValue(AppSettingsEntity::class.java)
-          if (entity != null && (entity.bkashNumber.isNotBlank() || entity.nagadNumber.isNotBlank())) {
-            entity
-          } else {
-            val bkash = snapshot.child("bkashNumber").getValue(String::class.java)
-              ?: snapshot.child("bkash").getValue(String::class.java)
-            val nagad = snapshot.child("nagadNumber").getValue(String::class.java)
-              ?: snapshot.child("nagad").getValue(String::class.java)
-            val minDep = snapshot.child("minDepositAmount").getValue(Double::class.java)
-              ?: snapshot.child("minDepositAmount").getValue(Long::class.java)?.toDouble()
-              ?: 50.0
-            val minWith = snapshot.child("minWithdrawalAmount").getValue(Double::class.java)
-              ?: snapshot.child("minWithdrawalAmount").getValue(Long::class.java)?.toDouble()
-              ?: 100.0
-            val depInstructions = snapshot.child("depositInstructions").getValue(String::class.java)
-            val withInstructions = snapshot.child("withdrawalInstructions").getValue(String::class.java)
-            val joinVid = snapshot.child("howToJoinVideoUrl").getValue(String::class.java)
-            val depVid = snapshot.child("howToDepositVideoUrl").getValue(String::class.java)
-            val resVid = snapshot.child("howToSubmitResultVideoUrl").getValue(String::class.java)
-            val rulesVid = snapshot.child("tournamentRulesVideoUrl").getValue(String::class.java)
-            val bannerImg = snapshot.child("customBannerImageUrl").getValue(String::class.java)
-            val depBanner = snapshot.child("depositBannerImageUrl").getValue(String::class.java)
-            val matchBanner = snapshot.child("matchJoinBannerImageUrl").getValue(String::class.java)
-            val resBanner = snapshot.child("resultSubmitBannerImageUrl").getValue(String::class.java)
-            val rulesBanner = snapshot.child("rulesBannerImageUrl").getValue(String::class.java)
-            AppSettingsEntity(
-              bkashNumber = bkash ?: LocalDataStore.localAppSettings.bkashNumber,
-              nagadNumber = nagad ?: LocalDataStore.localAppSettings.nagadNumber,
-              minDepositAmount = minDep,
-              minWithdrawalAmount = minWith,
-              depositInstructions = depInstructions ?: LocalDataStore.localAppSettings.depositInstructions,
-              withdrawalInstructions = withInstructions ?: LocalDataStore.localAppSettings.withdrawalInstructions,
-              howToJoinVideoUrl = joinVid ?: LocalDataStore.localAppSettings.howToJoinVideoUrl,
-              howToDepositVideoUrl = depVid ?: LocalDataStore.localAppSettings.howToDepositVideoUrl,
-              howToSubmitResultVideoUrl = resVid ?: LocalDataStore.localAppSettings.howToSubmitResultVideoUrl,
-              tournamentRulesVideoUrl = rulesVid ?: LocalDataStore.localAppSettings.tournamentRulesVideoUrl,
-              customBannerImageUrl = bannerImg ?: LocalDataStore.localAppSettings.customBannerImageUrl,
-              depositBannerImageUrl = depBanner ?: LocalDataStore.localAppSettings.depositBannerImageUrl,
-              matchJoinBannerImageUrl = matchBanner ?: LocalDataStore.localAppSettings.matchJoinBannerImageUrl,
-              resultSubmitBannerImageUrl = resBanner ?: LocalDataStore.localAppSettings.resultSubmitBannerImageUrl,
-              rulesBannerImageUrl = rulesBanner ?: LocalDataStore.localAppSettings.rulesBannerImageUrl,
-            )
-          }
+          val bkash = snapshot.child("bkashNumber").getValue(String::class.java)
+            ?: snapshot.child("bkash").getValue(String::class.java)
+          val nagad = snapshot.child("nagadNumber").getValue(String::class.java)
+            ?: snapshot.child("nagad").getValue(String::class.java)
+          val minDep = snapshot.child("minDepositAmount").getValue(Double::class.java)
+            ?: snapshot.child("minDepositAmount").getValue(Long::class.java)?.toDouble()
+            ?: 50.0
+          val minWith = snapshot.child("minWithdrawalAmount").getValue(Double::class.java)
+            ?: snapshot.child("minWithdrawalAmount").getValue(Long::class.java)?.toDouble()
+            ?: 100.0
+          val depInstructions = snapshot.child("depositInstructions").getValue(String::class.java)
+          val withInstructions = snapshot.child("withdrawalInstructions").getValue(String::class.java)
+          val joinVid = snapshot.child("howToJoinVideoUrl").getValue(String::class.java)
+          val depVid = snapshot.child("howToDepositVideoUrl").getValue(String::class.java)
+          val resVid = snapshot.child("howToSubmitResultVideoUrl").getValue(String::class.java)
+          val rulesVid = snapshot.child("tournamentRulesVideoUrl").getValue(String::class.java)
+          val bannerImg = snapshot.child("customBannerImageUrl").getValue(String::class.java)
+          val depBanner = snapshot.child("depositBannerImageUrl").getValue(String::class.java)
+          val matchBanner = snapshot.child("matchJoinBannerImageUrl").getValue(String::class.java)
+          val resBanner = snapshot.child("resultSubmitBannerImageUrl").getValue(String::class.java)
+          val rulesBanner = snapshot.child("rulesBannerImageUrl").getValue(String::class.java)
+          AppSettingsEntity(
+            bkashNumber = bkash ?: LocalDataStore.localAppSettings.bkashNumber,
+            nagadNumber = nagad ?: LocalDataStore.localAppSettings.nagadNumber,
+            minDepositAmount = minDep,
+            minWithdrawalAmount = minWith,
+            depositInstructions = depInstructions ?: LocalDataStore.localAppSettings.depositInstructions,
+            withdrawalInstructions = withInstructions ?: LocalDataStore.localAppSettings.withdrawalInstructions,
+            howToJoinVideoUrl = joinVid ?: LocalDataStore.localAppSettings.howToJoinVideoUrl,
+            howToDepositVideoUrl = depVid ?: LocalDataStore.localAppSettings.howToDepositVideoUrl,
+            howToSubmitResultVideoUrl = resVid ?: LocalDataStore.localAppSettings.howToSubmitResultVideoUrl,
+            tournamentRulesVideoUrl = rulesVid ?: LocalDataStore.localAppSettings.tournamentRulesVideoUrl,
+            customBannerImageUrl = bannerImg ?: LocalDataStore.localAppSettings.customBannerImageUrl,
+            depositBannerImageUrl = depBanner ?: LocalDataStore.localAppSettings.depositBannerImageUrl,
+            matchJoinBannerImageUrl = matchBanner ?: LocalDataStore.localAppSettings.matchJoinBannerImageUrl,
+            resultSubmitBannerImageUrl = resBanner ?: LocalDataStore.localAppSettings.resultSubmitBannerImageUrl,
+            rulesBannerImageUrl = rulesBanner ?: LocalDataStore.localAppSettings.rulesBannerImageUrl,
+          )
         } catch (_: Exception) {
           LocalDataStore.localAppSettings
         }
