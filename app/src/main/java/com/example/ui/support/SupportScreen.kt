@@ -25,49 +25,71 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.domain.model.UserEntity
+import com.example.domain.model.WalletEntity
+import com.example.ui.components.UnifiedEsportsTopBar
 import com.example.ui.components.TournamentCard
 import com.example.ui.theme.*
 
 @Composable
 fun SupportScreen(
+  currentUser: UserEntity? = null,
+  wallet: WalletEntity? = null,
+  unreadNotificationsCount: Int = 0,
+  onWalletClick: () -> Unit = {},
+  onNotificationClick: () -> Unit = {},
+  onProfileClick: () -> Unit = {},
+  onAdminClick: (() -> Unit)? = null,
   onNavigateBack: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val clipboardManager: ClipboardManager = LocalClipboardManager.current
   var copiedNotice by remember { mutableStateOf<String?>(null) }
 
-  Column(
-    modifier = modifier
-      .fillMaxSize()
-      .background(DeepNavyBg)
-      .testTag("support_screen"),
-  ) {
-    // Top Bar
-    Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(horizontal = 16.dp, vertical = 14.dp),
-      verticalAlignment = Alignment.CenterVertically,
+  Scaffold(
+    topBar = {
+      UnifiedEsportsTopBar(
+        currentUser = currentUser,
+        wallet = wallet,
+        unreadNotificationsCount = unreadNotificationsCount,
+        onWalletClick = onWalletClick,
+        onNotificationClick = onNotificationClick,
+        onProfileClick = onProfileClick,
+        onAdminClick = onAdminClick
+      )
+    },
+    containerColor = DeepNavyBg,
+  ) { innerPadding ->
+    Column(
+      modifier = modifier
+        .fillMaxSize()
+        .padding(innerPadding)
+        .testTag("support_screen"),
     ) {
-      IconButton(onClick = onNavigateBack, modifier = Modifier.testTag("support_back_button")) {
-        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+      // Page Identity Title
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = 16.dp, vertical = 12.dp),
+      ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Icon(
+            imageVector = Icons.Default.HeadsetMic,
+            contentDescription = null,
+            tint = Gold400,
+            modifier = Modifier.size(24.dp),
+          )
+          Spacer(modifier = Modifier.width(10.dp))
+          Text(
+            text = "HELP & SUPPORT",
+            style = MaterialTheme.typography.titleLarge.copy(
+              fontWeight = FontWeight.Black,
+              letterSpacing = 1.sp,
+            ),
+            color = Color.White,
+          )
+        }
       }
-      Icon(
-        imageVector = Icons.Default.HeadsetMic,
-        contentDescription = null,
-        tint = Gold400,
-        modifier = Modifier.size(24.dp),
-      )
-      Spacer(modifier = Modifier.width(10.dp))
-      Text(
-        text = "HELP & SUPPORT",
-        style = MaterialTheme.typography.titleLarge.copy(
-          fontWeight = FontWeight.Black,
-          letterSpacing = 1.sp,
-        ),
-        color = Color.White,
-      )
-    }
 
     LazyColumn(
       modifier = Modifier
@@ -256,6 +278,7 @@ fun SupportScreen(
       }
     }
   }
+}
 }
 
 @Composable

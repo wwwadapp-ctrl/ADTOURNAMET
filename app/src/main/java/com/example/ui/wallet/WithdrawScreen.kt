@@ -27,7 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.domain.model.UserEntity
-import com.example.ui.components.PremiumNotificationBellButton
+import com.example.domain.model.WalletEntity
+import com.example.ui.components.UnifiedEsportsTopBar
 import com.example.ui.components.TournamentButton
 import com.example.ui.components.TournamentCard
 import com.example.ui.components.TournamentTextField
@@ -49,10 +50,13 @@ private val NagadOrange = Color(0xFFF7941D)
 fun WithdrawScreen(
   viewModel: WalletViewModel,
   currentUser: UserEntity? = null,
-  onNavigateBack: () -> Unit,
+  wallet: WalletEntity? = null,
+  unreadNotificationsCount: Int = 0,
+  onWalletClick: () -> Unit = {},
   onNotificationClick: () -> Unit = {},
   onProfileClick: () -> Unit = {},
-  unreadNotificationsCount: Int = 0,
+  onAdminClick: (() -> Unit)? = null,
+  onNavigateBack: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val uiState by viewModel.uiState.collectAsState()
@@ -96,86 +100,14 @@ fun WithdrawScreen(
 
   Scaffold(
     topBar = {
-      // 1. BRANDED HEADER
-      TopAppBar(
-        title = {
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-              shape = RoundedCornerShape(8.dp),
-              color = Slate900,
-              border = BorderStroke(1.dp, Gold400.copy(alpha = 0.7f)),
-              modifier = Modifier.size(36.dp),
-            ) {
-              Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-              ) {
-                Image(
-                  painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                  contentDescription = "AD TOURNAMENT",
-                  modifier = Modifier.size(32.dp),
-                )
-              }
-            }
-            Spacer(modifier = Modifier.width(10.dp))
-            Column {
-              Text(
-                text = "AD TOURNAMENT",
-                style = MaterialTheme.typography.titleMedium.copy(
-                  fontWeight = FontWeight.Black,
-                  letterSpacing = 1.sp,
-                  fontSize = 14.sp,
-                ),
-                color = Color.White,
-              )
-              Text(
-                text = "1v1 ESPORTS BATTLES",
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = FontWeight.Bold,
-                  letterSpacing = 0.5.sp,
-                  fontSize = 10.sp,
-                ),
-                color = Gold400,
-              )
-            }
-          }
-        },
-        navigationIcon = {
-          IconButton(
-            onClick = onNavigateBack,
-            modifier = Modifier.testTag("withdraw_back_button"),
-          ) {
-            Icon(
-              imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-              contentDescription = "Back",
-              tint = Color.White,
-            )
-          }
-        },
-        actions = {
-          // Premium Unified Notification Bell Button
-          PremiumNotificationBellButton(
-            unreadCount = unreadNotificationsCount,
-            onClick = onNotificationClick,
-            testTag = "withdraw_notification_button",
-            contentDescription = "Notifications",
-          )
-
-          Spacer(modifier = Modifier.width(4.dp))
-
-          IconButton(
-            onClick = onProfileClick,
-            modifier = Modifier.testTag("withdraw_profile_button"),
-          ) {
-            Icon(
-              imageVector = Icons.Default.Person,
-              contentDescription = "Profile",
-              tint = Gold400,
-              modifier = Modifier.size(26.dp),
-            )
-          }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = NavySurface),
+      UnifiedEsportsTopBar(
+        currentUser = currentUser,
+        wallet = wallet,
+        unreadNotificationsCount = unreadNotificationsCount,
+        onWalletClick = onWalletClick,
+        onNotificationClick = onNotificationClick,
+        onProfileClick = onProfileClick,
+        onAdminClick = onAdminClick
       )
     },
     containerColor = DeepNavyBg,

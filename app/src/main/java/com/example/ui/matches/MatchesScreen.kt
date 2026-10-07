@@ -77,6 +77,7 @@ fun MatchesScreen(
   onWalletClick: () -> Unit = {},
   onNotificationClick: () -> Unit = {},
   onProfileClick: () -> Unit = {},
+  onAdminClick: (() -> Unit)? = null,
   onHistoryClick: () -> Unit = {},
   matchRepository: MatchRepository,
   modifier: Modifier = Modifier,
@@ -100,6 +101,7 @@ fun MatchesScreen(
         onWalletClick = onWalletClick,
         onNotificationClick = onNotificationClick,
         onProfileClick = onProfileClick,
+        onAdminClick = onAdminClick,
       )
     },
     containerColor = DeepNavyBg,
@@ -175,6 +177,7 @@ fun MatchesScreen(
                 MatchCard(
                   match = match,
                   isJoined = uiState.joinedMatchIds.contains(match.matchId),
+                  currentUserId = userId,
                   onCardClick = { onNavigateToMatchDetails(match.matchId) },
                   onJoinClick = { onNavigateToMatchDetails(match.matchId) },
                   onViewCodeClick = { onNavigateToMatchDetails(match.matchId) },

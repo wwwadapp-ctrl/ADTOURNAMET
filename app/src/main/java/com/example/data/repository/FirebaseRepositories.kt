@@ -359,8 +359,52 @@ class FirebaseMatchRepository(private val customDatabase: FirebaseDatabase? = nu
 
     fun resolveAndEmit(userMatches: List<UserMatchHistoryEntity>) {
       launch {
+        // Authoritatively identify matches won by checking prize credit transactions
+        val userTransactionsRef = FirebaseManager.getNodeReference(FirebaseConfig.NODE_USER_TRANSACTIONS)?.child(effectiveUid)
+        val winningMatchIds = mutableSetOf<String>()
+        try {
+          val txSnapshot = userTransactionsRef?.get()?.awaitTask(3_000L)
+          if (txSnapshot != null && txSnapshot.exists()) {
+            for (child in txSnapshot.children) {
+              val type = child.child("type").value?.toString().orEmpty().uppercase()
+              val status = child.child("status").value?.toString().orEmpty().uppercase()
+              val isPrizeType = type in setOf("MATCH_PRIZE", "MATCH_WIN", "WIN", "WINNING", "MATCH_REWARD")
+              val isCompleted = status in setOf("COMPLETED", "SUCCESS", "APPROVED")
+              
+              if (isPrizeType && isCompleted) {
+                val refId = child.child("referenceId").value?.toString().orEmpty()
+                val matchIdField = child.child("matchId").value?.toString().orEmpty()
+                val txId = child.child("transactionId").value?.toString().orEmpty()
+                val desc = child.child("description").value?.toString().orEmpty()
+                
+                if (refId.isNotBlank()) winningMatchIds.add(refId)
+                if (matchIdField.isNotBlank()) winningMatchIds.add(matchIdField)
+                
+                // Heuristic mapping: check if any historical match ID or Number is in description/refs
+                val matchedId = userMatches.find { m -> 
+                  (refId.contains(m.matchId) || txId.contains(m.matchId) || desc.contains(m.matchId) ||
+                   (m.matchNumber.isNotBlank() && desc.contains(m.matchNumber)))
+                }?.matchId
+                if (matchedId != null) winningMatchIds.add(matchedId)
+              }
+            }
+          }
+        } catch (_: Exception) {}
+
+        // Also check LocalDataStore for recent local prize transactions
+        LocalDataStore.localTransactions.filter { 
+          (it.uid == effectiveUid || it.userId == effectiveUid) && 
+          it.type.uppercase() in setOf("MATCH_PRIZE", "MATCH_WIN", "WIN", "WINNING") &&
+          it.status.uppercase() in setOf("COMPLETED", "SUCCESS")
+        }.forEach { tx ->
+          if (tx.referenceId.isNotBlank()) winningMatchIds.add(tx.referenceId)
+        }
+
         val resultMatches = mutableListOf<MatchEntity>()
         for (umh in userMatches) {
+          val hasWinningTx = winningMatchIds.contains(umh.matchId)
+          val isUserWinner = umh.isWinner == true || hasWinningTx
+
           var match = LocalDataStore.localMatches[umh.matchId]
           if (match == null && matchesRef != null) {
             try {
@@ -375,12 +419,14 @@ class FirebaseMatchRepository(private val customDatabase: FirebaseDatabase? = nu
           }
 
           val finalMatch = if (match != null) {
-            val effectiveStatus = if (umh.status == "REJECTED" || umh.status == MatchStatus.RESULT_SUBMITTED.name) {
+            val effectiveStatus = if (isUserWinner || match.winnerUserId == effectiveUid) {
+              MatchStatus.COMPLETED.name
+            } else if (umh.status == "REJECTED" || umh.status == MatchStatus.RESULT_SUBMITTED.name) {
               umh.status
             } else {
               match.status
             }
-            val effectiveWinner = if (umh.isWinner == true && match.winnerUserId.isBlank()) {
+            val effectiveWinner = if (isUserWinner || (match.winnerUserId.isNotBlank() && match.winnerUserId == effectiveUid)) {
               effectiveUid
             } else {
               match.winnerUserId
@@ -390,13 +436,32 @@ class FirebaseMatchRepository(private val customDatabase: FirebaseDatabase? = nu
               winnerUserId = effectiveWinner,
             )
           } else {
+            // AUTHORITATIVE FALLBACK: Resolve status based on victory/defeat/cancellation
+            val fallbackStatus = if (isUserWinner || umh.isWinner == true) {
+              MatchStatus.COMPLETED.name
+            } else if (umh.isWinner == false) {
+              MatchStatus.COMPLETED.name
+            } else if (umh.status == "CANCELLED" || umh.status == "REFUNDED") {
+              MatchStatus.CANCELLED.name
+            } else {
+              umh.status
+            }
+            
+            val fallbackWinner = if (isUserWinner || umh.isWinner == true) {
+              effectiveUid
+            } else if (umh.isWinner == false) {
+              "OPPONENT"
+            } else {
+              ""
+            }
+
             MatchEntity(
               matchId = umh.matchId,
               matchNumber = umh.matchNumber,
               title = umh.title.ifBlank { "${umh.gameType} Match" },
               gameType = umh.gameType,
-              status = umh.status,
-              winnerUserId = if (umh.isWinner == true) effectiveUid else if (umh.isWinner == false) "OPPONENT" else "",
+              status = fallbackStatus,
+              winnerUserId = fallbackWinner,
               entryFeeMinorUnits = umh.entryFeeMinorUnits,
               prizeMinorUnits = umh.prizeMinorUnits,
               createdAt = umh.joinedAt,
@@ -528,9 +593,43 @@ class FirebaseMatchRepository(private val customDatabase: FirebaseDatabase? = nu
     val listener = object : ValueEventListener {
       override fun onDataChange(snapshot: DataSnapshot) {
         hasReceivedData = true
-        val match = snapshot.getValue(MatchEntity::class.java) ?: LocalDataStore.localMatches[matchId]
-        if (match != null) LocalDataStore.localMatches[matchId] = match
-        trySend(Resource.Success(match))
+        launch {
+          val authUid = FirebaseManager.getAuth()?.currentUser?.uid.orEmpty()
+          var resolvedMatch = snapshot.getValue(MatchEntity::class.java) ?: LocalDataStore.localMatches[matchId]
+          
+          if (resolvedMatch == null && authUid.isNotBlank()) {
+            try {
+              val userMatchSnap = FirebaseManager.getNodeReference(FirebaseConfig.NODE_USER_MATCHES)
+                ?.child(authUid)?.child(matchId)?.get()?.awaitTask(3_000L)
+              val umh = userMatchSnap?.getValue(UserMatchHistoryEntity::class.java)
+                ?: LocalDataStore.localUserMatches[authUid]?.get(matchId)
+              
+              if (umh != null) {
+                resolvedMatch = MatchEntity(
+                  matchId = umh.matchId,
+                  matchNumber = umh.matchNumber,
+                  title = umh.title.ifBlank { "${umh.gameType} Match" },
+                  gameType = umh.gameType,
+                  status = if (umh.isWinner != null || umh.status == "COMPLETED") MatchStatus.COMPLETED.name else umh.status,
+                  winnerUserId = if (umh.isWinner == true) authUid else if (umh.isWinner == false) "OPPONENT" else "",
+                  entryFeeMinorUnits = umh.entryFeeMinorUnits,
+                  prizeMinorUnits = umh.prizeMinorUnits,
+                  scheduledTime = umh.joinedAt,
+                  scheduledAt = umh.joinedAt,
+                  createdAt = umh.joinedAt,
+                  updatedAt = umh.updatedAt,
+                  maxPlayers = 2,
+                  joinedPlayersCount = 2
+                )
+              }
+            } catch (_: Exception) {}
+          }
+          
+          if (resolvedMatch != null) {
+            LocalDataStore.localMatches[matchId] = resolvedMatch
+          }
+          trySend(Resource.Success(resolvedMatch))
+        }
       }
 
       override fun onCancelled(error: DatabaseError) {
@@ -580,6 +679,42 @@ class FirebaseMatchRepository(private val customDatabase: FirebaseDatabase? = nu
     val listener = object : ValueEventListener {
       override fun onDataChange(snapshot: DataSnapshot) {
         val remotePlayers = snapshot.children.mapNotNull { it.getValue(MatchPlayerEntity::class.java) }
+        val authUid = FirebaseManager.getAuth()?.currentUser?.uid.orEmpty()
+        
+        if (remotePlayers.isEmpty() && authUid.isNotBlank()) {
+          val umh = LocalDataStore.localUserMatches[authUid]?.get(matchId)
+          if (umh != null) {
+            val mePlayer = MatchPlayerEntity(
+              matchPlayerId = "MP_${matchId}_$authUid",
+              matchId = matchId,
+              uid = authUid,
+              userId = authUid,
+              username = FirebaseManager.getAuth()?.currentUser?.displayName ?: "Player",
+              slot = PlayerSlot.PLAYER_1.name,
+              joinedAt = umh.joinedAt,
+              entryFeeMinorUnits = umh.entryFeeMinorUnits,
+              status = if (umh.isWinner == true) "WON" else "COMPLETED",
+              isReady = true
+            )
+            val oppPlayer = MatchPlayerEntity(
+              matchPlayerId = "MP_${matchId}_opp",
+              matchId = matchId,
+              uid = umh.opponentUserId.ifBlank { "OPPONENT" },
+              userId = umh.opponentUserId.ifBlank { "OPPONENT" },
+              username = umh.opponentName.ifBlank { "প্রতিদ্বন্দ্বী খেলোয়াড়" },
+              slot = PlayerSlot.PLAYER_2.name,
+              joinedAt = umh.joinedAt,
+              entryFeeMinorUnits = umh.entryFeeMinorUnits,
+              status = if (umh.isWinner == false) "WON" else "COMPLETED",
+              isReady = true
+            )
+            val finalPlayers = listOf(mePlayer, oppPlayer)
+            LocalDataStore.localMatchPlayers[matchId] = CopyOnWriteArrayList(finalPlayers)
+            trySend(Resource.Success(finalPlayers))
+            return
+          }
+        }
+
         val localList = LocalDataStore.localMatchPlayers[matchId] ?: emptyList()
         val finalPlayers = if (remotePlayers.isNotEmpty()) {
           val remoteUids = remotePlayers.map { it.effectiveUid }.toSet()
@@ -648,6 +783,73 @@ class FirebaseMatchRepository(private val customDatabase: FirebaseDatabase? = nu
             ?: LocalDataStore.localMatches[matchId]
             ?: SampleData.sampleMatches.find { it.matchId == matchId }
             ?: return@withLock Resource.Error(AppError.InvalidInput(reason = "Match not found."))
+
+          val isLoyaltyFreeMatch = match.isLoyaltyFree || 
+              (matchSnapshot?.child("isLoyaltyFree")?.getValue(Boolean::class.java) == true)
+          val requiredCount = if (match.requiredMatches24h > 0) match.requiredMatches24h else 10
+
+          if (isLoyaltyFreeMatch) {
+              val cutoff24h = now - (24 * 60 * 60 * 1000L)
+              var paidCompletedCount = 0
+              var freeMatchesUsedCount = 0
+
+              try {
+                  val userMatchesSnap = database.getReference(FirebaseConfig.NODE_USER_MATCHES)
+                      .child(effectiveUid)
+                      .get()
+                      .awaitTask(4_000L)
+
+                  if (userMatchesSnap != null && userMatchesSnap.exists()) {
+                      val distinctPaidMatches = mutableSetOf<String>()
+                      val distinctFreeMatches = mutableSetOf<String>()
+
+                      for (child in userMatchesSnap.children) {
+                          val mId = child.key ?: child.child("matchId").getValue(String::class.java).orEmpty()
+                          val st = child.child("status").getValue(String::class.java).orEmpty()
+                          val joinedTime = (child.child("joinedAt").value as? Number)?.toLong()
+                              ?: (child.child("createdAt").value as? Number)?.toLong() ?: 0L
+                          val fee = (child.child("entryFeeMinorUnits").value as? Number)?.toLong() ?: 0L
+                          val isFreeFlag = child.child("isLoyaltyFree").getValue(Boolean::class.java) == true
+
+                          if (mId.isNotBlank() && joinedTime >= cutoff24h) {
+                              val isCompletedOrSubmitted = st.equals("COMPLETED", ignoreCase = true) || 
+                                  st.equals("RESULT_SUBMITTED", ignoreCase = true)
+                              
+                              if (isCompletedOrSubmitted && fee > 0L && !isFreeFlag) {
+                                  distinctPaidMatches.add(mId)
+                              } else if (isFreeFlag || fee == 0L) {
+                                  distinctFreeMatches.add(mId)
+                              }
+                          }
+                      }
+                      paidCompletedCount = distinctPaidMatches.size
+                      freeMatchesUsedCount = distinctFreeMatches.size
+                  }
+              } catch (_: Exception) {
+                  // Fallback to local cache only if network fails
+                  LocalDataStore.localUserMatches[effectiveUid]?.values?.forEach { m ->
+                      if (m.joinedAt >= cutoff24h) {
+                          val isDone = m.status.equals("COMPLETED", ignoreCase = true) || m.status.equals("RESULT_SUBMITTED", ignoreCase = true)
+                          if (isDone && m.entryFeeMinorUnits > 0L) {
+                              paidCompletedCount++
+                          } else if (m.entryFeeMinorUnits == 0L) {
+                              freeMatchesUsedCount++
+                          }
+                      }
+                  }
+              }
+
+              val availableTickets = (paidCompletedCount / 10) - freeMatchesUsedCount
+
+              if (availableTickets < 1) {
+                  val neededPaid = ((freeMatchesUsedCount + 1) * 10) - paidCompletedCount
+                  return@withLock Resource.Error(
+                      AppError.InvalidInput(
+                          reason = "আপনি গত ২৪ ঘণ্টায় ${paidCompletedCount}টি পেইড ম্যাচ খেলেছেন এবং ইতিমধ্যে ${freeMatchesUsedCount}টি ফ্রি ম্যাচ খেলেছেন। নতুন ফ্রি ম্যাচের টিকিট পেতে আরও ${neededPaid}টি পেইড ম্যাচ খেলুন।"
+                      )
+                  )
+              }
+          }
 
           // Check if match is AVAILABLE and has slots
           val isAvailable = match.status.equals(MatchStatus.AVAILABLE.name, ignoreCase = true)
@@ -906,8 +1108,27 @@ class FirebaseMatchRepository(private val customDatabase: FirebaseDatabase? = nu
             "${FirebaseConfig.NODE_MATCHES}/$matchId/updatedAt" to now,
             "${FirebaseConfig.NODE_MATCH_PLAYERS}/$matchId/$effectiveUid" to newPlayer,
             "${FirebaseConfig.NODE_USER_TRANSACTIONS}/$effectiveUid/$trxId" to transaction,
-            "${FirebaseConfig.NODE_USER_MATCHES}/$effectiveUid/$matchId" to userMatchHistory,
           )
+
+          if (isLoyaltyFreeMatch) {
+            updates["${FirebaseConfig.NODE_USER_MATCHES}/$effectiveUid/$matchId"] = hashMapOf(
+              "matchId" to matchId,
+              "userId" to effectiveUid,
+              "uid" to effectiveUid,
+              "joinedAt" to now,
+              "status" to "JOINED",
+              "isWinner" to null,
+              "updatedAt" to now,
+              "gameType" to match.gameType,
+              "matchNumber" to match.matchNumber,
+              "title" to match.title,
+              "entryFeeMinorUnits" to entryFeeMinorUnits,
+              "prizeMinorUnits" to match.effectivePrizeMinorUnits,
+              "isLoyaltyFree" to true
+            )
+          } else {
+            updates["${FirebaseConfig.NODE_USER_MATCHES}/$effectiveUid/$matchId"] = userMatchHistory
+          }
 
           try {
             database.reference.updateChildren(updates).awaitTask(5_000L)

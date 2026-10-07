@@ -212,6 +212,8 @@ data class MatchEntity(
   val updatedAt: Long = 0L,
   val startedAt: Long? = null,
   val cancelReason: String? = null,
+  val isLoyaltyFree: Boolean = false,
+  val requiredMatches24h: Int = 0,
 ) {
   val effectiveEntryFeeMinorUnits: Long
     get() = if (entryFeeMinorUnits > 0L) entryFeeMinorUnits else (entryFee).toLong()

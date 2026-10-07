@@ -257,7 +257,25 @@ fun MatchCard(
         .testTag("seat_status_bar_${match.matchId}"),
       contentAlignment = Alignment.Center,
     ) {
+      val strings = LocalAppStrings.current
       when {
+        isCompleted -> {
+          Box(
+            modifier = Modifier
+              .fillMaxSize()
+              .background(NeonEmerald.copy(alpha = 0.8f)),
+            contentAlignment = Alignment.Center,
+          ) {
+            Text(
+              text = strings.labelMatchCompleted.uppercase(),
+              style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = FontWeight.Black,
+                letterSpacing = 0.5.sp,
+              ),
+              color = Color.White,
+            )
+          }
+        }
         joinedCount >= 2 || isFull -> {
           Box(
             modifier = Modifier

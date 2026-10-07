@@ -32,11 +32,14 @@ import com.example.domain.model.DepositEntity
 import com.example.domain.model.MatchEntity
 import com.example.domain.model.ResultEntity
 import com.example.domain.model.WithdrawalEntity
+import com.example.domain.model.UserEntity
+import com.example.domain.model.WalletEntity
 import com.example.ui.components.EmptyState
 import com.example.ui.components.MatchStatusBadge
 import com.example.ui.components.TournamentButton
 import com.example.ui.components.TournamentButtonVariant
 import com.example.ui.components.TournamentCard
+import com.example.ui.components.UnifiedEsportsTopBar
 import com.example.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -46,6 +49,12 @@ import java.util.Locale
 @Composable
 fun AdminScreen(
   viewModel: AdminViewModel,
+  currentUser: UserEntity?,
+  wallet: WalletEntity?,
+  unreadNotificationsCount: Int,
+  onWalletClick: () -> Unit,
+  onNotificationClick: () -> Unit,
+  onProfileClick: () -> Unit,
   onNavigateBack: () -> Unit,
 ) {
   val uiState by viewModel.uiState.collectAsState()
@@ -64,32 +73,14 @@ fun AdminScreen(
 
   Scaffold(
     topBar = {
-      TopAppBar(
-        title = {
-          Column {
-            Text(
-              text = "Super Admin Dashboard",
-              style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-              color = Color.White,
-            )
-            Text(
-              text = "Admin ID: ${viewModel.adminUid}",
-              style = MaterialTheme.typography.labelSmall,
-              color = Gold400,
-            )
-          }
-        },
-        navigationIcon = {
-          IconButton(onClick = onNavigateBack) {
-            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
-          }
-        },
-        actions = {
-          IconButton(onClick = { viewModel.loadAllData() }) {
-            Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Gold400)
-          }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = NavySurface),
+      UnifiedEsportsTopBar(
+        currentUser = currentUser,
+        wallet = wallet,
+        unreadNotificationsCount = unreadNotificationsCount,
+        onWalletClick = onWalletClick,
+        onNotificationClick = onNotificationClick,
+        onProfileClick = onProfileClick,
+        onAdminClick = null // Already on admin screen
       )
     },
     containerColor = DeepNavyBg,
@@ -99,6 +90,42 @@ fun AdminScreen(
         .fillMaxSize()
         .padding(innerPadding),
     ) {
+      // Admin Control Bar
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .background(NavySurface)
+          .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        Column {
+          Text(
+            text = "Super Admin Dashboard",
+            color = Color.White,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+          )
+          Text(
+            text = "ID: ${viewModel.adminUid}",
+            color = Gold400,
+            style = MaterialTheme.typography.labelSmall
+          )
+        }
+        IconButton(
+          onClick = { viewModel.loadAllData() },
+          modifier = Modifier
+            .size(36.dp)
+            .background(DeepNavyBg, RoundedCornerShape(8.dp))
+        ) {
+          Icon(
+            imageVector = Icons.Default.Refresh,
+            contentDescription = "Refresh",
+            tint = Gold400,
+            modifier = Modifier.size(20.dp)
+          )
+        }
+      }
+
       // Tab Bar
       ScrollableTabRow(
         selectedTabIndex = uiState.selectedTab.ordinal,
