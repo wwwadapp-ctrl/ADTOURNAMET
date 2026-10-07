@@ -290,10 +290,19 @@ private fun copyToClipboard(context: Context, text: String) {
 }
 
 private fun shareReferral(context: Context, code: String) {
-    val shareText = "AD Tournament অ্যাপ ডাউনলোড করে লুডু ও ফ্রি ফায়ার খেলে টাকা আয় করো! আমার রেফার কোড ব্যবহার করলেই পাবে ফ্রি ক্যাশ বোনাস! রেফার কোড: $code\nডাউনলোড লিংক: https://adtournament.com"
+    val shareText = """
+        🎮 AD TOURNAMENT - ১vs১ লুডো ও ক্যারম টুর্নামেন্ট!
+        
+        আমার রেফার কোড ব্যবহার করে অ্যাকাউন্ট খুলে ডিপোজিট করলেই পাবেন ৳২০ ওয়েলকাম ক্যাশ বোনাস!
+        
+        👉 রেফার কোড: $code
+        📥 ডাউনলোড লিংক: https://adturnamet.web.app
+    """.trimIndent()
+
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, "AD Tournament Invitation")
         putExtra(Intent.EXTRA_TEXT, shareText)
     }
-    context.startActivity(Intent.createChooser(intent, "Share via"))
+    context.startActivity(Intent.createChooser(intent, "বন্ধুদের সাথে শেয়ার করুন"))
 }

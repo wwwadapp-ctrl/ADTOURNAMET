@@ -399,6 +399,7 @@ fun AppNavigation(
           viewModel = authViewModel,
           onNavigateToOtp = { phone -> navController.navigate(Destinations.otp(phone)) },
           onNavigateBack = { navController.popBackStack() },
+          appSettings = currentSettings
         )
       }
 

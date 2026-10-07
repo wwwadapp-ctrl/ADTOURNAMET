@@ -1,7 +1,10 @@
 package com.example.ui.auth
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,7 +17,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.core.i18n.LocalAppStrings
 import com.example.core.security.AuthValidator
+import com.example.domain.model.AppSettingsEntity
 import com.example.ui.components.TournamentButton
 import com.example.ui.components.TournamentButtonVariant
 import com.example.ui.components.TournamentCard
@@ -535,15 +541,10 @@ fun ForgotPasswordScreen(
   viewModel: AuthViewModel,
   onNavigateToOtp: (String) -> Unit,
   onNavigateBack: () -> Unit,
+  appSettings: AppSettingsEntity? = null,
 ) {
-  val uiState by viewModel.uiState.collectAsState()
-  var mobileNumber by remember { mutableStateOf("") }
-
-  LaunchedEffect(uiState.isOtpSent) {
-    if (uiState.isOtpSent) {
-      onNavigateToOtp(mobileNumber)
-    }
-  }
+  val strings = LocalAppStrings.current
+  val context = LocalContext.current
 
   Column(
     modifier = Modifier
@@ -560,13 +561,13 @@ fun ForgotPasswordScreen(
         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
       }
       Text(
-        text = "Reset Password",
+        text = "পাসওয়ার্ড রিসেট ও সহায়তা",
         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
         color = Color.White,
       )
     }
 
-    Spacer(modifier = Modifier.height(32.dp))
+    Spacer(modifier = Modifier.height(24.dp))
 
     TournamentCard(
       modifier = Modifier.fillMaxWidth(),
@@ -574,58 +575,112 @@ fun ForgotPasswordScreen(
       borderColor = NavyCardBorder,
     ) {
       Text(
-        text = "Enter Registered Mobile Number",
+        text = "অ্যাকাউন্ট রিকভারি সহায়তা",
         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-        color = Color.White,
+        color = Gold400,
       )
       Text(
-        text = "We will send a 6-digit verification code to reset your tournament account password.",
+        text = "অ্যাকাউন্টের সুরক্ষার জন্য সরাসরি অফিসিয়াল সাপোর্টে যোগাযোগ করে আপনার নতুন পাসওয়ার্ড সেট করে নিন। আমাদের এডমিন প্যানেল আপনাকে দ্রুত সহায়তা করবে।",
         style = MaterialTheme.typography.bodySmall,
         color = Slate400,
-        modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
+        modifier = Modifier.padding(top = 6.dp, bottom = 20.dp),
+        lineHeight = 18.sp
       )
 
-      if (uiState.errorMessage != null) {
-        Surface(
-          color = Rose900.copy(alpha = 0.4f),
-          shape = RoundedCornerShape(8.dp),
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 14.dp),
-        ) {
-          Text(
-            text = uiState.errorMessage ?: "",
-            color = Rose400,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(10.dp),
-          )
+      // 1. WhatsApp Support Button
+      SupportContactButton(
+        title = "WhatsApp-এ মেসেজ দিন",
+        subtitle = "অফিসিয়াল অ্যাডমিন সাপোর্ট",
+        icon = Icons.Default.Chat,
+        gradientColors = listOf(Color(0xFF16A34A), Color(0xFF15803D)),
+        onClick = {
+          val phone = appSettings?.activeWhatsappNumber?.replace("+", "")?.replace(" ", "")?.ifBlank { "8801700000000" } ?: "8801700000000"
+          val msg = "Hello Admin, I forgot my password in AD Tournament. Please help me reset it."
+          val url = "https://wa.me/$phone?text=${Uri.encode(msg)}"
+          try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+          } catch (_: Exception) {}
+        }
+      )
+
+      Spacer(modifier = Modifier.height(14.dp))
+
+      // 2. Telegram Support Button
+      SupportContactButton(
+        title = "Telegram-এ মেসেজ দিন",
+        subtitle = "অফিসিয়াল টেলিগ্রাম চ্যানেল বা চ্যাট",
+        icon = Icons.Default.Send,
+        gradientColors = listOf(Color(0xFF0284C7), Color(0xFF0369A1)),
+        onClick = {
+          val rawTelegram = appSettings?.activeTelegramUrl.orEmpty()
+          val url = if (rawTelegram.startsWith("http")) rawTelegram else "https://t.me/${rawTelegram.removePrefix("@")}"
+          val finalUrl = url.ifBlank { "https://t.me/adtournament" }
+          try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(finalUrl)))
+          } catch (_: Exception) {}
+        }
+      )
+    }
+
+    Spacer(modifier = Modifier.weight(1f))
+
+    TextButton(onClick = onNavigateBack) {
+      Text(
+        text = "লগইন স্ক্রিনে ফিরে যান",
+        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+        color = Gold400,
+      )
+    }
+  }
+}
+
+@Composable
+private fun SupportContactButton(
+  title: String,
+  subtitle: String,
+  icon: androidx.compose.ui.graphics.vector.ImageVector,
+  gradientColors: List<Color>,
+  onClick: () -> Unit,
+) {
+  Surface(
+    modifier = Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(14.dp))
+      .clickable { onClick() },
+    color = Color.Transparent,
+  ) {
+    Row(
+      modifier = Modifier
+        .background(Brush.horizontalGradient(gradientColors))
+        .padding(horizontal = 16.dp, vertical = 14.dp),
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      Surface(
+        shape = androidx.compose.foundation.shape.CircleShape,
+        color = Color.White.copy(alpha = 0.2f),
+        modifier = Modifier.size(40.dp)
+      ) {
+        Box(contentAlignment = Alignment.Center) {
+          Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
         }
       }
-
-      TournamentTextField(
-        value = mobileNumber,
-        onValueChange = {
-          if (it.length <= 11) {
-            mobileNumber = it
-            viewModel.clearMessages()
-          }
-        },
-        label = "Mobile Number",
-        placeholder = "01XXXXXXXXX",
-        leadingIcon = Icons.Default.Phone,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-        testTag = "forgot_mobile_input",
-      )
-
-      Spacer(modifier = Modifier.height(20.dp))
-
-      TournamentButton(
-        text = "SEND VERIFICATION CODE",
-        onClick = { viewModel.sendResetOtp(mobileNumber) },
-        isLoading = uiState.isLoading,
-        modifier = Modifier.fillMaxWidth(),
-        testTag = "send_otp_button",
-      )
+      
+      Spacer(modifier = Modifier.width(14.dp))
+      
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = title,
+          style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
+          color = Color.White,
+        )
+        Text(
+          text = subtitle,
+          style = MaterialTheme.typography.labelSmall,
+          color = Color.White.copy(alpha = 0.8f),
+        )
+      }
+      
+      Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White.copy(alpha = 0.6f))
     }
   }
 }

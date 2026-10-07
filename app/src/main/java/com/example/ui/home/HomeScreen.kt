@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -659,12 +660,13 @@ private fun HomeGuideCarousel(
       pageSpacing = 12.dp,
       modifier = Modifier
         .fillMaxWidth()
-        .height(136.dp)
+        .height(190.dp)
         .testTag("home_guide_carousel"),
     ) { page ->
       val banner = banners[page]
       GuideBannerCard(
         banner = banner,
+        appSettings = appSettings,
         onClick = {
           val videoUrl = when (banner.guideType) {
             GuideType.DEPOSIT -> appSettings.howToDepositVideoUrl
@@ -717,14 +719,24 @@ private fun HomeGuideCarousel(
 @Composable
 private fun GuideBannerCard(
   banner: GuideBannerItem,
+  appSettings: AppSettingsEntity,
   onClick: () -> Unit,
 ) {
+  val bannerUrl = when (banner.guideType) {
+    GuideType.DEPOSIT -> appSettings.depositBannerImageUrl
+    GuideType.MATCH_JOIN -> appSettings.matchJoinBannerImageUrl
+    GuideType.RESULT_SUBMIT -> appSettings.resultSubmitBannerImageUrl
+    GuideType.RULES -> appSettings.rulesBannerImageUrl
+  }.trim()
+
+  val hasBanner = bannerUrl.isNotBlank()
+
   Surface(
     shape = RoundedCornerShape(16.dp),
-    color = Color.Transparent,
+    color = if (hasBanner) Color.Black else Color.Transparent,
     border = BorderStroke(
       1.dp,
-      Brush.horizontalGradient(
+      if (hasBanner) SolidColor(Gold400.copy(alpha = 0.4f)) else Brush.horizontalGradient(
         listOf(
           banner.accentColor.copy(alpha = 0.55f),
           banner.secondaryColor.copy(alpha = 0.35f),
@@ -738,133 +750,232 @@ private fun GuideBannerCard(
       .clickable { onClick() }
       .testTag("guide_banner_${banner.id}"),
   ) {
-    Box(
-      modifier = Modifier
-        .fillMaxSize()
-        .background(
-          Brush.linearGradient(
-            colors = listOf(
-              Color(0xFF0F172A),
-              Color(0xFF1E2640),
-              Color(0xFF0F172A),
-            )
-          )
+    if (hasBanner) {
+      Box(modifier = Modifier.fillMaxSize()) {
+        AsyncImage(
+          model = ImageRequest.Builder(LocalContext.current)
+            .data(bannerUrl)
+            .crossfade(true)
+            .build(),
+          contentDescription = banner.title,
+          modifier = Modifier.fillMaxSize(),
+          contentScale = ContentScale.Crop
         )
-        .padding(horizontal = 16.dp, vertical = 12.dp),
-    ) {
-      Row(
-        modifier = Modifier.fillMaxSize(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        Column(
+
+        // Dark gradient overlay for bottom text legibility
+        Box(
           modifier = Modifier
-            .weight(1f)
-            .fillMaxHeight(),
-          verticalArrangement = Arrangement.SpaceBetween,
+            .fillMaxSize()
+            .background(
+              Brush.verticalGradient(
+                listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
+                startY = 0.5f
+              )
+            )
+        )
+
+        // Floating Interactive Badge
+        Surface(
+          shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp),
+          color = Gold400,
+          modifier = Modifier
+            .align(Alignment.TopEnd)
+            .padding(top = 12.dp)
         ) {
-          Column {
-            Surface(
-              shape = RoundedCornerShape(4.dp),
-              color = banner.accentColor.copy(alpha = 0.15f),
-              border = BorderStroke(1.dp, banner.accentColor.copy(alpha = 0.4f)),
-            ) {
-              Text(
-                text = banner.badgeText,
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = FontWeight.Black,
-                  fontSize = 9.sp,
-                  letterSpacing = 0.8.sp,
-                ),
-                color = banner.accentColor,
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-              )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-              text = banner.title,
-              style = MaterialTheme.typography.titleSmall.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-              ),
-              color = Color.White,
-              maxLines = 1,
-            )
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            Text(
-              text = banner.description,
-              style = MaterialTheme.typography.bodySmall.copy(
-                fontSize = 11.sp,
-              ),
-              color = Slate300,
-              maxLines = 1,
-            )
-          }
-
-          Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = banner.accentColor,
-            modifier = Modifier
-              .clickable { onClick() }
-              .testTag("banner_cta_${banner.id}"),
+          Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
           ) {
-            Row(
-              modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              Text(
-                text = banner.ctaText,
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = FontWeight.Black,
-                  fontSize = 11.sp,
-                ),
-                color = Slate950,
-              )
-            }
+            Icon(
+              imageVector = Icons.Default.PlayCircle,
+              contentDescription = null,
+              tint = Slate950,
+              modifier = Modifier.size(14.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+              text = "WATCH VIDEO",
+              style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Black,
+                fontSize = 10.sp
+              ),
+              color = Slate950
+            )
           }
         }
 
-        Spacer(modifier = Modifier.width(8.dp))
-
-        // Large Hero 3D Artwork Container (75-90% card height, full right side hero art)
-        Box(
+        // Bottom Info
+        Column(
           modifier = Modifier
-            .width(130.dp)
-            .fillMaxHeight()
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-              Brush.radialGradient(
-                colors = listOf(
-                  banner.accentColor.copy(alpha = 0.3f),
-                  banner.secondaryColor.copy(alpha = 0.1f),
-                  Color(0xFF0B1120).copy(alpha = 0.8f),
-                )
+            .align(Alignment.BottomStart)
+            .padding(16.dp)
+        ) {
+          Surface(
+            shape = RoundedCornerShape(4.dp),
+            color = Color.Black.copy(alpha = 0.4f),
+            border = BorderStroke(1.dp, Gold400.copy(alpha = 0.5f)),
+            modifier = Modifier.padding(bottom = 6.dp)
+          ) {
+            Text(
+              text = banner.badgeText,
+              style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Black,
+                fontSize = 9.sp,
+                letterSpacing = 0.8.sp,
+              ),
+              color = Gold400,
+              modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+          }
+
+          Text(
+            text = banner.title,
+            style = MaterialTheme.typography.titleMedium.copy(
+              fontWeight = FontWeight.Black,
+              fontSize = 16.sp,
+              letterSpacing = 0.5.sp
+            ),
+            color = Color.White
+          )
+          Text(
+            text = banner.description,
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+            color = Slate200,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+          )
+        }
+      }
+    } else {
+      // Fallback: Existing Gradient Card
+      Box(
+        modifier = Modifier
+          .fillMaxSize()
+          .background(
+            Brush.linearGradient(
+              colors = listOf(
+                Color(0xFF0F172A),
+                Color(0xFF1E2640),
+                Color(0xFF0F172A),
               )
             )
-            .border(
-              BorderStroke(
-                1.dp,
-                Brush.linearGradient(
-                  listOf(
-                    banner.accentColor.copy(alpha = 0.6f),
-                    banner.secondaryColor.copy(alpha = 0.2f),
+          )
+          .padding(horizontal = 16.dp, vertical = 12.dp),
+      ) {
+        Row(
+          modifier = Modifier.fillMaxSize(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Column(
+            modifier = Modifier
+              .weight(1f)
+              .fillMaxHeight(),
+            verticalArrangement = Arrangement.SpaceBetween,
+          ) {
+            Column {
+              Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = banner.accentColor.copy(alpha = 0.15f),
+                border = BorderStroke(1.dp, banner.accentColor.copy(alpha = 0.4f)),
+              ) {
+                Text(
+                  text = banner.badgeText,
+                  style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Black,
+                    fontSize = 9.sp,
+                    letterSpacing = 0.8.sp,
+                  ),
+                  color = banner.accentColor,
+                  modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+              }
+
+              Spacer(modifier = Modifier.height(4.dp))
+
+              Text(
+                text = banner.title,
+                style = MaterialTheme.typography.titleSmall.copy(
+                  fontWeight = FontWeight.Bold,
+                  fontSize = 14.sp,
+                ),
+                color = Color.White,
+                maxLines = 1,
+              )
+
+              Spacer(modifier = Modifier.height(2.dp))
+
+              Text(
+                text = banner.description,
+                style = MaterialTheme.typography.bodySmall.copy(
+                  fontSize = 11.sp,
+                ),
+                color = Slate300,
+                maxLines = 1,
+              )
+            }
+
+            Surface(
+              shape = RoundedCornerShape(20.dp),
+              color = banner.accentColor,
+              modifier = Modifier
+                .clickable { onClick() }
+                .testTag("banner_cta_${banner.id}"),
+            ) {
+              Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+              ) {
+                Text(
+                  text = banner.ctaText,
+                  style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Black,
+                    fontSize = 11.sp,
+                  ),
+                  color = Slate950,
+                )
+              }
+            }
+          }
+
+          Spacer(modifier = Modifier.width(8.dp))
+
+          // Large Hero 3D Artwork Container (75-90% card height, full right side hero art)
+          Box(
+            modifier = Modifier
+              .width(130.dp)
+              .fillMaxHeight()
+              .clip(RoundedCornerShape(12.dp))
+              .background(
+                Brush.radialGradient(
+                  colors = listOf(
+                    banner.accentColor.copy(alpha = 0.3f),
+                    banner.secondaryColor.copy(alpha = 0.1f),
+                    Color(0xFF0B1120).copy(alpha = 0.8f),
                   )
                 )
+              )
+              .border(
+                BorderStroke(
+                  1.dp,
+                  Brush.linearGradient(
+                    listOf(
+                      banner.accentColor.copy(alpha = 0.6f),
+                      banner.secondaryColor.copy(alpha = 0.2f),
+                    )
+                  )
+                ),
+                RoundedCornerShape(12.dp),
               ),
-              RoundedCornerShape(12.dp),
-            ),
-          contentAlignment = Alignment.Center,
-        ) {
-          GuideCard3DArt(
-            guideType = banner.guideType,
-            accentColor = banner.accentColor,
-            secondaryColor = banner.secondaryColor,
-            size = 116.dp,
-          )
+            contentAlignment = Alignment.Center,
+          ) {
+            GuideCard3DArt(
+              guideType = banner.guideType,
+              accentColor = banner.accentColor,
+              secondaryColor = banner.secondaryColor,
+              size = 116.dp,
+            )
+          }
         }
       }
     }
