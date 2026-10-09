@@ -52,3 +52,7 @@
 -dontwarn coil.**
 -keep class retrofit2.** { *; }
 -keep class com.squareup.moshi.** { *; }
+
+# Preserve Auto Ludo game engine, UI, models and state
+-keep class com.example.ui.autoludo.** { *; }
+-keepclassmembers class com.example.ui.autoludo.** { *; }
