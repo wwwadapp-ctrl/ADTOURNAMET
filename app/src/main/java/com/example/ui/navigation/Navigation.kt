@@ -76,6 +76,8 @@ import com.example.ui.support.AiSupportScreen
 import com.example.ui.support.SupportScreen
 import com.example.ui.theme.*
 import com.example.ui.wallet.*
+import com.example.ui.autoludo.AutoLudoScreen
+import com.example.ui.autoludo.AutoLudoGameScreen
 
 object Destinations {
   const val SPLASH = "splash"
@@ -105,10 +107,13 @@ object Destinations {
   const val DICE_ROLL = "dice_roll"
   const val HEAD_TAIL = "head_tail"
   const val SCRATCH_CARD = "scratch_card"
+  const val AUTO_LUDO = "auto_ludo"
+  const val AUTO_LUDO_GAME = "auto_ludo_game/{matchId}"
 
   fun otp(phone: String) = "otp/$phone"
   fun resetPassword(phone: String, otp: String) = "reset_password/$phone/$otp"
   fun matchDetail(matchId: String) = "match_detail/$matchId"
+  fun autoLudoGame(matchId: String) = "auto_ludo_game/$matchId"
 }
 
 data class BottomNavigationItem(
@@ -133,7 +138,7 @@ fun AppNavigation(
   onLanguageChange: (AppLanguage) -> Unit = {},
 ) {
   val strings = LocalAppStrings.current
-  val startDestination = Destinations.SPLASH
+  val startDestination = Destinations.autoLudoGame("preview_match_123")
 
   val bottomNavItems = remember(strings) {
     listOf(
@@ -498,6 +503,7 @@ fun AppNavigation(
           onDiceRollClick = { navController.navigate(Destinations.DICE_ROLL) },
           onHeadTailClick = { navController.navigate(Destinations.HEAD_TAIL) },
           onScratchCardClick = { navController.navigate(Destinations.SCRATCH_CARD) },
+          onAutoLudoClick = { navController.navigate(Destinations.AUTO_LUDO) },
           unreadNotificationsCount = unreadNotificationsCount,
           notificationRepository = container.notificationRepository,
         )
@@ -612,6 +618,36 @@ fun AppNavigation(
               "HOME" -> navController.navigate(Destinations.HOME)
             }
           },
+        )
+      }
+
+      // 10. AUTO LUDO MATCH LOBBY
+      composable(Destinations.AUTO_LUDO) { backStackEntry ->
+        val walletViewModel: WalletViewModel = viewModel(
+          viewModelStoreOwner = backStackEntry,
+          key = "WalletViewModel_AutoLudo_$activeUserId",
+          factory = remember(activeUserId) {
+            WalletViewModel.Factory(container.walletRepository, activeUserId, authRepository = container.authRepository)
+          }
+        )
+        val walletUiState by walletViewModel.uiState.collectAsStateWithLifecycle()
+
+        AutoLudoScreen(
+          user = currentUser,
+          wallet = walletUiState.wallet,
+          onNavigateBack = { navController.popBackStack() },
+          onPlayMatch = { matchId -> navController.navigate(Destinations.autoLudoGame(matchId)) }
+        )
+      }
+ 
+      composable(
+        route = Destinations.AUTO_LUDO_GAME,
+        arguments = listOf(navArgument("matchId") { type = NavType.StringType })
+      ) { backStackEntry ->
+        val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
+        AutoLudoGameScreen(
+          matchId = matchId,
+          onBackClick = { navController.popBackStack() }
         )
       }
 

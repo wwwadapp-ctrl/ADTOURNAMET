@@ -1,6 +1,7 @@
 package com.example.ui.home
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -21,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -166,6 +168,7 @@ fun HomeScreen(
   onDiceRollClick: () -> Unit = {},
   onHeadTailClick: () -> Unit = {},
   onScratchCardClick: () -> Unit = {},
+  onAutoLudoClick: () -> Unit = {},
   unreadNotificationsCount: Int = 0,
   notificationRepository: NotificationRepository = remember { FirebaseNotificationRepository() },
   modifier: Modifier = Modifier,
@@ -246,6 +249,19 @@ fun HomeScreen(
       item {
         MiniGamesSection(
             onGameClick = { selectedMiniGame = it }
+        )
+      }
+
+      // 2.6 AUTO GAMES SECTION HEADING
+      item {
+        AutoGamesSectionHeading()
+      }
+
+      // 2.7 BOARD GAMES SECTION (AUTO LUDO & CARROM POOL)
+      item {
+        LobbyBoardGamesSection(
+            onLudoClick = onAutoLudoClick,
+            onCarromClick = { android.widget.Toast.makeText(context, "ক্যারম পুল শীঘ্রই আসছে", android.widget.Toast.LENGTH_SHORT).show() }
         )
       }
 
@@ -926,6 +942,59 @@ private fun GuideBannerCard(
 }
 
 // -----------------------------------------------------------------------
+// 2.6 AUTO GAMES SECTION HEADING
+// -----------------------------------------------------------------------
+
+@Composable
+private fun AutoGamesSectionHeading(modifier: Modifier = Modifier) {
+  Row(
+    modifier = modifier
+      .fillMaxWidth()
+      .padding(horizontal = 16.dp, vertical = 8.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    HorizontalDivider(
+      modifier = Modifier.weight(1f),
+      color = Slate800,
+      thickness = 1.dp
+    )
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      modifier = Modifier.padding(horizontal = 12.dp)
+    ) {
+      Icon(
+        imageVector = Icons.Default.Star,
+        contentDescription = null,
+        tint = Gold400,
+        modifier = Modifier.size(16.dp)
+      )
+      Spacer(modifier = Modifier.width(6.dp))
+      Text(
+        text = "★ অটো গেম ★",
+        style = MaterialTheme.typography.titleMedium.copy(
+          fontWeight = FontWeight.Black,
+          fontSize = 14.sp,
+          letterSpacing = 2.sp
+        ),
+        color = Gold400
+      )
+      Spacer(modifier = Modifier.width(6.dp))
+      Icon(
+        imageVector = Icons.Default.Star,
+        contentDescription = null,
+        tint = Gold400,
+        modifier = Modifier.size(16.dp)
+      )
+    }
+    HorizontalDivider(
+      modifier = Modifier.weight(1f),
+      color = Slate800,
+      thickness = 1.dp
+    )
+  }
+}
+
+// -----------------------------------------------------------------------
 // 3. TOURNAMENT SECTION HEADING
 // -----------------------------------------------------------------------
 
@@ -1542,4 +1611,216 @@ fun NoticeDialog(
       )
     }
   )
+}
+
+// -----------------------------------------------------------------------
+// BOARD GAMES SECTION (AUTO LUDO & CARROM POOL)
+// -----------------------------------------------------------------------
+
+@Composable
+private fun LobbyBoardGamesSection(
+  onLudoClick: () -> Unit,
+  onCarromClick: () -> Unit,
+  modifier: Modifier = Modifier
+) {
+  Row(
+    modifier = modifier
+      .fillMaxWidth()
+      .padding(horizontal = 16.dp, vertical = 8.dp),
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
+    verticalAlignment = Alignment.CenterVertically
+  ) {
+    BoardGameCard(
+      title = "অটো লুডু",
+      subtitle = "ইনস্ট্যান্ট বোর্ড গেম",
+      badge = "১v১ ফাস্ট",
+      badgeColor = Emerald400,
+      iconType = 0, // Dice
+      modifier = Modifier.weight(1f),
+      onClick = onLudoClick
+    )
+    BoardGameCard(
+      title = "ক্যারম পুল",
+      subtitle = "বোর্ড স্ট্রাইক ব্যাটেল",
+      badge = "নতুন",
+      badgeColor = Gold400,
+      iconType = 1, // Striker/Coin
+      modifier = Modifier.weight(1f),
+      onClick = onCarromClick
+    )
+  }
+}
+
+@Composable
+private fun BoardGameCard(
+  title: String,
+  subtitle: String,
+  badge: String,
+  badgeColor: Color,
+  iconType: Int, // 0: Ludo Dice, 1: Carrom Striker
+  modifier: Modifier = Modifier,
+  onClick: () -> Unit
+) {
+  val infiniteTransition = rememberInfiniteTransition(label = "BoardGame")
+  
+  // Animation for Dice (Rotation) or Striker (Pulse/Glow)
+  val rotation by infiniteTransition.animateFloat(
+    initialValue = 0f,
+    targetValue = 360f,
+    animationSpec = infiniteRepeatable(
+      animation = tween(10000, easing = LinearEasing),
+      repeatMode = RepeatMode.Restart
+    ),
+    label = "rotation"
+  )
+  
+  val pulse by infiniteTransition.animateFloat(
+    initialValue = 0.95f,
+    targetValue = 1.05f,
+    animationSpec = infiniteRepeatable(
+      animation = tween(1500, easing = FastOutSlowInEasing),
+      repeatMode = RepeatMode.Reverse
+    ),
+    label = "pulse"
+  )
+
+  Surface(
+    modifier = modifier
+      .height(126.dp)
+      .clip(RoundedCornerShape(16.dp))
+      .clickable { onClick() },
+    shape = RoundedCornerShape(16.dp),
+    color = Color.Transparent,
+    border = BorderStroke(1.2.dp, Gold400.copy(alpha = 0.45f))
+  ) {
+    Box(
+      modifier = Modifier
+        .fillMaxSize()
+        .background(
+          Brush.horizontalGradient(
+            listOf(Color(0xFF0F172A), Color(0xFF1E1B4B))
+          )
+        )
+    ) {
+      // Content Row
+      Row(
+        modifier = Modifier
+          .fillMaxSize()
+          .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        Column(
+          modifier = Modifier.weight(1f),
+          verticalArrangement = Arrangement.SpaceBetween
+        ) {
+          // Badge
+          Surface(
+            shape = RoundedCornerShape(4.dp),
+            color = badgeColor.copy(alpha = 0.2f),
+            border = BorderStroke(0.5.dp, badgeColor.copy(alpha = 0.5f))
+          ) {
+            Text(
+              text = badge,
+              modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+              style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Black
+              ),
+              color = badgeColor
+            )
+          }
+          
+          Spacer(modifier = Modifier.height(12.dp))
+          
+          Column {
+            Text(
+              text = title,
+              style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Black,
+                fontSize = 15.sp
+              ),
+              color = Color.White,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis
+            )
+            Text(
+              text = subtitle,
+              style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 11.sp,
+                color = Slate400
+              ),
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis
+            )
+          }
+        }
+        
+        // Graphic Section
+        Box(
+          modifier = Modifier
+            .size(70.dp)
+            .padding(4.dp),
+          contentAlignment = Alignment.Center
+        ) {
+          if (iconType == 0) {
+            // Ludo Dice Graphic
+            Box(
+              modifier = Modifier
+                .size(48.dp)
+                .rotate(rotation)
+                .background(
+                  Brush.radialGradient(
+                    listOf(Color(0xFFEF4444), Color(0xFF991B1B))
+                  ),
+                  RoundedCornerShape(10.dp)
+                )
+                .border(1.2.dp, Gold400.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                .padding(8.dp)
+            ) {
+              // Dice Dots (Simplified 5)
+              Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(Gold400).align(Alignment.TopStart))
+              Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(Gold400).align(Alignment.TopEnd))
+              Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(Gold400).align(Alignment.Center))
+              Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(Gold400).align(Alignment.BottomStart))
+              Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(Gold400).align(Alignment.BottomEnd))
+            }
+          } else {
+            // Carrom Striker/Coin Graphic
+            Box(contentAlignment = Alignment.Center) {
+               // Ambient Glow
+               Canvas(modifier = Modifier.size(60.dp)) {
+                 drawCircle(
+                   brush = Brush.radialGradient(
+                     listOf(Gold400.copy(alpha = 0.15f), Color.Transparent)
+                   )
+                 )
+               }
+               // Striker
+               Surface(
+                 modifier = Modifier.size(44.dp * pulse),
+                 shape = CircleShape,
+                 color = Color(0xFF1E293B),
+                 border = BorderStroke(2.5.dp, Gold400),
+                 shadowElevation = 4.dp
+               ) {
+                 Box(contentAlignment = Alignment.Center) {
+                   Box(
+                     modifier = Modifier
+                       .size(24.dp)
+                       .border(1.dp, Gold400.copy(alpha = 0.4f), CircleShape)
+                   )
+                   Icon(
+                     Icons.Default.Adjust,
+                     contentDescription = null,
+                     tint = Gold400,
+                     modifier = Modifier.size(16.dp)
+                   )
+                 }
+               }
+            }
+          }
+        }
+      }
+    }
+  }
 }

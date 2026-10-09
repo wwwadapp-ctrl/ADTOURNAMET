@@ -56,7 +56,8 @@ object FcmTokenManager {
     }
 
     try {
-      FirebaseMessaging.getInstance().token
+      val messaging = FirebaseMessaging.getInstance()
+      messaging.token
         .addOnCompleteListener { task ->
           if (task.isSuccessful) {
             val token = task.result
@@ -72,12 +73,13 @@ object FcmTokenManager {
               onComplete?.invoke(null)
             }
           } else {
-            AppLogger.w(TAG, "FCM token task was not successful: ${task.exception?.message}")
+            // Silently log at warning level instead of error task failure
+            AppLogger.w(TAG, "FCM registration failed (expected in development environment): ${task.exception?.message}")
             onComplete?.invoke(null)
           }
         }
     } catch (e: Exception) {
-      AppLogger.w(TAG, "Exception during FCM token retrieval: ${e.message}")
+      AppLogger.w(TAG, "FCM messaging service unavailable: ${e.message}")
       onComplete?.invoke(null)
     }
   }
