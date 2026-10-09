@@ -138,7 +138,7 @@ fun AppNavigation(
   onLanguageChange: (AppLanguage) -> Unit = {},
 ) {
   val strings = LocalAppStrings.current
-  val startDestination = Destinations.autoLudoGame("preview_match_123")
+        val startDestination = Destinations.SPLASH
 
   val bottomNavItems = remember(strings) {
     listOf(
