@@ -53,6 +53,6 @@
 -keep class retrofit2.** { *; }
 -keep class com.squareup.moshi.** { *; }
 
-# Auto Ludo engine and UI protection
+# Preserve Auto Ludo engine and UI
 -keep class com.example.ui.autoludo.** { *; }
 -keepclassmembers class com.example.ui.autoludo.** { *; }

@@ -142,21 +142,26 @@ fun AutoLudoGameScreen(
     LaunchedEffect(currentMatch.gameState.currentTurnUid) {
         if (currentMatch.gameState.currentTurnUid.isNotBlank()) {
             previewTurnUid = currentMatch.gameState.currentTurnUid
+            // Reset local dice state when turn changes
+            localDiceValue = 0
+            localIsDiceRolled = false
         }
     }
 
     // Sync local dice state with match state in live mode
     LaunchedEffect(currentMatch.gameState.diceValue, currentMatch.gameState.isDiceRolled) {
         if (!isActuallyLocal) {
-            // CRITICAL FIX: Only clobber local state if Firebase has a TRUE roll OR if we aren't locally rolled.
-            // This prevents the "Dice Button Not Disabling" glitch where Firebase resets localIsDiceRolled to false before it updates.
-            if (currentMatch.gameState.isDiceRolled) {
-                localDiceValue = currentMatch.gameState.diceValue
+            val serverDice = currentMatch.gameState.diceValue
+            val serverIsRolled = currentMatch.gameState.isDiceRolled
+            if (serverIsRolled) {
+                localDiceValue = serverDice
                 localIsDiceRolled = true
-            } else if (!localIsDiceRolled) {
-                // If both are false, sync is fine
-                localDiceValue = 0
-                localIsDiceRolled = false
+            } else {
+                // Only accept false if turn actually passed or reset occurred on server
+                if (localDiceValue != serverDice || currentMatch.gameState.diceValue == 0) {
+                    localDiceValue = 0
+                    localIsDiceRolled = false
+                }
             }
         }
     }
@@ -251,13 +256,13 @@ fun AutoLudoGameScreen(
                     
                     val allP1Goal = p1Pawns.all { it == 57 }
                     val allP2Goal = p2Pawns.all { it == 57 }
-                    val isDisqualified = p1Strikes >= 5 || p2Strikes >= 5
+                    val isDisqualified = p1Strikes >= 3 || p2Strikes >= 3
                     val isCompleted = allP1Goal || allP2Goal || isDisqualified
                     val winner = when {
                         allP1Goal -> activeMatch.player1Uid.ifBlank { "player_1" }
                         allP2Goal -> activeMatch.player2Uid.ifBlank { "player_2" }
-                        p1Strikes >= 5 -> activeMatch.player2Uid.ifBlank { "player_2" }
-                        p2Strikes >= 5 -> activeMatch.player1Uid.ifBlank { "player_1" }
+                        p1Strikes >= 3 -> activeMatch.player2Uid.ifBlank { "player_2" }
+                        p2Strikes >= 3 -> activeMatch.player1Uid.ifBlank { "player_1" }
                         else -> ""
                     }
                     
@@ -279,7 +284,7 @@ fun AutoLudoGameScreen(
                             actionStartedAt = System.currentTimeMillis(),
                             lastMoveAt = System.currentTimeMillis(),
                             lastActionLog = when {
-                                isDisqualified -> "Player Disqualified (5 Misses)!"
+                                isDisqualified -> "Player Disqualified (3 Misses)!"
                                 localCapture -> "Captured! Bonus Roll"
                                 newPos == 57 -> "Goal! Bonus Roll"
                                 rolledDice == 6 -> "Rolled 6! Bonus Turn"
@@ -305,10 +310,10 @@ fun AutoLudoGameScreen(
                     if (isTimeout) {
                         if (isP1) p1Strikes++ else p2Strikes++
                     }
-                    val isDisqualified = p1Strikes >= 5 || p2Strikes >= 5
+                    val isDisqualified = p1Strikes >= 3 || p2Strikes >= 3
                     val winner = when {
-                        p1Strikes >= 5 -> currentMatch.player2Uid.ifBlank { "player_2" }
-                        p2Strikes >= 5 -> currentMatch.player1Uid.ifBlank { "player_1" }
+                        p1Strikes >= 3 -> currentMatch.player2Uid.ifBlank { "player_2" }
+                        p2Strikes >= 3 -> currentMatch.player1Uid.ifBlank { "player_1" }
                         else -> ""
                     }
                     
@@ -323,7 +328,7 @@ fun AutoLudoGameScreen(
                             diceValue = 0,
                             winnerUid = winner,
                             actionStartedAt = System.currentTimeMillis(),
-                            lastActionLog = if (isDisqualified) "Disqualified (5 Misses)!" else if (isTimeout) "Auto-Pass! Strike +1" else "No Moves! Turn Passed"
+                            lastActionLog = if (isDisqualified) "Disqualified (3 Misses)!" else if (isTimeout) "Auto-Pass! Strike +1" else "No Moves! Turn Passed"
                         )
                     )
                 } else {
@@ -441,9 +446,9 @@ fun AutoLudoBoardScreen(
     val effectiveDiceValue = gameState.diceValue
     val isRolled = gameState.isDiceRolled
     
-    // Timer Logic
+    // Timer Logic - strictly 15000L for both Roll and Move phases
     var timerProgress by remember { mutableStateOf(0f) }
-    val totalTime = if (isRolled) 20000L else 15000L
+    val totalTime = 15000L
     
     // Identify active player turn
     val isPlayer1Turn = when {
@@ -462,23 +467,25 @@ fun AutoLudoBoardScreen(
     val canControlPlayer1 = isPlayer1Turn && (
         isPreviewMode || 
         currentUid == "player_1" || 
-        match.player1Uid == currentUid ||
-        match.player1Uid == "player_1" ||
+        match.player1Uid == currentUid || 
+        match.player1Uid == "player_1" || 
         match.player1Uid.isBlank()
     )
 
     val canControlPlayer2 = isPlayer2Turn && (
         isPreviewMode || 
         currentUid == "player_2" || 
-        match.player2Uid == currentUid ||
-        match.player2Uid == "player_2" ||
+        match.player2Uid == currentUid || 
+        match.player2Uid == "player_2" || 
         match.player2Uid.isBlank()
     )
 
-    LaunchedEffect(gameState.currentTurnUid, isRolled, match.status) {
+    val isMyTurn = if (isPlayer1Turn) canControlPlayer1 else canControlPlayer2
+
+    // DETERMINISTIC 15-SECOND PHASE TIMER (Keyed on turn, roll state, actionStartedAt, status)
+    LaunchedEffect(gameState.currentTurnUid, isRolled, gameState.actionStartedAt, match.status) {
         if (match.status == "COMPLETED") return@LaunchedEffect
         
-        // Monotonic local anchor to prevent runaway loops due to server clock drift
         val localStartTime = System.currentTimeMillis()
         var actionDispatched = false
         
@@ -488,51 +495,49 @@ fun AutoLudoBoardScreen(
             timerProgress = (elapsed.toFloat() / totalTime).coerceIn(0f, 1f)
             
             if (timerProgress >= 1f) {
-                val isAuthoritativeTimeout = elapsed > (totalTime + 1500L)
-                val isCurrentPlayerMovable = if (isPlayer1Turn) canControlPlayer1 else canControlPlayer2
-                
-                if (isCurrentPlayerMovable || isAuthoritativeTimeout) {
-                    actionDispatched = true
-                    if (!isRolled) {
-                        onDiceRoll((1..6).random(), true)
-                    } else {
-                        // Find first eligible pawn
-                        val pawns = if (isPlayer1Turn) gameState.player1Pawns else gameState.player2Pawns
-                        val eligibleIndex = pawns.indexOfFirst { p -> 
-                            (p == -1 && effectiveDiceValue == 6) || (p >= 0 && p + effectiveDiceValue <= 57) 
-                        }
-                        if (eligibleIndex != -1) {
-                            val p = pawns[eligibleIndex]
-                            val newPos = if (p == -1) 0 else p + effectiveDiceValue
-                            onMovePawn(eligibleIndex, newPos, true)
-                        } else {
-                            onPassTurn(true)
-                        }
-                    }
-                    // Mandatory lock/debounce to prevent rapid consecutive timeouts
-                    delay(1500L)
+                // If local user is observer, wait 800ms grace period so active player has first chance
+                if (!isMyTurn) {
+                    delay(800L)
                 }
+                
+                if (!isRolled) {
+                    // PHASE 1 TIMEOUT: Auto-Roll
+                    val randomValue = (1..6).random()
+                    onDiceRoll(randomValue, true)
+                    actionDispatched = true
+                } else {
+                    // PHASE 2 TIMEOUT: Auto-Move or Auto-Pass
+                    val pawns = if (isPlayer1Turn) gameState.player1Pawns else gameState.player2Pawns
+                    val eligibleIndex = pawns.indexOfFirst { p -> 
+                        (p == -1 && effectiveDiceValue == 6) || (p >= 0 && p + effectiveDiceValue <= 57) 
+                    }
+                    if (eligibleIndex != -1) {
+                        val p = pawns[eligibleIndex]
+                        val newPos = if (p == -1) 0 else p + effectiveDiceValue
+                        onMovePawn(eligibleIndex, newPos, true)
+                    } else {
+                        onPassTurn(true)
+                    }
+                    actionDispatched = true
+                }
+                
+                delay(1000L)
             }
             delay(100)
         }
     }
     
-    // Auto-pass turn if rolled 1-5 and no legal moves exist (Roll 6 Guard applied)
+    // PHASE 2: Immediate auto-pass after 1200ms if dice rolled and NO legal moves exist
     LaunchedEffect(isRolled, effectiveDiceValue, isPlayer1Turn, isPlayer2Turn) {
-        if (isRolled && effectiveDiceValue in 1..5) {
-            val isCurrentPlayerMovable = if (isPlayer1Turn) canControlPlayer1 else canControlPlayer2
+        if (isRolled && effectiveDiceValue in 1..6) {
+            val pawns = if (isPlayer1Turn) gameState.player1Pawns else gameState.player2Pawns
+            val hasLegalMove = (effectiveDiceValue == 6 && pawns.any { it == -1 }) ||
+                               pawns.any { it >= 0 && it + effectiveDiceValue <= 57 }
             
-            // Only auto-pass if the local user HAS control but NO moves
-            if (isCurrentPlayerMovable) {
-                val pawns = if (isPlayer1Turn) gameState.player1Pawns else gameState.player2Pawns
-                val hasLegalMove = pawns.any { p -> 
-                    (p == -1 && effectiveDiceValue == 6) || (p >= 0 && p + effectiveDiceValue <= 57) 
-                }
-                
-                if (!hasLegalMove) {
-                    delay(1200L) // Wait for UI/Animations
-                    onPassTurn(false)
-                }
+            if (!hasLegalMove) {
+                delay(1200L) // Wait exactly 1200ms for roll animation to complete
+                // Authoritative pass: any connected client (active or observer) can trigger pass when no moves exist
+                onPassTurn(false)
             }
         }
     }
@@ -693,11 +698,13 @@ fun AutoLudoBoardScreen(
             }
 
             // 3. Bottom Battle Dock (Always visible)
+            val canActivePlayerRoll = (isPlayer1Turn && canControlPlayer1) || (isPlayer2Turn && canControlPlayer2)
             LudoBottomBattleDock(
                 player1 = player1,
                 player2 = player2,
                 currentDiceValue = effectiveDiceValue,
                 isDiceRolled = isRolled,
+                canRoll = canActivePlayerRoll,
                 timerProgress = timerProgress,
                 onDiceRoll = { onDiceRoll(it, false) },
                 modifier = Modifier
@@ -876,10 +883,10 @@ fun LudoPawnView(
     Box(
         modifier = Modifier
             .offset(
-                x = with(density) { animOffset.value.x.toDp() } - 22.dp,
-                y = with(density) { (animOffset.value.y + jumpAnim.value).toDp() } - 46.dp
+                x = with(density) { animOffset.value.x.toDp() } - 30.dp,
+                y = with(density) { (animOffset.value.y + jumpAnim.value).toDp() } - 50.dp
             )
-            .size(width = 44.dp, height = 56.dp)
+            .size(60.dp)
             .clickable(
                 enabled = isEligibleToMove,
                 interactionSource = remember { MutableInteractionSource() },
@@ -904,21 +911,48 @@ fun LudoKingPawnToken(
     isEligibleToMove: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "halo_rotation")
+    val infiniteTransition = rememberInfiniteTransition(label = "pawn_highlight")
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearEasing),
+            animation = tween(2500, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "rotation"
     )
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
+    )
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
 
-    Box(modifier = modifier.size(width = 32.dp, height = 46.dp), contentAlignment = Alignment.BottomCenter) {
-        // 1. Authentic Ludo King Segmented Rotating Ring (ONLY when eligible)
+    Box(modifier = modifier.size(54.dp), contentAlignment = Alignment.BottomCenter) {
+        // 1. Authentic Ludo King Segmented Pulsing Ring (ONLY when eligible)
         if (isEligibleToMove) {
-            Canvas(modifier = Modifier.size(36.dp).offset(y = 12.dp)) {
+            Canvas(
+                modifier = Modifier
+                    .size(40.dp)
+                    .graphicsLayer {
+                        scaleX = pulseScale
+                        scaleY = pulseScale
+                        alpha = pulseAlpha
+                    }
+                    .offset(y = 10.dp)
+            ) {
                 rotate(rotation) {
                     val segmentCount = 12
                     val sweepAngle = 360f / segmentCount
@@ -929,14 +963,14 @@ fun LudoKingPawnToken(
                             startAngle = i * sweepAngle,
                             sweepAngle = sweepAngle * 0.75f,
                             useCenter = false,
-                            style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Butt)
+                            style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
                         )
                     }
                 }
                 // Thin high-contrast outer ring
                 drawCircle(
-                    color = Color.White.copy(alpha = 0.3f),
-                    radius = 18.dp.toPx(),
+                    color = Color.White.copy(alpha = 0.4f),
+                    radius = 20.dp.toPx(),
                     style = Stroke(width = 1.dp.toPx())
                 )
             }
@@ -1036,6 +1070,7 @@ fun LudoBottomBattleDock(
     player2: LudoPlayer,
     currentDiceValue: Int,
     isDiceRolled: Boolean,
+    canRoll: Boolean = true,
     timerProgress: Float = 0f,
     onDiceRoll: (Int) -> Unit,
     modifier: Modifier = Modifier
@@ -1097,7 +1132,7 @@ fun LudoBottomBattleDock(
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 
-                // Strike Life Dots
+                // Strike Life Dots (3 Strikes)
                 StrikeDots(strikes = player1.strikes)
                 Spacer(modifier = Modifier.height(4.dp))
                 
@@ -1130,7 +1165,7 @@ fun LudoBottomBattleDock(
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 
-                // Strike Life Dots
+                // Strike Life Dots (3 Strikes)
                 StrikeDots(strikes = player2.strikes)
                 Spacer(modifier = Modifier.height(4.dp))
                 
@@ -1150,12 +1185,11 @@ fun LudoBottomBattleDock(
             contentAlignment = Alignment.Center
         ) {
             val isPlayer1Turn = player1.isCurrentTurn
-            val isPreviewMode = LocalInspectionMode.current || player1.userId.contains("player") || player2.userId.contains("player")
             val activeDiceColor = if (isPlayer1Turn) Color(0xFFEF4444) else Color(0xFFF59E0B)
             
             Luxury3DCubeDice(
                 diceValue = currentDiceValue,
-                isEnabled = (player1.isCurrentTurn || player2.isCurrentTurn) && !isDiceRolled,
+                isEnabled = canRoll && !isDiceRolled,
                 isPlayer1Turn = isPlayer1Turn,
                 diceColor = activeDiceColor,
                 onRoll = onDiceRoll
@@ -1167,7 +1201,7 @@ fun LudoBottomBattleDock(
 @Composable
 fun StrikeDots(strikes: Int) {
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        repeat(5) { i ->
+        repeat(3) { i ->
             val isStruck = i < strikes
             Box(
                 modifier = Modifier

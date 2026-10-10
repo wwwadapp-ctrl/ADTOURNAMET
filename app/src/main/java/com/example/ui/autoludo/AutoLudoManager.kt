@@ -415,34 +415,23 @@ object AutoLudoManager {
                     val isP2Turn = state.currentTurnUid == match.player2Uid || 
                         state.currentTurnUid == "player_2"
 
-                    val elapsed = System.currentTimeMillis() - state.actionStartedAt
-                    val isExpired = elapsed > 15000L
-                    
-                    // CRITICAL FIX: Guard against 0-state runaway and clock drift
-                    if (state.actionStartedAt <= 0L) {
-                        currentData.child("gameState").child("actionStartedAt").value = System.currentTimeMillis()
-                        return Transaction.success(currentData)
-                    }
-
                     val isTurnOwner = (isPlayer1 && isP1Turn) || (isPlayer2 && isP2Turn) ||
-                        playerUid == match.creatorUid ||
                         state.currentTurnUid == playerUid ||
                         state.currentTurnUid.isBlank()
                     
-                    if (!isTurnOwner && !(isTimeout && isExpired)) return Transaction.abort()
-                    
-                    // Minimum interval enforcement for timeout actions
-                    if (isTimeout && !isExpired) return Transaction.abort()
+                    // PHASE 1: Turn owner rolls, or observer triggers timeout roll
+                    if (!isTurnOwner && !isTimeout) return Transaction.abort()
 
                     if (state.isDiceRolled) return Transaction.abort()
                     
-                    var nextConsecutiveSixes = if (value == 6) state.consecutiveSixesCount + 1 else 0
+                    val rollValue = if (value in 1..6) value else (1..6).random()
+                    var nextConsecutiveSixes = if (rollValue == 6) state.consecutiveSixesCount + 1 else 0
                     var nextTurnUid = if (isP1Turn) {
                         match.player1Uid.ifBlank { "player_1" }
                     } else {
                         match.player2Uid.ifBlank { "player_2" }
                     }
-                    var diceValue = value
+                    var diceValue = rollValue
                     var isDiceRolled = true
                     var actionLog = if (isTimeout) "Auto-Roll! Strike +1" else ""
                     
@@ -452,12 +441,16 @@ object AutoLudoManager {
                     var status = match.status
                     
                     if (isTimeout) {
-                        if (isP1Turn) p1Strikes++ else p2Strikes++
-                        
-                        if (p1Strikes >= 5 || p2Strikes >= 5) {
-                            status = "COMPLETED"
-                            winnerUid = if (p1Strikes >= 5) (match.player2Uid.ifBlank { "player_2" }) else (match.player1Uid.ifBlank { "player_1" })
-                            actionLog = "Player Disqualified (5 Misses)!"
+                        val elapsedSinceAction = System.currentTimeMillis() - state.actionStartedAt
+                        // Only register a strike if at least 14 seconds have genuinely elapsed
+                        if (elapsedSinceAction >= 14000L) {
+                            if (isP1Turn) p1Strikes++ else p2Strikes++
+                            
+                            if (p1Strikes >= 3 || p2Strikes >= 3) {
+                                status = "COMPLETED"
+                                winnerUid = if (p1Strikes >= 3) (match.player2Uid.ifBlank { "player_2" }) else (match.player1Uid.ifBlank { "player_1" })
+                                actionLog = "Player Disqualified (3 Misses)!"
+                            }
                         }
                     }
 
@@ -522,30 +515,14 @@ object AutoLudoManager {
                     val isP2Turn = state.currentTurnUid == match.player2Uid || 
                         state.currentTurnUid == "player_2"
 
-                    val elapsed = System.currentTimeMillis() - state.actionStartedAt
-                    val isExpired = elapsed > 20000L
-                    
-                    // CRITICAL FIX: Guard against 0-state runaway and clock drift
-                    if (state.actionStartedAt <= 0L) {
-                        currentData.child("gameState").child("actionStartedAt").value = System.currentTimeMillis()
-                        return Transaction.success(currentData)
-                    }
+                    val isTurnOwner = (isPlayer1Match && isP1Turn) || (isPlayer2Match && isP2Turn) ||
+                        state.currentTurnUid == playerUid ||
+                        state.currentTurnUid.isBlank()
 
-                    if (!isPlayer1Match && !isPlayer2Match && !(isTimeout && isExpired)) return Transaction.abort()
-                    
-                    // Minimum interval enforcement for timeout actions
-                    if (isTimeout && !isExpired) return Transaction.abort()
+                    // PHASE 2: Allow active player move, OR observer auto-move upon timeout
+                    if (!isTurnOwner && !isTimeout) return Transaction.abort()
 
-                    // Determine which player's pawns to move based on active turn & UID
-                    val isPlayer1 = if (isPlayer1Match && isP1Turn) {
-                        true
-                    } else if (isPlayer2Match && isP2Turn) {
-                        false
-                    } else if (isTimeout && isExpired) {
-                        isP1Turn
-                    } else {
-                        return Transaction.abort()
-                    }
+                    val isPlayer1 = isP1Turn
                     
                     val myPawns = (if (isPlayer1) state.player1Pawns else state.player2Pawns).toMutableList()
                     val oppPawns = (if (isPlayer1) state.player2Pawns else state.player1Pawns).toMutableList()
@@ -613,20 +590,21 @@ object AutoLudoManager {
                     if (isTimeout) {
                         if (isP1Turn) p1Strikes++ else p2Strikes++
                         
-                        if (p1Strikes >= 5 || p2Strikes >= 5) {
+                        if (p1Strikes >= 3 || p2Strikes >= 3) {
                             status = "COMPLETED"
-                            winnerUid = if (p1Strikes >= 5) (match.player2Uid.ifBlank { "player_2" }) else (match.player1Uid.ifBlank { "player_1" })
+                            winnerUid = if (p1Strikes >= 3) (match.player2Uid.ifBlank { "player_2" }) else (match.player1Uid.ifBlank { "player_1" })
                         }
                     }
 
                     val actionLogText = when {
-                        status == "COMPLETED" && isTimeout -> "Disqualified (5 Misses)!"
+                        status == "COMPLETED" && isTimeout -> "Disqualified (3 Misses)!"
+                        status == "COMPLETED" -> "Victory!"
                         captured -> "Captured! Bonus Roll"
                         newPos == 57 -> "Goal! Bonus Roll"
-                        oldPos == -1 && newPos == 0 -> "Exited Base!"
+                        oldPos == -1 && newPos == 0 -> "Exited Yard!"
                         rolledValue == 6 -> "Rolled 6! Bonus Turn"
                         isTimeout -> "Auto-Move! Strike +1"
-                        else -> ""
+                        else -> "Pawn Moved"
                     }
 
                     val newState = state.copy(
@@ -680,19 +658,17 @@ object AutoLudoManager {
                     val isP2Match = playerUid == match.player2Uid || playerUid == "player_2"
                     val isTurnOwner = (isP1Match && isP1Turn) || (isP2Match && !isP1Turn)
                     
-                    val elapsed = System.currentTimeMillis() - state.actionStartedAt
-                    val isExpired = elapsed > 20000L
-                    
-                    // CRITICAL FIX: Guard against 0-state runaway and clock drift
-                    if (state.actionStartedAt <= 0L) {
-                        currentData.child("gameState").child("actionStartedAt").value = System.currentTimeMillis()
-                        return Transaction.success(currentData)
-                    }
+                    val activePawns = if (isP1Turn) state.player1Pawns else state.player2Pawns
+                    val hasLegalMoves = (state.diceValue == 6 && activePawns.any { it == -1 }) ||
+                                       activePawns.any { it >= 0 && it + state.diceValue <= 57 }
 
-                    if (!isTurnOwner && !(isTimeout && isExpired)) return Transaction.abort()
+                    // Allow turn pass whenever:
+                    // 1. Turn owner requests pass
+                    // 2. OR dice is rolled and active player has NO legal moves (any connected observer or owner can pass)
+                    // 3. OR timeout is triggered (observer safety for offline/idle players)
+                    val canRotate = isTurnOwner || (state.isDiceRolled && !hasLegalMoves) || isTimeout
                     
-                    // Minimum interval enforcement for timeout actions
-                    if (isTimeout && !isExpired) return Transaction.abort()
+                    if (!canRotate) return Transaction.abort()
 
                     val nextTurnUid = if (isP1Turn) {
                         match.player2Uid.ifBlank { "player_2" }
@@ -707,12 +683,16 @@ object AutoLudoManager {
                     var actionLog = if (isTimeout) "Auto-Pass! Strike +1" else "No Moves! Turn Passed"
                     
                     if (isTimeout) {
-                        if (isP1Turn) p1Strikes++ else p2Strikes++
-                        
-                        if (p1Strikes >= 5 || p2Strikes >= 5) {
-                            status = "COMPLETED"
-                            winnerUid = if (p1Strikes >= 5) (match.player2Uid.ifBlank { "player_2" }) else (match.player1Uid.ifBlank { "player_1" })
-                            actionLog = "Player Disqualified (5 Misses)!"
+                        val elapsedSinceAction = System.currentTimeMillis() - state.actionStartedAt
+                        // Only register a strike if at least 14 seconds have genuinely elapsed
+                        if (elapsedSinceAction >= 14000L) {
+                            if (isP1Turn) p1Strikes++ else p2Strikes++
+                            
+                            if (p1Strikes >= 3 || p2Strikes >= 3) {
+                                status = "COMPLETED"
+                                winnerUid = if (p1Strikes >= 3) (match.player2Uid.ifBlank { "player_2" }) else (match.player1Uid.ifBlank { "player_1" })
+                                actionLog = "Player Disqualified (3 Misses)!"
+                            }
                         }
                     }
 
