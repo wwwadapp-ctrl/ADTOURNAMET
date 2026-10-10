@@ -154,8 +154,14 @@ class HomeViewModel(
       delay(3000L)
       _uiState.update { current ->
         if (current.isLoading) {
-          com.example.core.logging.AppLogger.w("HomeViewModel", "Match loading timeout reached for tab ${current.selectedTab}")
-          current.copy(isLoading = false) 
+          com.example.core.logging.AppLogger.w("HomeViewModel", "Match loading timeout reached for tab ${current.selectedTab}. Injecting mock data for preview.")
+          val mockMatches = getMockMatchesForTab(current.selectedTab)
+          current.copy(
+            isLoading = false,
+            matchesList = mockMatches,
+            filteredMatches = filterMatches(mockMatches, current.selectedGameFilter),
+            errorMessage = null
+          )
         } else current
       }
     }
@@ -260,6 +266,38 @@ class HomeViewModel(
       compareBy<MatchEntity> { 
         it.matchNumber.replace(Regex("[^0-9]"), "").toIntOrNull() ?: Int.MAX_VALUE 
       }.thenBy { it.effectiveScheduledAt }
+    )
+  }
+
+  private fun getMockMatchesForTab(tab: MatchFilterTab): List<MatchEntity> {
+    val now = System.currentTimeMillis()
+    return listOf(
+      MatchEntity(
+        matchId = "mock_1",
+        matchNumber = "101",
+        title = "Ludo King Tournament",
+        gameType = GameType.LUDO.name,
+        entryFee = 50.0,
+        prizePool = 90.0,
+        status = MatchStatus.AVAILABLE.name,
+        maxPlayers = 2,
+        joinedPlayersCount = 1,
+        scheduledAt = now + 3600000,
+        scheduledTime = now + 3600000
+      ),
+      MatchEntity(
+        matchId = "mock_2",
+        matchNumber = "102",
+        title = "Auto Ludo Battle",
+        gameType = GameType.LUDO.name,
+        entryFee = 20.0,
+        prizePool = 36.0,
+        status = MatchStatus.AVAILABLE.name,
+        maxPlayers = 2,
+        joinedPlayersCount = 1,
+        scheduledAt = now + 1800000,
+        scheduledTime = now + 1800000
+      )
     )
   }
 

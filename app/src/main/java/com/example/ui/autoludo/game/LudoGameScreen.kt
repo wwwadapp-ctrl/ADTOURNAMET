@@ -45,6 +45,10 @@ fun LudoGameScreen(
     var diceValue by remember { mutableIntStateOf(1) }
     var isRolling by remember { mutableStateOf(false) }
     var showSplash by remember { mutableStateOf(true) }
+    var tokenPos by remember { mutableIntStateOf(-1) }
+    var diceRolled by remember { mutableStateOf(false) }
+
+    val isTokenEligible = diceRolled && ((tokenPos == -1 && diceValue == 6) || (tokenPos >= 0 && tokenPos + diceValue <= 57))
 
     // Animation for the background gradient
     val infiniteTransition = rememberInfiniteTransition(label = "bg_anim")
@@ -119,13 +123,25 @@ fun LudoGameScreen(
                             contentScale = ContentScale.Fit
                         )
 
-                        // Demo Tokens
+                        // Tokens
                         LudoToken(
                             color = LudoRed,
-                            isSelected = true,
+                            isSelected = isTokenEligible,
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
-                                .offset(x = 35.dp, y = (-20).dp)
+                                .offset(
+                                    x = if (tokenPos == -1) 35.dp else (35 + (tokenPos % 10) * 12).dp,
+                                    y = (-20).dp
+                                ),
+                            onClick = {
+                                if (tokenPos == -1 && diceValue == 6) {
+                                    tokenPos = 0
+                                    diceRolled = false
+                                } else if (tokenPos >= 0) {
+                                    tokenPos += diceValue
+                                    diceRolled = false
+                                }
+                            }
                         )
                     }
 
@@ -138,6 +154,7 @@ fun LudoGameScreen(
                         onRoll = {
                             if (!isRolling) {
                                 isRolling = true
+                                diceRolled = false
                             }
                         }
                     )
@@ -154,6 +171,7 @@ fun LudoGameScreen(
                 delay(80)
             }
             isRolling = false
+            diceRolled = true
         }
     }
 }

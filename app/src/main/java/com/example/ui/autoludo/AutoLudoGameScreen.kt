@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -51,7 +52,8 @@ data class LudoPlayer(
     val name: String = "Player",
     val avatarUrl: String = "",
     val isCurrentTurn: Boolean = false,
-    val pawnColor: Long = 0xFFE53935
+    val pawnColor: Long = 0xFFE53935,
+    val strikes: Int = 0
 )
 
 @Composable
@@ -59,7 +61,7 @@ fun AutoLudoGameScreen(
     matchId: String,
     onBackClick: () -> Unit
 ) {
-    val isPreviewMode = LocalInspectionMode.current || matchId.contains("preview")
+    val isPreviewMode = LocalInspectionMode.current || matchId.contains("preview") || matchId.contains("mock")
     val coroutineScope = rememberCoroutineScope()
     val mockMatch = remember {
         AutoLudoMatchEntity(
@@ -80,14 +82,16 @@ fun AutoLudoGameScreen(
     }
 
     var match by remember { mutableStateOf<AutoLudoMatchEntity?>(if (isPreviewMode) mockMatch else null) }
-    var showBoard by remember { mutableStateOf(isPreviewMode) } // Skip splash in preview mode
+    var showBoard by remember { mutableStateOf(isPreviewMode) } 
 
     // Observe real-time match state from Firebase with safety
     LaunchedEffect(matchId) {
         if (!isPreviewMode) {
             try {
                 AutoLudoManager.observeMatch(matchId).collect {
-                    if (it != null) match = it
+                    if (it != null) {
+                        match = it
+                    }
                 }
             } catch (e: Exception) {
                 android.util.Log.e("AutoLudo", "Firebase Observation Error: ${e.message}")
@@ -98,16 +102,18 @@ fun AutoLudoGameScreen(
         }
     }
 
-    // Immediate fallback if still null after a short timeout to prevent unfreeze
+    // Immediate fallback if still null after a short timeout
     LaunchedEffect(Unit) {
         if (!isPreviewMode) {
-            delay(1000)
-            if (match == null) match = mockMatch
+            delay(1500)
+            if (match == null) {
+                match = mockMatch
+                android.util.Log.d("AutoLudo", "Falling back to mock match (Offline/Loading)")
+            }
         }
     }
 
     if (match == null && !isPreviewMode) {
-        // Simple loading or error state if match not found
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = Color(0xFFBF953F))
         }
@@ -115,76 +121,214 @@ fun AutoLudoGameScreen(
     }
 
     val currentMatch = match ?: mockMatch
-    val currentUid = remember { 
+    val isActuallyLocal = isPreviewMode || currentMatch.matchId == "preview_match_123"
+    
+    val currentUid = remember(currentMatch, isActuallyLocal) { 
         try { 
-            if (!isPreviewMode) com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: "player_1"
-            else "player_1"
+            if (isActuallyLocal) {
+                "player_1"
+            } else {
+                com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: "player_1"
+            }
         } catch (_: Exception) { "player_1" }
     }
 
     // Local Preview Game Engine State
-    var localDiceValue by remember { mutableStateOf(if (isPreviewMode) 0 else currentMatch.gameState.diceValue) }
-    var localIsDiceRolled by remember { mutableStateOf(if (isPreviewMode) false else currentMatch.gameState.isDiceRolled) }
+    var localDiceValue by remember { mutableStateOf(0) }
+    var localIsDiceRolled by remember { mutableStateOf(false) }
     var previewTurnUid by remember { mutableStateOf("player_1") }
     
-    // Synchronize local state with match state in non-preview mode
+    // Synchronize local turn with match state if available
+    LaunchedEffect(currentMatch.gameState.currentTurnUid) {
+        if (currentMatch.gameState.currentTurnUid.isNotBlank()) {
+            previewTurnUid = currentMatch.gameState.currentTurnUid
+        }
+    }
+
+    // Sync local dice state with match state in live mode
     LaunchedEffect(currentMatch.gameState.diceValue, currentMatch.gameState.isDiceRolled) {
-        if (!isPreviewMode) {
-            localDiceValue = currentMatch.gameState.diceValue
-            localIsDiceRolled = currentMatch.gameState.isDiceRolled
+        if (!isActuallyLocal) {
+            // CRITICAL FIX: Only clobber local state if Firebase has a TRUE roll OR if we aren't locally rolled.
+            // This prevents the "Dice Button Not Disabling" glitch where Firebase resets localIsDiceRolled to false before it updates.
+            if (currentMatch.gameState.isDiceRolled) {
+                localDiceValue = currentMatch.gameState.diceValue
+                localIsDiceRolled = true
+            } else if (!localIsDiceRolled) {
+                // If both are false, sync is fine
+                localDiceValue = 0
+                localIsDiceRolled = false
+            }
         }
     }
 
     if (!showBoard) {
         AutoLudoGameSplashScreen(onFinished = { showBoard = true })
     } else {
+        // Derive effective game state for the board
+        val boardGameState = currentMatch.gameState.copy(
+            currentTurnUid = if (isActuallyLocal) previewTurnUid else currentMatch.gameState.currentTurnUid,
+            diceValue = if (localIsDiceRolled && localDiceValue > 0) localDiceValue else currentMatch.gameState.diceValue,
+            isDiceRolled = localIsDiceRolled || currentMatch.gameState.isDiceRolled
+        )
+
         AutoLudoBoardScreen(
-            match = if (isPreviewMode) {
-                currentMatch.copy(
-                    gameState = currentMatch.gameState.copy(
-                        currentTurnUid = previewTurnUid,
-                        diceValue = localDiceValue,
-                        isDiceRolled = localIsDiceRolled
-                    )
-                )
-            } else currentMatch,
+            match = currentMatch.copy(gameState = boardGameState),
             currentUid = currentUid,
             localDiceValue = localDiceValue,
             localIsDiceRolled = localIsDiceRolled,
-            onDiceRoll = { value ->
-                if (isPreviewMode) {
-                    localDiceValue = value
-                    localIsDiceRolled = true
-                } else {
+            onDiceRoll = { value, isTimeout ->
+                // Immediate optimistic state update
+                localDiceValue = value
+                localIsDiceRolled = true
+
+                if (!isActuallyLocal) {
                     coroutineScope.launch {
-                        AutoLudoManager.rollDice(matchId, currentUid, value)
+                        AutoLudoManager.rollDice(matchId, currentUid, value, isTimeout)
                     }
                 }
             },
-            onMovePawn = { pawnIndex, newPos ->
-                if (isPreviewMode) {
-                    // Update mock state locally for visual feedback
-                    val p1Pawns = currentMatch.gameState.player1Pawns.toMutableList()
-                    val p2Pawns = currentMatch.gameState.player2Pawns.toMutableList()
-                    if (previewTurnUid == "player_1") p1Pawns[pawnIndex] = newPos
-                    else p2Pawns[pawnIndex] = newPos
+            onMovePawn = { pawnIndex, newPos, isTimeout ->
+                val activeMatch = currentMatch.copy(gameState = boardGameState)
+                val rolledDice = boardGameState.diceValue
+                
+                val currentTurnUid = boardGameState.currentTurnUid
+                val isP1 = currentTurnUid == activeMatch.player1Uid || currentTurnUid == "player_1"
+                
+                var localCapture = false
+                if (newPos in 0..51) {
+                    val isSafe = AutoLudoManager.isSafeCell(newPos, isP1)
+                    if (!isSafe) {
+                        val myGlobal = AutoLudoManager.getGlobalTrackPos(newPos, isP1)
+                        val oppPawns = if (isP1) boardGameState.player2Pawns else boardGameState.player1Pawns
+                        oppPawns.forEach { oppPos ->
+                            if (oppPos in 0..51) {
+                                val oppGlobal = AutoLudoManager.getGlobalTrackPos(oppPos, !isP1)
+                                if (myGlobal == oppGlobal) {
+                                    localCapture = true
+                                }
+                            }
+                        }
+                    }
+                }
+
+                val isBonusTurn = rolledDice == 6 || newPos == 57 || localCapture
+
+                // Clear optimistic roll state immediately upon move
+                localIsDiceRolled = false
+                localDiceValue = 0
+
+                if (isActuallyLocal) {
+                    val p1Pawns = boardGameState.player1Pawns.toMutableList()
+                    val p2Pawns = boardGameState.player2Pawns.toMutableList()
+                    var p1Strikes = boardGameState.player1Strikes
+                    var p2Strikes = boardGameState.player2Strikes
                     
-                    match = currentMatch.copy(
-                        gameState = currentMatch.gameState.copy(
+                    if (isTimeout) {
+                        if (isP1) p1Strikes++ else p2Strikes++
+                    }
+
+                    if (isP1) {
+                        p1Pawns[pawnIndex] = newPos
+                        if (localCapture) {
+                            val myGlobal = AutoLudoManager.getGlobalTrackPos(newPos, true)
+                            p2Pawns.forEachIndexed { idx, oppPos ->
+                                if (oppPos in 0..51 && AutoLudoManager.getGlobalTrackPos(oppPos, false) == myGlobal) {
+                                    p2Pawns[idx] = -1
+                                }
+                            }
+                        }
+                    } else {
+                        p2Pawns[pawnIndex] = newPos
+                        if (localCapture) {
+                            val myGlobal = AutoLudoManager.getGlobalTrackPos(newPos, false)
+                            p1Pawns.forEachIndexed { idx, oppPos ->
+                                if (oppPos in 0..51 && AutoLudoManager.getGlobalTrackPos(oppPos, true) == myGlobal) {
+                                    p1Pawns[idx] = -1
+                                }
+                            }
+                        }
+                    }
+                    
+                    val allP1Goal = p1Pawns.all { it == 57 }
+                    val allP2Goal = p2Pawns.all { it == 57 }
+                    val isDisqualified = p1Strikes >= 5 || p2Strikes >= 5
+                    val isCompleted = allP1Goal || allP2Goal || isDisqualified
+                    val winner = when {
+                        allP1Goal -> activeMatch.player1Uid.ifBlank { "player_1" }
+                        allP2Goal -> activeMatch.player2Uid.ifBlank { "player_2" }
+                        p1Strikes >= 5 -> activeMatch.player2Uid.ifBlank { "player_2" }
+                        p2Strikes >= 5 -> activeMatch.player1Uid.ifBlank { "player_1" }
+                        else -> ""
+                    }
+                    
+                    val nextTurn = if (isBonusTurn || isCompleted) previewTurnUid else (if (isP1) "player_2" else "player_1")
+                    
+                    previewTurnUid = nextTurn
+                    
+                    match = activeMatch.copy(
+                        status = if (isCompleted) "COMPLETED" else activeMatch.status,
+                        gameState = boardGameState.copy(
                             player1Pawns = p1Pawns,
                             player2Pawns = p2Pawns,
+                            player1Strikes = p1Strikes,
+                            player2Strikes = p2Strikes,
                             isDiceRolled = false,
-                            currentTurnUid = if (localDiceValue == 6 || newPos == 57) previewTurnUid else (if (previewTurnUid == "player_1") "player_2" else "player_1")
+                            diceValue = 0,
+                            currentTurnUid = nextTurn,
+                            winnerUid = winner,
+                            actionStartedAt = System.currentTimeMillis(),
+                            lastMoveAt = System.currentTimeMillis(),
+                            lastActionLog = when {
+                                isDisqualified -> "Player Disqualified (5 Misses)!"
+                                localCapture -> "Captured! Bonus Roll"
+                                newPos == 57 -> "Goal! Bonus Roll"
+                                rolledDice == 6 -> "Rolled 6! Bonus Turn"
+                                isTimeout -> "Auto-Move! Strike +1"
+                                else -> "Pawn Moved"
+                            }
                         )
                     )
-                    localIsDiceRolled = false
-                    localDiceValue = 0
-                    if (!(match?.gameState?.diceValue == 6 || newPos == 57)) {
-                        previewTurnUid = if (previewTurnUid == "player_1") "player_2" else "player_1" // Toggle turn if no bonus
-                    }
                 } else {
                     coroutineScope.launch {
-                        AutoLudoManager.movePawn(matchId, currentUid, pawnIndex, newPos)
+                        AutoLudoManager.movePawn(matchId, currentUid, pawnIndex, newPos, isTimeout)
+                    }
+                }
+            },
+            onPassTurn = { isTimeout ->
+                localIsDiceRolled = false
+                localDiceValue = 0
+                if (isActuallyLocal) {
+                    val isP1 = previewTurnUid == currentMatch.player1Uid || previewTurnUid == "player_1"
+                    val nextTurn = if (isP1) "player_2" else "player_1"
+                    var p1Strikes = boardGameState.player1Strikes
+                    var p2Strikes = boardGameState.player2Strikes
+                    if (isTimeout) {
+                        if (isP1) p1Strikes++ else p2Strikes++
+                    }
+                    val isDisqualified = p1Strikes >= 5 || p2Strikes >= 5
+                    val winner = when {
+                        p1Strikes >= 5 -> currentMatch.player2Uid.ifBlank { "player_2" }
+                        p2Strikes >= 5 -> currentMatch.player1Uid.ifBlank { "player_1" }
+                        else -> ""
+                    }
+                    
+                    previewTurnUid = nextTurn
+                    match = currentMatch.copy(
+                        status = if (isDisqualified) "COMPLETED" else currentMatch.status,
+                        gameState = currentMatch.gameState.copy(
+                            currentTurnUid = nextTurn,
+                            player1Strikes = p1Strikes,
+                            player2Strikes = p2Strikes,
+                            isDiceRolled = false,
+                            diceValue = 0,
+                            winnerUid = winner,
+                            actionStartedAt = System.currentTimeMillis(),
+                            lastActionLog = if (isDisqualified) "Disqualified (5 Misses)!" else if (isTimeout) "Auto-Pass! Strike +1" else "No Moves! Turn Passed"
+                        )
+                    )
+                } else {
+                    coroutineScope.launch {
+                        AutoLudoManager.passTurn(matchId, currentUid, isTimeout)
                     }
                 }
             },
@@ -285,30 +429,129 @@ fun AutoLudoBoardScreen(
     currentUid: String,
     localDiceValue: Int = 0,
     localIsDiceRolled: Boolean = false,
-    onDiceRoll: (Int) -> Unit,
-    onMovePawn: (Int, Int) -> Unit,
+    onDiceRoll: (Int, Boolean) -> Unit,
+    onMovePawn: (Int, Int, Boolean) -> Unit,
+    onPassTurn: (Boolean) -> Unit = {},
     onBackClick: () -> Unit
 ) {
-    val isPreviewMode = LocalInspectionMode.current || match.matchId.contains("preview")
+    val isPreviewMode = LocalInspectionMode.current || match.matchId.contains("preview") || match.matchId.contains("mock")
     val gameState = match.gameState
-    // Force turn in preview to allow interaction
-    val isMyTurn = if (isPreviewMode) true else gameState.currentTurnUid == currentUid
-    val diceRolled = if (isPreviewMode) localIsDiceRolled else gameState.isDiceRolled
-    val diceVal = if (isPreviewMode) localDiceValue else gameState.diceValue
+    
+    // Use the values already injected into the gameState by the parent
+    val effectiveDiceValue = gameState.diceValue
+    val isRolled = gameState.isDiceRolled
+    
+    // Timer Logic
+    var timerProgress by remember { mutableStateOf(0f) }
+    val totalTime = if (isRolled) 20000L else 15000L
+    
+    // Identify active player turn
+    val isPlayer1Turn = when {
+        gameState.currentTurnUid == match.player1Uid -> true
+        gameState.currentTurnUid == "player_1" -> true
+        gameState.currentTurnUid.isBlank() -> true
+        else -> false
+    }
+    val isPlayer2Turn = when {
+        gameState.currentTurnUid == match.player2Uid -> true
+        gameState.currentTurnUid == "player_2" -> true
+        else -> false
+    }
+
+    // Interactive permission: allow control if it's our turn or if we are in local session
+    val canControlPlayer1 = isPlayer1Turn && (
+        isPreviewMode || 
+        currentUid == "player_1" || 
+        match.player1Uid == currentUid ||
+        match.player1Uid == "player_1" ||
+        match.player1Uid.isBlank()
+    )
+
+    val canControlPlayer2 = isPlayer2Turn && (
+        isPreviewMode || 
+        currentUid == "player_2" || 
+        match.player2Uid == currentUid ||
+        match.player2Uid == "player_2" ||
+        match.player2Uid.isBlank()
+    )
+
+    LaunchedEffect(gameState.currentTurnUid, isRolled, match.status) {
+        if (match.status == "COMPLETED") return@LaunchedEffect
+        
+        // Monotonic local anchor to prevent runaway loops due to server clock drift
+        val localStartTime = System.currentTimeMillis()
+        var actionDispatched = false
+        
+        while (!actionDispatched) {
+            val now = System.currentTimeMillis()
+            val elapsed = now - localStartTime
+            timerProgress = (elapsed.toFloat() / totalTime).coerceIn(0f, 1f)
+            
+            if (timerProgress >= 1f) {
+                val isAuthoritativeTimeout = elapsed > (totalTime + 1500L)
+                val isCurrentPlayerMovable = if (isPlayer1Turn) canControlPlayer1 else canControlPlayer2
+                
+                if (isCurrentPlayerMovable || isAuthoritativeTimeout) {
+                    actionDispatched = true
+                    if (!isRolled) {
+                        onDiceRoll((1..6).random(), true)
+                    } else {
+                        // Find first eligible pawn
+                        val pawns = if (isPlayer1Turn) gameState.player1Pawns else gameState.player2Pawns
+                        val eligibleIndex = pawns.indexOfFirst { p -> 
+                            (p == -1 && effectiveDiceValue == 6) || (p >= 0 && p + effectiveDiceValue <= 57) 
+                        }
+                        if (eligibleIndex != -1) {
+                            val p = pawns[eligibleIndex]
+                            val newPos = if (p == -1) 0 else p + effectiveDiceValue
+                            onMovePawn(eligibleIndex, newPos, true)
+                        } else {
+                            onPassTurn(true)
+                        }
+                    }
+                    // Mandatory lock/debounce to prevent rapid consecutive timeouts
+                    delay(1500L)
+                }
+            }
+            delay(100)
+        }
+    }
+    
+    // Auto-pass turn if rolled 1-5 and no legal moves exist (Roll 6 Guard applied)
+    LaunchedEffect(isRolled, effectiveDiceValue, isPlayer1Turn, isPlayer2Turn) {
+        if (isRolled && effectiveDiceValue in 1..5) {
+            val isCurrentPlayerMovable = if (isPlayer1Turn) canControlPlayer1 else canControlPlayer2
+            
+            // Only auto-pass if the local user HAS control but NO moves
+            if (isCurrentPlayerMovable) {
+                val pawns = if (isPlayer1Turn) gameState.player1Pawns else gameState.player2Pawns
+                val hasLegalMove = pawns.any { p -> 
+                    (p == -1 && effectiveDiceValue == 6) || (p >= 0 && p + effectiveDiceValue <= 57) 
+                }
+                
+                if (!hasLegalMove) {
+                    delay(1200L) // Wait for UI/Animations
+                    onPassTurn(false)
+                }
+            }
+        }
+    }
     
     val player1 = LudoPlayer(
-        userId = match.player1Uid,
-        name = match.player1Name,
+        userId = match.player1Uid.ifBlank { "player_1" },
+        name = match.player1Name.ifBlank { "Player 1" },
         avatarUrl = match.player1Avatar,
-        isCurrentTurn = gameState.currentTurnUid == match.player1Uid,
-        pawnColor = 0xFFC62828
+        isCurrentTurn = isPlayer1Turn,
+        pawnColor = 0xFFC62828,
+        strikes = gameState.player1Strikes
     )
     val player2 = LudoPlayer(
-        userId = match.player2Uid,
-        name = match.player2Name,
+        userId = match.player2Uid.ifBlank { "player_2" },
+        name = match.player2Name.ifBlank { "Player 2" },
         avatarUrl = match.player2Avatar,
-        isCurrentTurn = gameState.currentTurnUid == match.player2Uid,
-        pawnColor = 0xFFFFA000
+        isCurrentTurn = isPlayer2Turn,
+        pawnColor = 0xFFFFA000,
+        strikes = gameState.player2Strikes
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -329,6 +572,22 @@ fun AutoLudoBoardScreen(
         ) {
             // 1. Top Bar
             LudoTopBar(onBackClick = onBackClick)
+
+            // Action Log Indicator (Non-blocking)
+            if (gameState.lastActionLog.isNotBlank()) {
+                Text(
+                    text = gameState.lastActionLog,
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            } else {
+                Spacer(modifier = Modifier.height(30.dp)) // Placeholder to avoid jump
+            }
             
             // 2. Centered Ludo Board Container (Flex-weighted to guarantee fit)
             Box(
@@ -370,9 +629,9 @@ fun AutoLudoBoardScreen(
                     val yellowOutline = Color(0xFF4E2D00)
 
                     gameState.player1Pawns.forEachIndexed { index, pos ->
-                        val isEligible = isMyTurn && (if (isPreviewMode) gameState.currentTurnUid == "player_1" else match.player1Uid == currentUid) && diceRolled && (
-                            (gameState.player1Pawns[index] == -1 && (if (isPreviewMode) localDiceValue == 6 else gameState.diceValue == 6)) ||
-                            (gameState.player1Pawns[index] >= 0 && gameState.player1Pawns[index] + (if (isPreviewMode) localDiceValue else gameState.diceValue) <= 57)
+                        val isEligible = canControlPlayer1 && isRolled && (
+                            (pos == -1 && effectiveDiceValue == 6) ||
+                            (pos >= 0 && pos + effectiveDiceValue <= 57)
                         )
                         
                         LudoPawnView(
@@ -385,25 +644,25 @@ fun AutoLudoBoardScreen(
                             outlineColor = redOutline,
                             isEligibleToMove = isEligible,
                             onClick = {
-                                val dice = if (isPreviewMode) localDiceValue else gameState.diceValue
+                                val dice = effectiveDiceValue
                                 var newPos = pos
                                 if (pos == -1 && dice == 6) {
-                                    newPos = 0
+                                    newPos = 0 // Unlock onto starting cell (Standard Ludo King)
                                 } else if (pos >= 0) {
                                     newPos = pos + dice
                                     if (newPos > 57) return@LudoPawnView
                                 }
                                 if (newPos != pos) {
-                                    onMovePawn(index, newPos)
+                                    onMovePawn(index, newPos, false)
                                 }
                             }
                         )
                     }
 
                     gameState.player2Pawns.forEachIndexed { index, pos ->
-                        val isEligible = isMyTurn && (if (isPreviewMode) gameState.currentTurnUid == "player_2" else match.player2Uid == currentUid) && diceRolled && (
-                            (gameState.player2Pawns[index] == -1 && (if (isPreviewMode) localDiceValue == 6 else gameState.diceValue == 6)) ||
-                            (gameState.player2Pawns[index] >= 0 && gameState.player2Pawns[index] + (if (isPreviewMode) localDiceValue else gameState.diceValue) <= 57)
+                        val isEligible = canControlPlayer2 && isRolled && (
+                            (pos == -1 && effectiveDiceValue == 6) ||
+                            (pos >= 0 && pos + effectiveDiceValue <= 57)
                         )
                         
                         LudoPawnView(
@@ -416,16 +675,16 @@ fun AutoLudoBoardScreen(
                             outlineColor = yellowOutline,
                             isEligibleToMove = isEligible,
                             onClick = {
-                                val dice = if (isPreviewMode) localDiceValue else gameState.diceValue
+                                val dice = effectiveDiceValue
                                 var newPos = pos
                                 if (pos == -1 && dice == 6) {
-                                    newPos = 0
+                                    newPos = 0 // Unlock onto starting cell (Standard Ludo King)
                                 } else if (pos >= 0) {
                                     newPos = pos + dice
                                     if (newPos > 57) return@LudoPawnView
                                 }
                                 if (newPos != pos) {
-                                    onMovePawn(index, newPos)
+                                    onMovePawn(index, newPos, false)
                                 }
                             }
                         )
@@ -437,9 +696,10 @@ fun AutoLudoBoardScreen(
             LudoBottomBattleDock(
                 player1 = player1,
                 player2 = player2,
-                currentDiceValue = diceVal,
-                isDiceRolled = diceRolled,
-                onDiceRoll = onDiceRoll,
+                currentDiceValue = effectiveDiceValue,
+                isDiceRolled = isRolled,
+                timerProgress = timerProgress,
+                onDiceRoll = { onDiceRoll(it, false) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
@@ -450,53 +710,75 @@ fun AutoLudoBoardScreen(
 }
 
 @Composable
-fun PlayerAvatarCard(player: LudoPlayer, isLeft: Boolean) {
+fun PlayerAvatarCard(player: LudoPlayer, isLeft: Boolean, timerProgress: Float = 0f) {
     val glowColor = if (isLeft) Color(0xFF00E5FF) else Color(0xFF00C853) // Cyan for P1, Emerald for P2
     val borderColor = if (player.isCurrentTurn) glowColor else Color.White.copy(alpha = 0.4f)
     val borderStroke = if (player.isCurrentTurn) 3.5.dp else 1.5.dp
     
-    // Elevated Square Avatar Box with Vibrant Frame
-    Surface(
-        modifier = Modifier
-            .size(54.dp)
-            .shadow(
-                elevation = if (player.isCurrentTurn) 12.dp else 2.dp,
-                shape = RoundedCornerShape(12.dp),
-                ambientColor = glowColor,
-                spotColor = glowColor
-            ),
-        shape = RoundedCornerShape(12.dp),
-        color = Color.White.copy(alpha = 0.15f), // Translucent Frame
-        border = BorderStroke(borderStroke, borderColor)
-    ) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            // Placeholder Icon (Royal Blue Background)
-            Box(modifier = Modifier.fillMaxSize().background(Color(0xFF1A237E))) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp).align(Alignment.Center),
-                    tint = Color(0xFFFFD54F) // Bright Gold Icon
+    Box(contentAlignment = Alignment.Center) {
+        // Authoritative Cooldown Ring (Only for active turn)
+        if (player.isCurrentTurn) {
+            Canvas(modifier = Modifier.size(64.dp)) {
+                drawArc(
+                    color = glowColor.copy(alpha = 0.3f),
+                    startAngle = -90f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                )
+                drawArc(
+                    color = glowColor,
+                    startAngle = -90f,
+                    sweepAngle = 360f * (1f - timerProgress),
+                    useCenter = false,
+                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
                 )
             }
+        }
 
-            AsyncImage(
-                model = player.avatarUrl,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-            
-            // Neon Glow Overlay
-            if (player.isCurrentTurn) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .border(
-                            BorderStroke(2.dp, Brush.verticalGradient(listOf(glowColor.copy(alpha = 0.8f), Color.Transparent))),
-                            RoundedCornerShape(12.dp)
-                        )
+        // Elevated Square Avatar Box with Vibrant Frame
+        Surface(
+            modifier = Modifier
+                .size(54.dp)
+                .shadow(
+                    elevation = if (player.isCurrentTurn) 12.dp else 2.dp,
+                    shape = RoundedCornerShape(12.dp),
+                    ambientColor = glowColor,
+                    spotColor = glowColor
+                ),
+            shape = RoundedCornerShape(12.dp),
+            color = Color.White.copy(alpha = 0.15f), // Translucent Frame
+            border = BorderStroke(borderStroke, borderColor)
+        ) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                // Placeholder Icon (Royal Blue Background)
+                Box(modifier = Modifier.fillMaxSize().background(Color(0xFF1A237E))) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp).align(Alignment.Center),
+                        tint = Color(0xFFFFD54F) // Bright Gold Icon
+                    )
+                }
+
+                AsyncImage(
+                    model = player.avatarUrl,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
+                
+                // Neon Glow Overlay
+                if (player.isCurrentTurn) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .border(
+                                BorderStroke(2.dp, Brush.verticalGradient(listOf(glowColor.copy(alpha = 0.8f), Color.Transparent))),
+                                RoundedCornerShape(12.dp)
+                            )
+                    )
+                }
             }
         }
     }
@@ -591,20 +873,27 @@ fun LudoPawnView(
         }
     }
 
-    LudoKingPawnToken(
-        pawnColor = pawnColor,
-        deepShadeColor = deepShadeColor,
-        outlineColor = outlineColor,
-        isEligibleToMove = isEligibleToMove,
-        modifier = Modifier.offset(
-            x = with(density) { animOffset.value.x.toDp() } - 16.dp,
-            y = with(density) { (animOffset.value.y + jumpAnim.value).toDp() } - 40.dp
-        ).clickable(
-            enabled = isEligibleToMove,
-            interactionSource = remember { MutableInteractionSource() },
-            indication = null
-        ) { onClick() }
-    )
+    Box(
+        modifier = Modifier
+            .offset(
+                x = with(density) { animOffset.value.x.toDp() } - 22.dp,
+                y = with(density) { (animOffset.value.y + jumpAnim.value).toDp() } - 46.dp
+            )
+            .size(width = 44.dp, height = 56.dp)
+            .clickable(
+                enabled = isEligibleToMove,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        LudoKingPawnToken(
+            pawnColor = pawnColor,
+            deepShadeColor = deepShadeColor,
+            outlineColor = outlineColor,
+            isEligibleToMove = isEligibleToMove
+        )
+    }
 }
 
 @Composable
@@ -747,6 +1036,7 @@ fun LudoBottomBattleDock(
     player2: LudoPlayer,
     currentDiceValue: Int,
     isDiceRolled: Boolean,
+    timerProgress: Float = 0f,
     onDiceRoll: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -806,7 +1096,12 @@ fun LudoBottomBattleDock(
                     )
                 }
                 Spacer(modifier = Modifier.height(6.dp))
-                PlayerAvatarCard(player = player1, isLeft = true)
+                
+                // Strike Life Dots
+                StrikeDots(strikes = player1.strikes)
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                PlayerAvatarCard(player = player1, isLeft = true, timerProgress = if (player1.isCurrentTurn) timerProgress else 0f)
             }
 
             // Player 2 Area (Name + Avatar)
@@ -834,7 +1129,12 @@ fun LudoBottomBattleDock(
                     MiniPawnIcon(color = Color(0xFFFF9100))
                 }
                 Spacer(modifier = Modifier.height(6.dp))
-                PlayerAvatarCard(player = player2, isLeft = false)
+                
+                // Strike Life Dots
+                StrikeDots(strikes = player2.strikes)
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                PlayerAvatarCard(player = player2, isLeft = false, timerProgress = if (player2.isCurrentTurn) timerProgress else 0f)
             }
         }
 
@@ -850,12 +1150,31 @@ fun LudoBottomBattleDock(
             contentAlignment = Alignment.Center
         ) {
             val isPlayer1Turn = player1.isCurrentTurn
-            val isPreviewMode = androidx.compose.ui.platform.LocalInspectionMode.current || player1.userId.contains("player") || player2.userId.contains("player")
+            val isPreviewMode = LocalInspectionMode.current || player1.userId.contains("player") || player2.userId.contains("player")
+            val activeDiceColor = if (isPlayer1Turn) Color(0xFFEF4444) else Color(0xFFF59E0B)
+            
             Luxury3DCubeDice(
                 diceValue = currentDiceValue,
-                isEnabled = (if (isPreviewMode) true else player1.isCurrentTurn || player2.isCurrentTurn) && !isDiceRolled,
+                isEnabled = (player1.isCurrentTurn || player2.isCurrentTurn) && !isDiceRolled,
                 isPlayer1Turn = isPlayer1Turn,
+                diceColor = activeDiceColor,
                 onRoll = onDiceRoll
+            )
+        }
+    }
+}
+
+@Composable
+fun StrikeDots(strikes: Int) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        repeat(5) { i ->
+            val isStruck = i < strikes
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(if (isStruck) Color(0xFFEF4444) else Color(0xFF00E5FF))
+                    .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
             )
         }
     }
@@ -908,7 +1227,6 @@ private data class GridPos(val x: Int, val y: Int)
 
 private fun getGridPositionForPath(pos: Int, isPlayer1: Boolean): GridPos {
     // Basic Ludo path for a 15x15 grid
-    // This is a simplified version of the path
     val pathPoints = listOf(
         // Segment 1: Red Start area (Left-Middle)
         GridPos(1, 6), GridPos(2, 6), GridPos(3, 6), GridPos(4, 6), GridPos(5, 6),
@@ -937,10 +1255,8 @@ private fun getGridPositionForPath(pos: Int, isPlayer1: Boolean): GridPos {
         }
     }
     
-    // Rotate path for Yellow (player2) if needed
-    // In this simplified logic, let's just use the same path with an offset for Yellow
-    val p1StartIdx = 0 // Red starts at (1, 6)
-    val p2StartIdx = 26 // Yellow starts at (13, 8) roughly half way
+    val p1StartIdx = 39 // Red starts at (1, 8) - Bottom Arm Exit
+    val p2StartIdx = 13 // Yellow starts at (13, 6) - Top Arm Exit
     
     val actualIdx = if (isPlayer1) {
         (p1StartIdx + pos) % 52
@@ -956,6 +1272,7 @@ fun Luxury3DCubeDice(
     diceValue: Int,
     isEnabled: Boolean,
     isPlayer1Turn: Boolean,
+    diceColor: Color = if (isPlayer1Turn) Color(0xFFEF4444) else Color(0xFFF59E0B),
     onRoll: (Int) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -963,12 +1280,17 @@ fun Luxury3DCubeDice(
     var isRolling by remember { mutableStateOf(false) }
     var displayValue by remember { mutableStateOf(diceValue) }
     
+    // Physical Animatables
     val jumpY = remember { Animatable(0f) }
     val rotX = remember { Animatable(0f) }
     val rotY = remember { Animatable(0f) }
     val rotZ = remember { Animatable(0f) }
-    val dScaleX = remember { Animatable(1f) }
-    val dScaleY = remember { Animatable(1f) }
+    val squashX = remember { Animatable(1f) }
+    val squashY = remember { Animatable(1f) }
+    
+    // Shadow Animatables
+    val shadowAlpha = remember { Animatable(0.4f) }
+    val shadowScale = remember { Animatable(1f) }
 
     LaunchedEffect(diceValue) {
         if (!isRolling) displayValue = diceValue
@@ -976,148 +1298,275 @@ fun Luxury3DCubeDice(
 
     Box(
         modifier = Modifier
-            .size(64.dp)
-            .zIndex(50f)
-            .graphicsLayer {
-                translationY = jumpY.value
-                rotationX = rotX.value
-                rotationY = rotY.value
-                rotationZ = rotZ.value
-                cameraDistance = 16f * this.density
-                scaleX = dScaleX.value
-                scaleY = dScaleY.value
-            }
-            .clickable(
-                enabled = isEnabled && !isRolling,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) {
-                if (!isRolling) {
-                    isRolling = true
-                    coroutineScope.launch {
-                        val jumpTarget = -localDensity.run { 48.dp.toPx() }
-                        // 1. Jump up and rotate
-                        launch {
-                            jumpY.animateTo(jumpTarget, tween(180, easing = FastOutSlowInEasing))
-                            jumpY.animateTo(0f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessMedium))
-                        }
-                        
-                        launch { rotX.animateTo(rotX.value + 720f, tween(600, easing = LinearEasing)) }
-                        launch { rotY.animateTo(rotY.value + 540f, tween(600, easing = LinearEasing)) }
-                        launch { rotZ.animateTo(rotZ.value + 360f, tween(600, easing = LinearEasing)) }
-
-                        // 2. Shuffle numbers rapidly
-                        val tumbleJob = launch {
-                            while (true) {
-                                displayValue = (1..6).random()
-                                delay(45)
-                            }
-                        }
-                        
-                        delay(600)
-                        tumbleJob.cancel()
-                        
-                        // 3. Final settled value
-                        val finalValue = (1..6).random()
-                        displayValue = finalValue
-                        
-                        launch { rotX.snapTo(0f) }
-                        launch { rotY.snapTo(0f) }
-                        launch { rotZ.snapTo(0f) }
-                        
-                        launch {
-                            dScaleX.animateTo(1.15f, tween(100))
-                            dScaleX.animateTo(1f, spring(Spring.DampingRatioHighBouncy))
-                        }
-                        launch {
-                            dScaleY.animateTo(0.84f, tween(100))
-                            dScaleY.animateTo(1.06f, tween(100))
-                            dScaleY.animateTo(1f, spring(Spring.DampingRatioHighBouncy))
-                        }
-                        
-                        delay(200)
-                        onRoll(finalValue)
-                        isRolling = false
-                    }
-                }
-            },
+            .size(80.dp)
+            .zIndex(50f),
         contentAlignment = Alignment.Center
     ) {
-        LudoVibrantDiceFace(value = displayValue, isPlayer1 = isPlayer1Turn)
-    }
-}
-
-@Composable
-fun LudoVibrantDiceFace(value: Int, isPlayer1: Boolean) {
-    val gradient = if (isPlayer1) {
-        Brush.verticalGradient(listOf(Color(0xFFFF1744), Color(0xFFD50000))) // Crimson
-    } else {
-        Brush.verticalGradient(listOf(Color(0xFFFFEA00), Color(0xFFFFB300))) // Sunshine Gold
-    }
-
-    Box(
-        modifier = Modifier
-            .size(46.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(gradient)
-            .border(
-                BorderStroke(1.5.dp, Color.White.copy(alpha = 0.6f)), // Bevel highlight
-                RoundedCornerShape(10.dp)
+        // 1. Authoritative Dynamic Drop Shadow (Anchored to ground)
+        Canvas(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .offset(y = (-4).dp)
+                .size(width = 40.dp, height = 12.dp)
+        ) {
+            drawOval(
+                color = Color.Black.copy(alpha = shadowAlpha.value),
+                size = Size(size.width * shadowScale.value, size.height * shadowScale.value),
+                topLeft = Offset(
+                    (size.width * (1f - shadowScale.value)) / 2,
+                    (size.height * (1f - shadowScale.value)) / 2
+                )
             )
-            .padding(6.dp)
-    ) {
-        VibrantDicePips(value = value)
+        }
+
+        // 2. The Volumetric 3D Cube Dice
+        Box(
+            modifier = Modifier
+                .size(54.dp)
+                .graphicsLayer {
+                    translationY = jumpY.value
+                    rotationX = rotX.value
+                    rotationY = rotY.value
+                    rotationZ = rotZ.value
+                    scaleX = squashX.value
+                    scaleY = squashY.value
+                    cameraDistance = 12f * density
+                }
+                .clickable(
+                    enabled = isEnabled && !isRolling,
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
+                    if (!isRolling) {
+                        isRolling = true
+                        coroutineScope.launch {
+                            val jumpTarget = -localDensity.run { 65.dp.toPx() }
+                            
+                            // Phase 1: Anticipation Squash
+                            squashY.animateTo(0.82f, tween(60, easing = FastOutSlowInEasing))
+                            squashX.animateTo(1.15f, tween(60, easing = FastOutSlowInEasing))
+
+                            // Phase 2: Parabolic Tumbling Jump & Erratic Multi-axis Rotation
+                            launch {
+                                // shadow fading
+                                launch {
+                                    shadowAlpha.animateTo(0.12f, tween(250))
+                                    shadowScale.animateTo(1.4f, tween(250))
+                                }
+                                jumpY.animateTo(jumpTarget, tween(250, easing = LinearOutSlowInEasing))
+                                
+                                // Return with shadow tightening
+                                launch {
+                                    shadowAlpha.animateTo(0.55f, tween(250))
+                                    shadowScale.animateTo(0.85f, tween(250))
+                                }
+                                jumpY.animateTo(0f, tween(250, easing = FastOutLinearInEasing))
+                                
+                                // Phase 3: Impact Bounce & Settle
+                                launch {
+                                    shadowAlpha.animateTo(0.4f, spring(Spring.DampingRatioMediumBouncy))
+                                    shadowScale.animateTo(1f, spring(Spring.DampingRatioMediumBouncy))
+                                }
+                                
+                                squashY.animateTo(0.85f, tween(80))
+                                squashY.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow))
+                                squashX.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow))
+                            }
+                            
+                            // Multi-axis Erratic Tumbling (Synchronized to not clash with initial squash)
+                            launch {
+                                squashY.animateTo(1f, tween(100))
+                                squashX.animateTo(1f, tween(100))
+                                rotX.animateTo(rotX.value + 720f, tween(500, easing = LinearEasing))
+                            }
+                            launch { rotY.animateTo(rotY.value + 1080f, tween(500, easing = LinearEasing)) }
+                            launch { rotZ.animateTo(rotZ.value + 180f, tween(500, easing = LinearEasing)) }
+
+                            // Rapid Number Shuffling
+                            val tumbleJob = launch {
+                                while (true) {
+                                    displayValue = (1..6).random()
+                                    delay(50)
+                                }
+                            }
+                            
+                            delay(500)
+                            tumbleJob.cancel()
+                            
+                            // Final Settle Value
+                            val finalValue = (1..6).random()
+                            displayValue = finalValue
+                            
+                            // Snap tilt to neutral
+                            launch { rotX.animateTo(0f, spring()) }
+                            launch { rotY.animateTo(0f, spring()) }
+                            launch { rotZ.animateTo(0f, spring()) }
+                            
+                            delay(200)
+                            onRoll(finalValue)
+                            isRolling = false
+                        }
+                    }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            LudoVibrantDiceFace(
+                value = displayValue, 
+                isPlayer1 = isPlayer1Turn,
+                diceColor = diceColor,
+                modifier = Modifier.size(54.dp)
+            )
+        }
     }
 }
 
 @Composable
-fun VibrantDicePips(value: Int) {
-    Box(modifier = Modifier.fillMaxSize()) {
+fun LudoVibrantDiceFace(
+    value: Int, 
+    isPlayer1: Boolean,
+    diceColor: Color = if (isPlayer1) Color(0xFFEF4444) else Color(0xFFF59E0B),
+    modifier: Modifier = Modifier
+) {
+    // Shading palette derived from base color
+    val sideColor = diceColor.copy(alpha = 1f).darken(0.35f)
+    val topHighlight = diceColor.copy(alpha = 1f).lighten(0.25f)
+    val bevelColor = Color.White.copy(alpha = 0.5f)
+
+    Box(modifier = modifier) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val depth = 12.dp.toPx() // Volumetric depth thickness
+            val cornerRadius = 10.dp.toPx()
+
+            // 1. Right/Side Facet (Depth Extrusion)
+            val sidePath = Path().apply {
+                moveTo(w, cornerRadius)
+                lineTo(w + depth * 0.5f, cornerRadius - depth * 0.3f)
+                lineTo(w + depth * 0.5f, h - cornerRadius - depth * 0.3f)
+                lineTo(w, h - cornerRadius)
+                close()
+            }
+            drawPath(sidePath, sideColor)
+
+            // 2. Top Facet (Perspective Quad)
+            val topPath = Path().apply {
+                moveTo(cornerRadius, 0f)
+                lineTo(cornerRadius + depth * 0.5f, -depth * 0.3f)
+                lineTo(w - cornerRadius + depth * 0.5f, -depth * 0.3f)
+                lineTo(w - cornerRadius, 0f)
+                close()
+            }
+            drawPath(topPath, topHighlight)
+
+            // 3. Main Front Face (Rounded Core)
+            val gradientRadius = (w * 0.8f).coerceAtLeast(1f)
+            drawRoundRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(diceColor.lighten(0.1f), diceColor),
+                    center = Offset(w * 0.3f, h * 0.3f),
+                    radius = gradientRadius
+                ),
+                size = Size(w, h),
+                cornerRadius = CornerRadius(cornerRadius, cornerRadius)
+            )
+
+            // 4. Luxury Chamfered Bevel Lines
+            drawRoundRect(
+                color = bevelColor,
+                size = Size(w, h),
+                cornerRadius = CornerRadius(cornerRadius, cornerRadius),
+                style = Stroke(width = 1.5.dp.toPx())
+            )
+            
+            // Specular Glint Across Face
+            drawPath(
+                path = Path().apply {
+                    moveTo(0f, h * 0.2f)
+                    lineTo(w * 0.8f, 0f)
+                    lineTo(w, 0f)
+                    lineTo(0f, h * 0.4f)
+                    close()
+                },
+                color = Color.White.copy(alpha = 0.15f)
+            )
+        }
+
+        // 5. Carved Pips with Radial Depth
+        VibrantDicePips(value = value, diceColor = diceColor)
+    }
+}
+
+@Composable
+fun VibrantDicePips(value: Int, diceColor: Color) {
+    Box(modifier = Modifier.fillMaxSize().padding(10.dp)) {
         when (value) {
-            1 -> VibrantPip(Alignment.Center)
+            1 -> CarvedPip(Alignment.Center, diceColor)
             2 -> {
-                VibrantPip(Alignment.TopEnd)
-                VibrantPip(Alignment.BottomStart)
+                CarvedPip(Alignment.TopEnd, diceColor)
+                CarvedPip(Alignment.BottomStart, diceColor)
             }
             3 -> {
-                VibrantPip(Alignment.TopEnd)
-                VibrantPip(Alignment.Center)
-                VibrantPip(Alignment.BottomStart)
+                CarvedPip(Alignment.TopEnd, diceColor)
+                CarvedPip(Alignment.Center, diceColor)
+                CarvedPip(Alignment.BottomStart, diceColor)
             }
             4 -> {
-                VibrantPip(Alignment.TopStart)
-                VibrantPip(Alignment.TopEnd)
-                VibrantPip(Alignment.BottomStart)
-                VibrantPip(Alignment.BottomEnd)
+                CarvedPip(Alignment.TopStart, diceColor)
+                CarvedPip(Alignment.TopEnd, diceColor)
+                CarvedPip(Alignment.BottomStart, diceColor)
+                CarvedPip(Alignment.BottomEnd, diceColor)
             }
             5 -> {
-                VibrantPip(Alignment.TopStart)
-                VibrantPip(Alignment.TopEnd)
-                VibrantPip(Alignment.Center)
-                VibrantPip(Alignment.BottomStart)
-                VibrantPip(Alignment.BottomEnd)
+                CarvedPip(Alignment.TopStart, diceColor)
+                CarvedPip(Alignment.TopEnd, diceColor)
+                CarvedPip(Alignment.Center, diceColor)
+                CarvedPip(Alignment.BottomStart, diceColor)
+                CarvedPip(Alignment.BottomEnd, diceColor)
             }
             6 -> {
-                VibrantPip(Alignment.TopStart)
-                VibrantPip(Alignment.TopEnd)
-                VibrantPip(Alignment.CenterStart)
-                VibrantPip(Alignment.CenterEnd)
-                VibrantPip(Alignment.BottomStart)
-                VibrantPip(Alignment.BottomEnd)
+                CarvedPip(Alignment.TopStart, diceColor)
+                CarvedPip(Alignment.TopEnd, diceColor)
+                CarvedPip(Alignment.CenterStart, diceColor)
+                CarvedPip(Alignment.CenterEnd, diceColor)
+                CarvedPip(Alignment.BottomStart, diceColor)
+                CarvedPip(Alignment.BottomEnd, diceColor)
             }
         }
     }
 }
 
 @Composable
-fun BoxScope.VibrantPip(alignment: Alignment) {
+fun BoxScope.CarvedPip(alignment: Alignment, diceColor: Color) {
+    val pipDepthColor = diceColor.darken(0.4f)
     Box(
         modifier = Modifier
             .align(alignment)
-            .size(9.dp)
+            .size(10.dp)
             .shadow(1.dp, CircleShape)
-            .clip(CircleShape)
-            .background(Color.White)
-            .border(0.5.dp, Color(0xFF1565C0).copy(alpha = 0.2f), CircleShape)
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(Color.White, Color(0xFFE0E0E0), pipDepthColor.copy(alpha = 0.4f)),
+                    center = Offset.Zero,
+                    radius = 30f
+                ),
+                CircleShape
+            )
+            .border(0.5.dp, Color.Black.copy(alpha = 0.1f), CircleShape)
     )
 }
+
+// Utility Extensions for Shading
+fun Color.darken(factor: Float): Color = Color(
+    red = (red * (1f - factor)).coerceIn(0f, 1f),
+    green = (green * (1f - factor)).coerceIn(0f, 1f),
+    blue = (blue * (1f - factor)).coerceIn(0f, 1f),
+    alpha = alpha
+)
+
+fun Color.lighten(factor: Float): Color = Color(
+    red = (red + (1f - red) * factor).coerceIn(0f, 1f),
+    green = (green + (1f - green) * factor).coerceIn(0f, 1f),
+    blue = (blue + (1f - blue) * factor).coerceIn(0f, 1f),
+    alpha = alpha
+)

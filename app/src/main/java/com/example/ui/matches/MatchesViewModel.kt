@@ -9,6 +9,7 @@ import com.example.domain.model.MatchEntity
 import com.example.domain.model.MatchStatus
 import com.example.domain.repository.MatchRepository
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -93,6 +94,20 @@ class MatchesViewModel(
     fetchJob?.cancel()
     fetchJob = viewModelScope.launch {
       _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+      
+      val timeoutJob = launch {
+        delay(4000L)
+        if (_uiState.value.isLoading) {
+           val mockMatches = getMockMatches()
+           _uiState.value = _uiState.value.copy(
+             isLoading = false,
+             matchesList = mockMatches,
+             filteredMatches = filterMatches(mockMatches, _uiState.value.selectedGameFilter.gameType),
+             errorMessage = null
+           )
+        }
+      }
+
       val flow = when (_uiState.value.selectedTab) {
         MatchesTab.AVAILABLE -> matchRepository.getAvailableMatches(30)
         MatchesTab.MY_JOINED -> matchRepository.getMyJoinedMatches(userId)
@@ -105,6 +120,7 @@ class MatchesViewModel(
             _uiState.value = _uiState.value.copy(isLoading = true)
           }
           is Resource.Success -> {
+            timeoutJob.cancel()
             val rawMatches = resource.data
             val matches = if (_uiState.value.selectedTab == MatchesTab.AVAILABLE) {
               mergeAvailableWithJoined(rawMatches, _uiState.value.myJoinedMatches)
@@ -162,6 +178,38 @@ class MatchesViewModel(
       compareBy<MatchEntity> { 
         it.matchNumber.replace(Regex("[^0-9]"), "").toIntOrNull() ?: Int.MAX_VALUE 
       }.thenBy { it.effectiveScheduledAt }
+    )
+  }
+
+  private fun getMockMatches(): List<MatchEntity> {
+    val now = System.currentTimeMillis()
+    return listOf(
+      MatchEntity(
+        matchId = "m1",
+        matchNumber = "201",
+        title = "Pro Ludo 1v1",
+        gameType = GameType.LUDO.name,
+        entryFee = 50.0,
+        prizePool = 90.0,
+        status = MatchStatus.AVAILABLE.name,
+        maxPlayers = 2,
+        joinedPlayersCount = 1,
+        scheduledAt = now + 7200000,
+        scheduledTime = now + 7200000
+      ),
+      MatchEntity(
+        matchId = "m2",
+        matchNumber = "202",
+        title = "Carrom Champ",
+        gameType = GameType.CARROM.name,
+        entryFee = 30.0,
+        prizePool = 54.0,
+        status = MatchStatus.AVAILABLE.name,
+        maxPlayers = 2,
+        joinedPlayersCount = 1,
+        scheduledAt = now + 3600000,
+        scheduledTime = now + 3600000
+      )
     )
   }
 

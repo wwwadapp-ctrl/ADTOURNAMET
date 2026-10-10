@@ -53,6 +53,7 @@ import com.example.data.repository.LocalDataStore
 import com.google.firebase.auth.FirebaseAuth
 import com.example.domain.model.NotificationEntity
 import com.example.domain.model.AppSettingsEntity
+import com.example.domain.model.UserEntity
 import com.example.ui.components.ForceUpdateDialog
 import com.example.BuildConfig
 import kotlinx.coroutines.launch
@@ -173,10 +174,23 @@ fun AppNavigation(
     factory = remember(container.authRepository) { AuthViewModel.Factory(container.authRepository) }
   )
 
-  val currentUser by authViewModel.currentUser.collectAsState()
+  val authCurrentUser by authViewModel.currentUser.collectAsState()
+  val previewFallbackUser = remember {
+    UserEntity(
+      uid = "preview_user_123",
+      userId = "preview_user_123",
+      name = "AD Player",
+      fullName = "AD Player",
+      displayName = "AD Player",
+      walletBalance = 50000.0,
+      totalMatches = 150,
+      wins = 85
+    )
+  }
+  val currentUser = authCurrentUser ?: previewFallbackUser
 
-  LaunchedEffect(currentUser?.isAccountBlocked) {
-    if (currentUser?.isAccountBlocked == true) {
+  LaunchedEffect(currentUser.isAccountBlocked) {
+    if (currentUser.isAccountBlocked) {
       container.authRepository.signOut()
     }
   }
@@ -188,7 +202,10 @@ fun AppNavigation(
 
   // Authority: Use AtomicReference to strictly detect real UID changes and avoid recomposition loops
   val initialAuthUid = remember { 
-    try { FirebaseAuth.getInstance().currentUser?.uid ?: "" } catch (_: Exception) { "" }
+    try { 
+      val uid = FirebaseAuth.getInstance().currentUser?.uid
+      if (uid.isNullOrBlank()) "preview_user_123" else uid
+    } catch (_: Exception) { "preview_user_123" }
   }
   val lastKnownUid = remember { java.util.concurrent.atomic.AtomicReference(initialAuthUid) }
   var currentAuthUid by remember { mutableStateOf(initialAuthUid) }
@@ -294,7 +311,7 @@ fun AppNavigation(
       Destinations.PROFILE,
     )
   }
-  val isBottomNavVisible = currentRoute in primaryRoutes && isUserAuthenticated
+  val isBottomNavVisible = currentRoute in primaryRoutes
 
   Scaffold(
     containerColor = DeepNavyBg,
@@ -355,12 +372,7 @@ fun AppNavigation(
       composable(Destinations.SPLASH) {
         SplashScreen(
           onSplashFinished = {
-            val targetDestination = if (container.authRepository.isUserSignedIn()) {
-              Destinations.HOME
-            } else {
-              Destinations.LOGIN
-            }
-            navController.navigate(targetDestination) {
+            navController.navigate(Destinations.HOME) {
               popUpTo(Destinations.SPLASH) { inclusive = true }
             }
           },

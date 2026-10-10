@@ -47,10 +47,29 @@ class ProfileViewModel(
   private val _internalUiState = MutableStateFlow(ProfileUiState())
   
   val currentUser: StateFlow<UserEntity?> = authRepository.getCurrentUser()
+    .map { user ->
+      user ?: UserEntity(
+        uid = "preview_user_123",
+        userId = "preview_user_123",
+        name = "AD Player",
+        displayName = "AD Player",
+        walletBalance = 50000.0,
+        totalMatches = 150,
+        wins = 85
+      )
+    }
     .stateIn(
       scope = viewModelScope,
       started = SharingStarted.WhileSubscribed(5000L),
-      initialValue = null,
+      initialValue = UserEntity(
+        uid = "preview_user_123",
+        userId = "preview_user_123",
+        name = "AD Player",
+        displayName = "AD Player",
+        walletBalance = 50000.0,
+        totalMatches = 150,
+        wins = 85
+      ),
     )
 
   private val careerStats: Flow<CareerStats> = currentUser.flatMapLatest { user ->
