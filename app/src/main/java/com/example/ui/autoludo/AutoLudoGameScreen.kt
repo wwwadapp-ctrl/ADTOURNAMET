@@ -215,7 +215,7 @@ fun AutoLudoGameScreen(
                     }
                 }
 
-                val isBonusTurn = rolledDice == 6 || newPos == 57 || localCapture
+                val isBonusTurn = rolledDice == 6 || newPos == 56 || localCapture
 
                 // Clear optimistic roll state immediately upon move
                 localIsDiceRolled = false
@@ -253,8 +253,8 @@ fun AutoLudoGameScreen(
                         }
                     }
                     
-                    val allP1Goal = p1Pawns.all { it == 57 }
-                    val allP2Goal = p2Pawns.all { it == 57 }
+                    val allP1Goal = p1Pawns.all { it == 56 }
+                    val allP2Goal = p2Pawns.all { it == 56 }
                     val isDisqualified = p1Strikes >= 3 || p2Strikes >= 3
                     val isCompleted = allP1Goal || allP2Goal || isDisqualified
                     val winner = when {
@@ -285,7 +285,7 @@ fun AutoLudoGameScreen(
                             lastActionLog = when {
                                 isDisqualified -> "Player Disqualified (3 Misses)!"
                                 localCapture -> "Captured! Bonus Roll"
-                                newPos == 57 -> "Goal! Bonus Roll"
+                                newPos == 56 -> "Goal! Bonus Roll"
                                 rolledDice == 6 -> "Rolled 6! Bonus Turn"
                                 isTimeout -> "Auto-Move! Strike +1"
                                 else -> "Pawn Moved"
@@ -351,8 +351,16 @@ fun AutoLudoGameScreen(
                 title = { Text("গেম সমাপ্ত!", fontWeight = FontWeight.Bold) },
                 text = {
                     val winnerUid = currentMatch.gameState.winnerUid
+                    val isMe = currentUid == winnerUid
                     val winnerName = if (winnerUid == currentMatch.player1Uid) currentMatch.player1Name else if (winnerUid == currentMatch.player2Uid) currentMatch.player2Name else "বিজয়ী"
-                    Text("অভিনন্দন! $winnerName গেমটি জিতেছেন।")
+                    
+                    Column {
+                        if (isMe) {
+                            Text("অভিনন্দন! আপনি ৳${String.format("%.2f", currentMatch.prizePool)} জিতেছেন এবং তা আপনার ওয়ালেটে যোগ হয়েছে!")
+                        } else {
+                            Text("দুঃখিত! $winnerName গেমটি জিতেছেন। ভালো খেলার জন্য ধন্যবাদ।")
+                        }
+                    }
                 },
                 confirmButton = {
                     Button(onClick = { onBackClick() }) {
@@ -449,6 +457,10 @@ fun AutoLudoBoardScreen(
     var timerProgress by remember { mutableStateOf(0f) }
     val totalTime = 15000L
 
+    // Determine Local Perspective Rotation
+    val isPlayer2 = currentUid == match.player2Uid
+    val boardRotation = if (isPlayer2) 180f else 0f
+
     // Native Ticking Sound via ToneGenerator
     val toneGenerator = remember {
         try {
@@ -538,7 +550,7 @@ fun AutoLudoBoardScreen(
                     // PHASE 2 TIMEOUT: Auto-Move or Auto-Pass
                     val pawns = if (isPlayer1Turn) gameState.player1Pawns else gameState.player2Pawns
                     val eligibleIndex = pawns.indexOfFirst { p -> 
-                        (p == -1 && effectiveDiceValue == 6) || (p >= 0 && p + effectiveDiceValue <= 57) 
+                        (p == -1 && effectiveDiceValue == 6) || (p >= 0 && p + effectiveDiceValue <= 56) 
                     }
                     if (eligibleIndex != -1) {
                         val p = pawns[eligibleIndex]
@@ -561,10 +573,10 @@ fun AutoLudoBoardScreen(
         if (isRolled && effectiveDiceValue in 1..6) {
             val pawns = if (isPlayer1Turn) gameState.player1Pawns else gameState.player2Pawns
             val hasLegalMove = (effectiveDiceValue == 6 && pawns.any { it == -1 }) ||
-                               pawns.any { it >= 0 && it + effectiveDiceValue <= 57 }
+                               pawns.any { it >= 0 && it + effectiveDiceValue <= 56 }
             
             if (!hasLegalMove) {
-                delay(1200L) // Wait exactly 1200ms for roll animation to complete
+                delay(800L) // Wait exactly 800ms for roll animation to complete
                 // Authoritative pass: any connected client (active or observer) can trigger pass when no moves exist
                 onPassTurn(false)
             }
@@ -638,6 +650,9 @@ fun AutoLudoBoardScreen(
                         .shadow(12.dp, RoundedCornerShape(8.dp))
                         .border(2.dp, Color(0xFFBF953F), RoundedCornerShape(8.dp))
                         .background(Color.White)
+                        .graphicsLayer {
+                            rotationZ = boardRotation
+                        }
                 ) {
                     val boardSizePx = constraints.maxWidth.toFloat()
                     val unit = boardSizePx / 15f
@@ -662,12 +677,23 @@ fun AutoLudoBoardScreen(
                     val yellowDeep = Color(0xFF9E5B00)
                     val yellowOutline = Color(0xFF4E2D00)
 
+                    // 1. Group all pawns on track to identify overlaps
+                    val onTrackPawns = (gameState.player1Pawns.mapIndexed { i, p -> Triple(i, p, true) } +
+                                       gameState.player2Pawns.mapIndexed { i, p -> Triple(i, p, false) })
+                                       .filter { it.second >= 0 }
+                    val clusterMap = onTrackPawns.groupBy { it.second }
+
+                    // 2. Render Player 1 Pawns
                     gameState.player1Pawns.forEachIndexed { index, pos ->
                         val isEligible = canControlPlayer1 && isRolled && (
                             (pos == -1 && effectiveDiceValue == 6) ||
-                            (pos >= 0 && pos + effectiveDiceValue <= 57)
+                            (pos >= 0 && pos + effectiveDiceValue <= 56)
                         )
                         
+                        val cluster = if (pos >= 0) clusterMap[pos] ?: emptyList() else emptyList()
+                        val stackIdx = if (pos >= 0) cluster.indexOfFirst { it.first == index && it.third } else 0
+                        val total = if (pos >= 0) cluster.size else 1
+
                         LudoPawnView(
                             targetPos = pos,
                             index = index,
@@ -677,14 +703,18 @@ fun AutoLudoBoardScreen(
                             deepShadeColor = redDeep,
                             outlineColor = redOutline,
                             isEligibleToMove = isEligible,
+                            boardRotation = boardRotation,
+                            stackIndex = stackIdx,
+                            totalInStack = total,
+                            toneGenerator = toneGenerator,
                             onClick = {
                                 val dice = effectiveDiceValue
                                 var newPos = pos
                                 if (pos == -1 && dice == 6) {
-                                    newPos = 0 // Unlock onto starting cell (Standard Ludo King)
+                                    newPos = 0 
                                 } else if (pos >= 0) {
                                     newPos = pos + dice
-                                    if (newPos > 57) return@LudoPawnView
+                                    if (newPos > 56) return@LudoPawnView
                                 }
                                 if (newPos != pos) {
                                     onMovePawn(index, newPos, false)
@@ -693,12 +723,17 @@ fun AutoLudoBoardScreen(
                         )
                     }
 
+                    // 3. Render Player 2 Pawns
                     gameState.player2Pawns.forEachIndexed { index, pos ->
                         val isEligible = canControlPlayer2 && isRolled && (
                             (pos == -1 && effectiveDiceValue == 6) ||
-                            (pos >= 0 && pos + effectiveDiceValue <= 57)
+                            (pos >= 0 && pos + effectiveDiceValue <= 56)
                         )
                         
+                        val cluster = if (pos >= 0) clusterMap[pos] ?: emptyList() else emptyList()
+                        val stackIdx = if (pos >= 0) cluster.indexOfFirst { it.first == index && !it.third } else 0
+                        val total = if (pos >= 0) cluster.size else 1
+
                         LudoPawnView(
                             targetPos = pos,
                             index = index,
@@ -708,14 +743,18 @@ fun AutoLudoBoardScreen(
                             deepShadeColor = yellowDeep,
                             outlineColor = yellowOutline,
                             isEligibleToMove = isEligible,
+                            boardRotation = boardRotation,
+                            stackIndex = stackIdx,
+                            totalInStack = total,
+                            toneGenerator = toneGenerator,
                             onClick = {
                                 val dice = effectiveDiceValue
                                 var newPos = pos
                                 if (pos == -1 && dice == 6) {
-                                    newPos = 0 // Unlock onto starting cell (Standard Ludo King)
+                                    newPos = 0 
                                 } else if (pos >= 0) {
                                     newPos = pos + dice
-                                    if (newPos > 57) return@LudoPawnView
+                                    if (newPos > 56) return@LudoPawnView
                                 }
                                 if (newPos != pos) {
                                     onMovePawn(index, newPos, false)
@@ -736,6 +775,7 @@ fun AutoLudoBoardScreen(
                 canRoll = canActivePlayerRoll,
                 timerProgress = timerProgress,
                 onDiceRoll = { onDiceRoll(it, false) },
+                toneGenerator = toneGenerator,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
@@ -911,62 +951,96 @@ fun LudoPawnView(
     deepShadeColor: Color,
     outlineColor: Color,
     isEligibleToMove: Boolean,
+    boardRotation: Float = 0f,
+    stackIndex: Int = 0,
+    totalInStack: Int = 1,
+    toneGenerator: android.media.ToneGenerator? = null,
     onClick: () -> Unit
 ) {
     val density = LocalDensity.current
     
     // Maintain visual position state for step-by-step hopping
     var visualPos by remember { mutableStateOf(targetPos) }
-    val animOffset = remember { Animatable(getPawnOffset(targetPos, index, boardSizePx, isPlayer1), Offset.VectorConverter) }
+    val animOffset = remember { Animatable(getPawnOffset(targetPos, index, boardSizePx, isPlayer1, stackIndex, totalInStack), Offset.VectorConverter) }
     
     // Jump height animation for parabolic effect
     val jumpAnim = remember { Animatable(0f) }
 
-    LaunchedEffect(targetPos, boardSizePx) {
+    LaunchedEffect(targetPos, boardSizePx, stackIndex, totalInStack) {
         if (boardSizePx <= 0f) return@LaunchedEffect
         
         if (targetPos == visualPos) {
-             animOffset.snapTo(getPawnOffset(targetPos, index, boardSizePx, isPlayer1))
+             animOffset.animateTo(getPawnOffset(targetPos, index, boardSizePx, isPlayer1, stackIndex, totalInStack), tween(300))
              return@LaunchedEffect
         }
 
         // Logic for movement: step-by-step hopping
         if (visualPos == -1 && targetPos >= 0) {
             // From yard to start: one big jump
-            val startOffset = getPawnOffset(0, index, boardSizePx, isPlayer1)
+            val startOffset = getPawnOffset(0, index, boardSizePx, isPlayer1, stackIndex, totalInStack)
             launch {
                 jumpAnim.animateTo(-24f, tween(180, easing = FastOutLinearInEasing))
                 jumpAnim.animateTo(0f, tween(180, easing = LinearOutSlowInEasing))
             }
             animOffset.animateTo(startOffset, tween(360))
             visualPos = 0
+            try {
+                toneGenerator?.startTone(android.media.ToneGenerator.TONE_DTMF_1, 60)
+            } catch (e: Exception) { }
         }
         
         if (targetPos > visualPos && visualPos >= 0) {
             // Step-by-step hop through the track
             for (step in (visualPos + 1)..targetPos) {
-                val stepOffset = getPawnOffset(step, index, boardSizePx, isPlayer1)
+                val stepOffset = if (step == targetPos) {
+                    getPawnOffset(step, index, boardSizePx, isPlayer1, stackIndex, totalInStack)
+                } else {
+                    getPawnOffset(step, index, boardSizePx, isPlayer1)
+                }
                 launch {
                     jumpAnim.animateTo(-18f, tween(150, easing = FastOutLinearInEasing))
                     jumpAnim.animateTo(0f, tween(150, easing = LinearOutSlowInEasing))
                 }
                 animOffset.animateTo(stepOffset, tween(300, easing = LinearEasing))
                 visualPos = step
+                try {
+                    toneGenerator?.startTone(android.media.ToneGenerator.TONE_DTMF_1, 60)
+                } catch (e: Exception) { }
             }
         } else if (targetPos < visualPos) {
             // Captured or teleported back (yard)
-            animOffset.animateTo(getPawnOffset(targetPos, index, boardSizePx, isPlayer1), tween(500))
+            animOffset.animateTo(getPawnOffset(targetPos, index, boardSizePx, isPlayer1, stackIndex, totalInStack), tween(500))
             visualPos = targetPos
         }
     }
 
+    val eligibleScale by if (isEligibleToMove) {
+        rememberInfiniteTransition(label = "pawnBreath").animateFloat(
+            initialValue = 1.0f,
+            targetValue = 1.14f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(650, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "eligibleScale"
+        )
+    } else {
+        rememberUpdatedState(1.0f)
+    }
+
     Box(
         modifier = Modifier
+            .zIndex(if (isEligibleToMove) 100f else (stackIndex.toFloat() + 1f))
             .offset {
                 IntOffset(
                     x = (animOffset.value.x - 14.dp.toPx()).roundToInt(),
                     y = (animOffset.value.y + jumpAnim.value - 30.dp.toPx()).roundToInt()
                 )
+            }
+            .graphicsLayer {
+                rotationZ = -boardRotation
+                scaleX = eligibleScale
+                scaleY = eligibleScale
             }
             .size(width = 28.dp, height = 38.dp)
             .clickable(
@@ -992,17 +1066,6 @@ fun LudoKingPawnToken(
     isEligible: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.20f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(650, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseScale"
-    )
-
     Box(
         modifier = modifier.size(width = 24.dp, height = 34.dp),
         contentAlignment = Alignment.Center
@@ -1015,16 +1078,18 @@ fun LudoKingPawnToken(
             // Layer 0: Restored Selection / Eligible Pulse Ring
             if (isEligible) {
                 val pulseBaseY = h - 5.dp.toPx()
+                // Outer pulse circle: Player color with alpha 0.4f
                 drawOval(
-                    color = pawnColor.copy(alpha = 0.35f),
-                    topLeft = Offset(cx - (12.dp.toPx() * pulseScale), pulseBaseY - (4.dp.toPx() * pulseScale)),
-                    size = Size(24.dp.toPx() * pulseScale, 8.dp.toPx() * pulseScale)
+                    color = pawnColor.copy(alpha = 0.4f),
+                    topLeft = Offset(cx - 12.dp.toPx(), pulseBaseY - 4.dp.toPx()),
+                    size = Size(24.dp.toPx(), 8.dp.toPx())
                 )
+                // Inner ring: Glowing White with alpha 0.8f, stroke width 2.dp.toPx()
                 drawOval(
-                    color = Color.White.copy(alpha = 0.7f),
-                    topLeft = Offset(cx - (9.dp.toPx() * pulseScale), pulseBaseY - (3.dp.toPx() * pulseScale)),
-                    size = Size(18.dp.toPx() * pulseScale, 6.dp.toPx() * pulseScale),
-                    style = Stroke(width = 1.5.dp.toPx())
+                    color = Color.White.copy(alpha = 0.8f),
+                    topLeft = Offset(cx - 9.dp.toPx(), pulseBaseY - 3.dp.toPx()),
+                    size = Size(18.dp.toPx(), 6.dp.toPx()),
+                    style = Stroke(width = 2.dp.toPx())
                 )
             }
 
@@ -1120,6 +1185,7 @@ fun LudoBottomBattleDock(
     canRoll: Boolean = true,
     timerProgress: Float = 0f,
     onDiceRoll: (Int) -> Unit,
+    toneGenerator: android.media.ToneGenerator? = null,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -1239,7 +1305,8 @@ fun LudoBottomBattleDock(
                 isEnabled = canRoll && !isDiceRolled,
                 isPlayer1Turn = isPlayer1Turn,
                 diceColor = activeDiceColor,
-                onRoll = onDiceRoll
+                onRoll = onDiceRoll,
+                toneGenerator = toneGenerator
             )
         }
     }
@@ -1278,7 +1345,14 @@ fun MiniPawnIcon(color: Color) {
 }
 
 // Helper to calculate a single pawn offset
-private fun getPawnOffset(pos: Int, index: Int, boardSize: Float, isPlayer1: Boolean): Offset {
+private fun getPawnOffset(
+    pos: Int, 
+    index: Int, 
+    boardSize: Float, 
+    isPlayer1: Boolean,
+    stackIndex: Int = 0,
+    totalInStack: Int = 1
+): Offset {
     if (pos == -1) {
         // Home positions
         return if (isPlayer1) {
@@ -1300,7 +1374,19 @@ private fun getPawnOffset(pos: Int, index: Int, boardSize: Float, isPlayer1: Boo
         // Real path mapping logic
         val unit = boardSize / 15f
         val gridPos = getGridPositionForPath(pos, isPlayer1)
-        return Offset(gridPos.x * unit + unit / 2f, gridPos.y * unit + unit / 2f)
+        var baseOffset = Offset(gridPos.x * unit + unit / 2f, gridPos.y * unit + unit / 2f)
+
+        // Apply micro-offset clustering if multiple pawns are in the same cell
+        if (totalInStack > 1) {
+            val shift = unit * 0.18f // Fan-out distance within the cell
+            val angle = (stackIndex * 360f / totalInStack).toDouble()
+            val rad = Math.toRadians(angle)
+            baseOffset = Offset(
+                baseOffset.x + (shift * Math.cos(rad)).toFloat(),
+                baseOffset.y + (shift * Math.sin(rad)).toFloat()
+            )
+        }
+        return baseOffset
     }
 }
 
@@ -1326,13 +1412,21 @@ private fun getGridPositionForPath(pos: Int, isPlayer1: Boolean): GridPos {
     
     // Home stretch mapping
     if (pos >= 51) {
-        val stretchIdx = pos - 51
+        val stretchIdx = (pos - 51).coerceIn(0, 5)
         return if (isPlayer1) {
-            // Red home stretch (Row 7, Left to Right)
-            GridPos(1 + stretchIdx, 7)
+            // Player 1 (Red): Moves UP along Column 7 from bottom (Y: 13 down to 9), finishes at Center (7, 7)
+            if (stretchIdx >= 5) {
+                GridPos(7, 7)
+            } else {
+                GridPos(7, 13 - stretchIdx)
+            }
         } else {
-            // Yellow home stretch (Row 7, Right to Left)
-            GridPos(13 - stretchIdx, 7)
+            // Player 2 (Yellow): Moves DOWN along Column 7 from top (Y: 1 up to 5), finishes at Center (7, 7)
+            if (stretchIdx >= 5) {
+                GridPos(7, 7)
+            } else {
+                GridPos(7, 1 + stretchIdx)
+            }
         }
     }
     
@@ -1354,7 +1448,8 @@ fun Luxury3DCubeDice(
     isEnabled: Boolean,
     isPlayer1Turn: Boolean,
     diceColor: Color = if (isPlayer1Turn) Color(0xFFEF4444) else Color(0xFFF59E0B),
-    onRoll: (Int) -> Unit
+    onRoll: (Int) -> Unit,
+    toneGenerator: android.media.ToneGenerator? = null
 ) {
     val coroutineScope = rememberCoroutineScope()
     val localDensity = LocalDensity.current
@@ -1420,6 +1515,9 @@ fun Luxury3DCubeDice(
                 ) {
                     if (!isRolling) {
                         isRolling = true
+                        try {
+                            toneGenerator?.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 120)
+                        } catch (e: Exception) { }
                         coroutineScope.launch {
                             val jumpTarget = -localDensity.run { 65.dp.toPx() }
                             

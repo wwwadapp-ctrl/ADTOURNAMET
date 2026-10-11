@@ -6,13 +6,15 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import kotlin.coroutines.resume
 
 data class LudoGameState(
     val currentTurnUid: String = "",
     val diceValue: Int = 1,
     val isDiceRolled: Boolean = false,
-    val player1Pawns: List<Int> = listOf(-1, -1, -1, -1), // -1 = Yard, 0-51 = Track, 52-56 = Home Runway, 57 = Goal
+    val player1Pawns: List<Int> = listOf(-1, -1, -1, -1), // -1 = Yard, 0-51 = Track, 52-55 = Home Runway, 56 = Goal
     val player2Pawns: List<Int> = listOf(-1, -1, -1, -1),
     val consecutiveSixesCount: Int = 0,
     val player1Strikes: Int = 0,
@@ -48,6 +50,7 @@ data class AutoLudoMatchEntity(
     val player1Ready: Boolean = false,
     val player2Ready: Boolean = false,
     val gameStartedAt: Long = 0L,
+    val prizeDistributed: Boolean = false,
     val gameState: LudoGameState = LudoGameState()
 )
 
@@ -483,6 +486,14 @@ object AutoLudoManager {
                     
                     currentData.child("gameState").value = newState
                     currentData.child("status").value = status
+
+                    // Trigger atomic payout if completed
+                    if (status == "COMPLETED" && winnerUid.isNotBlank()) {
+                        kotlinx.coroutines.GlobalScope.launch {
+                            distributePrize(matchId, winnerUid)
+                        }
+                    }
+
                     return Transaction.success(currentData)
                 }
 
@@ -532,12 +543,14 @@ object AutoLudoManager {
                     if (pawnIndex !in 0..3) return Transaction.abort()
                     
                     val oldPos = myPawns[pawnIndex]
-                    // 1. Update pawn position
+                    
+                    // 1. Update pawn position with overshoot validation
+                    if (newPos > 56) return Transaction.abort()
                     myPawns[pawnIndex] = newPos
                     
                     var captured = false
                     val rolledValue = state.diceValue
-                    var bonusRoll = (rolledValue == 6) || (newPos == 57) // Bonus for rolling 6 or reaching goal
+                    var bonusRoll = (rolledValue == 6) || (newPos == 56) // Bonus for rolling 6 or reaching goal
 
                     // 2. Collision & Capture (Cutting) Engine
                     // Check only if newPos is on the track (0-51) and NOT a safe zone
@@ -562,7 +575,7 @@ object AutoLudoManager {
                     }
 
                     // 3. Victory Check
-                    val allAtGoal = myPawns.all { it == 57 }
+                    val allAtGoal = myPawns.all { it == 56 }
                     var winnerUid = state.winnerUid
                     var status = match.status
                     if (allAtGoal) {
@@ -602,7 +615,7 @@ object AutoLudoManager {
                         status == "COMPLETED" && isTimeout -> "Disqualified (3 Misses)!"
                         status == "COMPLETED" -> "Victory!"
                         captured -> "Captured! Bonus Roll"
-                        newPos == 57 -> "Goal! Bonus Roll"
+                        newPos == 56 -> "Goal! Bonus Roll"
                         oldPos == -1 && newPos == 0 -> "Exited Yard!"
                         rolledValue == 6 -> "Rolled 6! Bonus Turn"
                         isTimeout -> "Auto-Move! Strike +1"
@@ -627,6 +640,13 @@ object AutoLudoManager {
                     currentData.child("gameState").value = newState
                     currentData.child("status").value = status
                     currentData.child("updatedAt").value = ServerValue.TIMESTAMP
+
+                    // Trigger atomic payout if completed
+                    if (status == "COMPLETED" && winnerUid.isNotBlank()) {
+                        kotlinx.coroutines.GlobalScope.launch {
+                            distributePrize(matchId, winnerUid)
+                        }
+                    }
                     
                     return Transaction.success(currentData)
                 }
@@ -665,7 +685,7 @@ object AutoLudoManager {
                     
                     val activePawns = if (isP1Turn) state.player1Pawns else state.player2Pawns
                     val hasLegalMoves = (state.diceValue == 6 && activePawns.any { it == -1 }) ||
-                                       activePawns.any { it >= 0 && it + state.diceValue <= 57 }
+                                       activePawns.any { it >= 0 && it + state.diceValue <= 56 }
 
                     // Allow turn pass whenever:
                     // 1. Turn owner requests pass
@@ -717,12 +737,67 @@ object AutoLudoManager {
                     currentData.child("gameState").value = newState
                     currentData.child("status").value = status
                     currentData.child("updatedAt").value = ServerValue.TIMESTAMP
+
+                    // Trigger atomic payout if completed
+                    if (status == "COMPLETED" && winnerUid.isNotBlank()) {
+                        kotlinx.coroutines.GlobalScope.launch {
+                            distributePrize(matchId, winnerUid)
+                        }
+                    }
+
                     return Transaction.success(currentData)
                 }
 
                 override fun onComplete(err: DatabaseError?, committed: Boolean, d: DataSnapshot?) {
                     if (committed && err == null) cont.resume(Result.success(Unit))
                     else cont.resume(Result.failure(err?.toException() ?: Exception("Pass turn failed")))
+                }
+            })
+        }
+    }
+
+    /**
+     * Atomically credits the prize pool to the winner and marks match as distributed.
+     */
+    private suspend fun distributePrize(matchId: String, winnerUid: String) {
+        if (winnerUid.isBlank() || matchId.isBlank()) return
+        
+        val db = getDb() ?: return
+        val rootRef = db.reference
+
+        suspendCancellableCoroutine<Unit> { cont ->
+            rootRef.runTransaction(object : Transaction.Handler {
+                override fun doTransaction(currentData: MutableData): Transaction.Result {
+                    val matchNode = currentData.child(NODE_MATCHES).child(matchId)
+                    val match = matchNode.getValue(AutoLudoMatchEntity::class.java) ?: return Transaction.abort()
+                    
+                    // Validation: Must be completed and NOT already distributed
+                    if (match.status != "COMPLETED" || match.prizeDistributed) {
+                        return Transaction.abort()
+                    }
+                    
+                    val prizeAmount = match.prizePool
+                    if (prizeAmount <= 0.0) return Transaction.abort()
+                    
+                    val walletRef = currentData.child(NODE_GAME_WALLETS).child(winnerUid)
+                    val rawBal = walletRef.child("balance").value
+                    val currentBal = when (rawBal) {
+                        is Number -> rawBal.toDouble()
+                        is String -> rawBal.toDoubleOrNull() ?: 0.0
+                        else -> 0.0
+                    }
+                    
+                    // 1. Mark as distributed
+                    matchNode.child("prizeDistributed").value = true
+                    
+                    // 2. Credit Wallet
+                    walletRef.child("balance").value = currentBal + prizeAmount
+                    
+                    return Transaction.success(currentData)
+                }
+
+                override fun onComplete(err: DatabaseError?, committed: Boolean, d: DataSnapshot?) {
+                    cont.resume(Unit)
                 }
             })
         }
