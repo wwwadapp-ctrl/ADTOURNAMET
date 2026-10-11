@@ -23,10 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.zIndex
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.*
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -36,6 +33,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -44,8 +42,12 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
 import coil.compose.AsyncImage
 import com.example.R
+import android.media.ToneGenerator
+import android.media.AudioManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
+import kotlin.math.ceil
 
 data class LudoPlayer(
     val userId: String = "",
@@ -446,6 +448,20 @@ fun AutoLudoBoardScreen(
     // Timer Logic - strictly 15000L for both Roll and Move phases
     var timerProgress by remember { mutableStateOf(0f) }
     val totalTime = 15000L
+
+    // Native Ticking Sound via ToneGenerator
+    val toneGenerator = remember {
+        try {
+            ToneGenerator(AudioManager.STREAM_MUSIC, 75)
+        } catch (e: Exception) {
+            null
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            toneGenerator?.release()
+        }
+    }
     
     // Identify active player turn
     val isPlayer1Turn = when {
@@ -493,11 +509,19 @@ fun AutoLudoBoardScreen(
         
         val localStartTime = System.currentTimeMillis()
         var actionDispatched = false
+        var lastBeepSec = 0
         
         while (!actionDispatched) {
             val now = System.currentTimeMillis()
             val elapsed = now - localStartTime
             timerProgress = (elapsed.toFloat() / totalTime).coerceIn(0f, 1f)
+
+            // Last 5 Seconds Ticking Sound (Only for current active user)
+            val remainingSec = ceil((totalTime - elapsed) / 1000f).toInt()
+            if (isMyTurn && remainingSec in 1..5 && remainingSec != lastBeepSec) {
+                lastBeepSec = remainingSec
+                toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
+            }
             
             if (timerProgress >= 1f) {
                 // If local user is observer, wait 800ms grace period so active player has first chance
@@ -723,28 +747,79 @@ fun AutoLudoBoardScreen(
 
 @Composable
 fun PlayerAvatarCard(player: LudoPlayer, isLeft: Boolean, timerProgress: Float = 0f) {
+    // Urgent Pulsing Logic for Last 5 Seconds
+    val isUrgent = timerProgress >= 0.66f
+    val infiniteTransition = rememberInfiniteTransition(label = "urgent_pulse")
+    val urgentAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(450, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "urgent_alpha"
+    )
+
     val glowColor = if (isLeft) Color(0xFF00E5FF) else Color(0xFF00C853) // Cyan for P1, Emerald for P2
-    val borderColor = if (player.isCurrentTurn) glowColor else Color.White.copy(alpha = 0.4f)
-    val borderStroke = if (player.isCurrentTurn) 3.5.dp else 1.5.dp
+    val activeBorderColor = if (player.isCurrentTurn && isUrgent) {
+        Color(0xFFFF1744).copy(alpha = urgentAlpha)
+    } else {
+        glowColor
+    }
     
+    val borderColor = if (player.isCurrentTurn) activeBorderColor else Color.White.copy(alpha = 0.4f)
+    val borderStroke = if (player.isCurrentTurn) 3.5.dp else 1.5.dp
+
     Box(contentAlignment = Alignment.Center) {
-        // Authoritative Cooldown Ring (Only for active turn)
-        if (player.isCurrentTurn) {
-            Canvas(modifier = Modifier.size(64.dp)) {
-                drawArc(
-                    color = glowColor.copy(alpha = 0.3f),
-                    startAngle = -90f,
-                    sweepAngle = 360f,
-                    useCenter = false,
-                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+        // 4-Sided Rounded Rectangle Profile Timer Border
+        Canvas(
+            modifier = Modifier
+                .size(60.dp)
+                .align(Alignment.Center)
+        ) {
+            val strokeWidth = 3.5.dp.toPx()
+            val pad = strokeWidth / 2f
+            val cornerRad = 14.dp.toPx()
+            val isCurrentTurn = player.isCurrentTurn
+
+            val rectPath = Path().apply {
+                addRoundRect(
+                    RoundRect(
+                        left = pad,
+                        top = pad,
+                        right = size.width - pad,
+                        bottom = size.height - pad,
+                        cornerRadius = CornerRadius(cornerRad, cornerRad)
+                    )
                 )
-                drawArc(
-                    color = glowColor,
-                    startAngle = -90f,
-                    sweepAngle = 360f * (1f - timerProgress),
-                    useCenter = false,
-                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
-                )
+            }
+
+            // 1. Subtle Background Track
+            drawPath(
+                path = rectPath,
+                color = Color.White.copy(alpha = 0.2f),
+                style = Stroke(width = strokeWidth)
+            )
+
+            // 2. Active Cooldown Progress Border (Depletes along all 4 sides)
+            if (isCurrentTurn && timerProgress in 0f..1f) {
+                val pathMeasure = PathMeasure()
+                pathMeasure.setPath(rectPath, false)
+                val totalLength = pathMeasure.length
+                val remainingLength = totalLength * (1f - timerProgress)
+
+                if (remainingLength > 0f) {
+                    val segmentPath = Path()
+                    pathMeasure.getSegment(0f, remainingLength, segmentPath, true)
+                    drawPath(
+                        path = segmentPath,
+                        color = activeBorderColor,
+                        style = Stroke(
+                            width = strokeWidth,
+                            cap = StrokeCap.Round
+                        )
+                    )
+                }
             }
         }
 
@@ -887,188 +962,155 @@ fun LudoPawnView(
 
     Box(
         modifier = Modifier
-            .offset(
-                x = with(density) { animOffset.value.x.toDp() } - 30.dp,
-                y = with(density) { (animOffset.value.y + jumpAnim.value).toDp() } - 50.dp
-            )
-            .size(60.dp)
+            .offset {
+                IntOffset(
+                    x = (animOffset.value.x - 14.dp.toPx()).roundToInt(),
+                    y = (animOffset.value.y + jumpAnim.value - 30.dp.toPx()).roundToInt()
+                )
+            }
+            .size(width = 28.dp, height = 38.dp)
             .clickable(
                 enabled = isEligibleToMove,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) { onClick() },
-        contentAlignment = Alignment.Center
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() }
+            ) {
+                onClick()
+            }
     ) {
         LudoKingPawnToken(
             pawnColor = pawnColor,
-            deepShadeColor = deepShadeColor,
-            outlineColor = outlineColor,
-            isEligibleToMove = isEligibleToMove
+            isEligible = isEligibleToMove,
+            modifier = Modifier.align(Alignment.Center)
         )
     }
 }
 
+
 @Composable
 fun LudoKingPawnToken(
     pawnColor: Color,
-    deepShadeColor: Color,
-    outlineColor: Color,
-    isEligibleToMove: Boolean,
+    isEligible: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pawn_highlight")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "rotation"
-    )
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1.0f,
-        targetValue = 1.3f,
+        targetValue = 1.20f,
         animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
+            animation = tween(650, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulseScale"
     )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseAlpha"
-    )
 
-    Box(modifier = modifier.size(54.dp), contentAlignment = Alignment.BottomCenter) {
-        // 1. Authentic Ludo King Segmented Pulsing Ring (ONLY when eligible)
-        if (isEligibleToMove) {
-            Canvas(
-                modifier = Modifier
-                    .size(40.dp)
-                    .graphicsLayer {
-                        scaleX = pulseScale
-                        scaleY = pulseScale
-                        alpha = pulseAlpha
-                    }
-                    .offset(y = 10.dp)
-            ) {
-                rotate(rotation) {
-                    val segmentCount = 12
-                    val sweepAngle = 360f / segmentCount
-                    for (i in 0 until segmentCount) {
-                        val color = if (i % 2 == 0) pawnColor else Color.White
-                        drawArc(
-                            color = color,
-                            startAngle = i * sweepAngle,
-                            sweepAngle = sweepAngle * 0.75f,
-                            useCenter = false,
-                            style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
-                        )
-                    }
-                }
-                // Thin high-contrast outer ring
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.4f),
-                    radius = 20.dp.toPx(),
-                    style = Stroke(width = 1.dp.toPx())
-                )
-            }
-        }
-
+    Box(
+        modifier = modifier.size(width = 24.dp, height = 34.dp),
+        contentAlignment = Alignment.Center
+    ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
+            val cx = w / 2f
 
-            val centerX = w * 0.5f
-            val headCenterY = h * 0.32f
-            val headRadius = w * 0.38f
-            val tipY = h * 0.86f
+            // Layer 0: Restored Selection / Eligible Pulse Ring
+            if (isEligible) {
+                val pulseBaseY = h - 5.dp.toPx()
+                drawOval(
+                    color = pawnColor.copy(alpha = 0.35f),
+                    topLeft = Offset(cx - (12.dp.toPx() * pulseScale), pulseBaseY - (4.dp.toPx() * pulseScale)),
+                    size = Size(24.dp.toPx() * pulseScale, 8.dp.toPx() * pulseScale)
+                )
+                drawOval(
+                    color = Color.White.copy(alpha = 0.7f),
+                    topLeft = Offset(cx - (9.dp.toPx() * pulseScale), pulseBaseY - (3.dp.toPx() * pulseScale)),
+                    size = Size(18.dp.toPx() * pulseScale, 6.dp.toPx() * pulseScale),
+                    style = Stroke(width = 1.5.dp.toPx())
+                )
+            }
 
-            // NO STATIC SAUCER CIRCLE OR CONTACT SHADOW AS REQUESTED
+            // 1. Soft Floor Contact Shadow
+            drawOval(
+                color = Color.Black.copy(alpha = 0.22f),
+                topLeft = Offset(1.5.dp.toPx(), h - 5.dp.toPx()),
+                size = Size(w - 3.dp.toPx(), 5.dp.toPx())
+            )
 
-            // 2. Exact Standing Map-Pin (Teardrop) Path with Crisp Outline
+            // 2. 3D Pedestal Base Disc
+            val baseTopY = h - 8.dp.toPx()
+            val baseH = 6.dp.toPx()
+            drawOval(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color(0xFFE0E0E0), Color.White, Color(0xFFB0B0B0)),
+                    startY = baseTopY,
+                    endY = baseTopY + baseH
+                ),
+                topLeft = Offset(2.dp.toPx(), baseTopY),
+                size = Size(w - 4.dp.toPx(), baseH)
+            )
+            drawOval(
+                color = pawnColor,
+                topLeft = Offset(4.dp.toPx(), baseTopY + 1.dp.toPx()),
+                size = Size(w - 8.dp.toPx(), baseH - 2.dp.toPx())
+            )
+
+            // 3. Upright Bulbous White Teardrop Pin (Slimmed)
+            val headCenterY = 9.dp.toPx()
+            val headRadius = 7.5.dp.toPx()
+            val pinBaseY = h - 6.dp.toPx()
+
             val pinPath = Path().apply {
-                moveTo(centerX, tipY)
+                moveTo(cx, pinBaseY)
                 cubicTo(
-                    centerX - headRadius * 0.95f, h * 0.60f,
-                    centerX - headRadius, headCenterY + headRadius * 0.45f,
-                    centerX - headRadius, headCenterY
+                    cx - 6.2.dp.toPx(), pinBaseY - 6.5.dp.toPx(),
+                    cx - headRadius, headCenterY + 4.dp.toPx(),
+                    cx - headRadius, headCenterY
                 )
                 arcTo(
-                    rect = Rect(
-                        left = centerX - headRadius,
-                        top = headCenterY - headRadius,
-                        right = centerX + headRadius,
-                        bottom = headCenterY + headRadius
-                    ),
+                    rect = Rect(cx - headRadius, headCenterY - headRadius, cx + headRadius, headCenterY + headRadius),
                     startAngleDegrees = 180f,
                     sweepAngleDegrees = 180f,
                     forceMoveTo = false
                 )
                 cubicTo(
-                    centerX + headRadius, headCenterY + headRadius * 0.45f,
-                    centerX + headRadius * 0.95f, h * 0.60f,
-                    centerX, tipY
+                    cx + headRadius, headCenterY + 4.dp.toPx(),
+                    cx + 6.2.dp.toPx(), pinBaseY - 6.5.dp.toPx(),
+                    cx, pinBaseY
                 )
                 close()
             }
 
-            // Draw Subtle Shadow for depth (ONLY a small drop shadow for the pin itself, not a base circle)
-            translate(left = 1.5.dp.toPx(), top = 1.5.dp.toPx()) {
-                drawPath(
-                    path = pinPath,
-                    color = Color(0xFF0D47A1).copy(alpha = 0.35f)
-                )
-            }
-
-            // Fill Pin Body with DEEP 3D team gradient
-            drawPath(
-                path = pinPath,
-                brush = Brush.horizontalGradient(
-                    colors = listOf(deepShadeColor, pawnColor, deepShadeColor)
-                )
-            )
-
-            // High-contrast CRISP Outer Outline (Obsidian/Deep rim)
-            drawPath(
-                path = pinPath,
-                color = outlineColor,
-                style = Stroke(width = 1.8.dp.toPx())
-            )
-
-            // Metallic light rim inner accent
+            // Fill Pin Body (Glossy White)
             drawPath(
                 path = pinPath,
                 brush = Brush.verticalGradient(
-                    listOf(Color.White.copy(alpha = 0.5f), Color.Transparent)
-                ),
-                style = Stroke(width = 1.dp.toPx())
+                    colors = listOf(Color(0xFFFAFAFA), Color.White, Color(0xFFD6D6D6)),
+                    startY = 0f,
+                    endY = pinBaseY
+                )
+            )
+            // Pin Outline
+            drawPath(
+                path = pinPath,
+                color = Color(0xFF333333),
+                style = Stroke(width = 1.2.dp.toPx())
             )
 
-            // 3. Iconic Bold White Core Circle inside Head
-            val whiteCoreRadius = headRadius * 0.52f
+            // 4. Inner Colored Dome & Specular Gloss
+            val coreRadius = 4.8.dp.toPx()
             drawCircle(
-                color = Color.White,
-                center = Offset(centerX, headCenterY),
-                radius = whiteCoreRadius
+                color = pawnColor,
+                radius = coreRadius,
+                center = Offset(cx, headCenterY)
             )
-
-            // Specular highlight on the white core
+            // White Glint Dot
             drawCircle(
-                color = Color.White,
-                center = Offset(centerX - whiteCoreRadius * 0.25f, headCenterY - whiteCoreRadius * 0.25f),
-                radius = whiteCoreRadius * 0.35f
+                color = Color.White.copy(alpha = 0.9f),
+                radius = 1.2.dp.toPx(),
+                center = Offset(cx - 1.5.dp.toPx(), headCenterY - 1.5.dp.toPx())
             )
         }
     }
 }
-
 @Composable
 fun LudoBottomBattleDock(
     player1: LudoPlayer,
@@ -1317,7 +1359,7 @@ fun Luxury3DCubeDice(
     val coroutineScope = rememberCoroutineScope()
     val localDensity = LocalDensity.current
     var isRolling by remember { mutableStateOf(false) }
-    var displayValue by remember { mutableStateOf(diceValue) }
+    var displayValue by remember { mutableStateOf(if (diceValue in 1..6) diceValue else 1) }
     
     // Physical Animatables
     val jumpY = remember { Animatable(0f) }
@@ -1332,7 +1374,7 @@ fun Luxury3DCubeDice(
     val shadowScale = remember { Animatable(1f) }
 
     LaunchedEffect(diceValue) {
-        if (!isRolling) displayValue = diceValue
+        if (!isRolling && diceValue in 1..6) displayValue = diceValue
     }
 
     Box(
@@ -1466,65 +1508,53 @@ fun LudoVibrantDiceFace(
     diceColor: Color = if (isPlayer1) Color(0xFFEF4444) else Color(0xFFF59E0B),
     modifier: Modifier = Modifier
 ) {
-    // Shading palette derived from base color
-    val sideColor = diceColor.copy(alpha = 1f).darken(0.35f)
-    val topHighlight = diceColor.copy(alpha = 1f).lighten(0.25f)
-    val bevelColor = Color.White.copy(alpha = 0.5f)
-
     Box(modifier = modifier) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
-            val depth = 12.dp.toPx() // Volumetric depth thickness
-            val cornerRadius = 10.dp.toPx()
-
-            // 1. Right/Side Facet (Depth Extrusion)
-            val sidePath = Path().apply {
-                moveTo(w, cornerRadius)
-                lineTo(w + depth * 0.5f, cornerRadius - depth * 0.3f)
-                lineTo(w + depth * 0.5f, h - cornerRadius - depth * 0.3f)
-                lineTo(w, h - cornerRadius)
-                close()
-            }
-            drawPath(sidePath, sideColor)
-
-            // 2. Top Facet (Perspective Quad)
-            val topPath = Path().apply {
-                moveTo(cornerRadius, 0f)
-                lineTo(cornerRadius + depth * 0.5f, -depth * 0.3f)
-                lineTo(w - cornerRadius + depth * 0.5f, -depth * 0.3f)
-                lineTo(w - cornerRadius, 0f)
-                close()
-            }
-            drawPath(topPath, topHighlight)
-
-            // 3. Main Front Face (Rounded Core)
-            val gradientRadius = (w * 0.8f).coerceAtLeast(1f)
+            val cornerRadius = 12.dp.toPx()
+            
+            // 1. Main 3D Tactile Face (Clean rounded cube face)
             drawRoundRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(diceColor.lighten(0.1f), diceColor),
-                    center = Offset(w * 0.3f, h * 0.3f),
-                    radius = gradientRadius
+                brush = Brush.verticalGradient(
+                    colors = listOf(diceColor.lighten(0.35f), diceColor, diceColor.darken(0.25f)),
+                    startY = 0f,
+                    endY = h
                 ),
                 size = Size(w, h),
                 cornerRadius = CornerRadius(cornerRadius, cornerRadius)
             )
 
-            // 4. Luxury Chamfered Bevel Lines
+            // 2. Beveled Edge Highlight (Top-Left)
+            val rimPath = Path().apply {
+                moveTo(0f, cornerRadius)
+                quadraticBezierTo(0f, 0f, cornerRadius, 0f)
+                lineTo(w - cornerRadius, 0f)
+                lineTo(w - cornerRadius, 2.dp.toPx())
+                lineTo(cornerRadius, 2.dp.toPx())
+                quadraticBezierTo(2.dp.toPx(), 2.dp.toPx(), 2.dp.toPx(), cornerRadius)
+                close()
+            }
+            drawPath(rimPath, Color.White.copy(alpha = 0.55f))
+
+            // 3. Ambient Bottom-Right Occlusion
             drawRoundRect(
-                color = bevelColor,
+                brush = Brush.linearGradient(
+                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.28f)),
+                    start = Offset(w * 0.5f, h * 0.5f),
+                    end = Offset(w, h)
+                ),
                 size = Size(w, h),
-                cornerRadius = CornerRadius(cornerRadius, cornerRadius),
-                style = Stroke(width = 1.5.dp.toPx())
+                cornerRadius = CornerRadius(cornerRadius, cornerRadius)
             )
             
-            // Specular Glint Across Face
+            // 4. Subtle Surface Specular Glint
             drawPath(
                 path = Path().apply {
-                    moveTo(0f, h * 0.2f)
-                    lineTo(w * 0.8f, 0f)
+                    moveTo(0f, h * 0.15f)
+                    lineTo(w * 0.75f, 0f)
                     lineTo(w, 0f)
-                    lineTo(0f, h * 0.4f)
+                    lineTo(0f, h * 0.45f)
                     close()
                 },
                 color = Color.White.copy(alpha = 0.15f)
@@ -1538,8 +1568,9 @@ fun LudoVibrantDiceFace(
 
 @Composable
 fun VibrantDicePips(value: Int, diceColor: Color) {
+    val displayValue = if (value in 1..6) value else 1 // Fallback to 1 for idle/blank states
     Box(modifier = Modifier.fillMaxSize().padding(10.dp)) {
-        when (value) {
+        when (displayValue) {
             1 -> CarvedPip(Alignment.Center, diceColor)
             2 -> {
                 CarvedPip(Alignment.TopEnd, diceColor)
@@ -1577,22 +1608,31 @@ fun VibrantDicePips(value: Int, diceColor: Color) {
 
 @Composable
 fun BoxScope.CarvedPip(alignment: Alignment, diceColor: Color) {
-    val pipDepthColor = diceColor.darken(0.4f)
     Box(
         modifier = Modifier
             .align(alignment)
             .size(10.dp)
-            .shadow(1.dp, CircleShape)
-            .background(
-                Brush.radialGradient(
-                    colors = listOf(Color.White, Color(0xFFE0E0E0), pipDepthColor.copy(alpha = 0.4f)),
-                    center = Offset.Zero,
-                    radius = 30f
-                ),
-                CircleShape
+            .background(Color.White, CircleShape) // Pip Base: Crisp, solid White dome
+            .border(1.dp, Color(0x38000000), CircleShape) // Outer Shadow Ring for contrast on yellow
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val r = size.minDimension / 2
+            
+            // Inner crescent shadow at top-left (Concave Illusion)
+            drawCircle(
+                color = Color(0x35000000),
+                radius = r * 0.85f,
+                center = Offset(size.width * 0.32f, size.height * 0.32f)
             )
-            .border(0.5.dp, Color.Black.copy(alpha = 0.1f), CircleShape)
-    )
+            
+            // Specular glint rim at bottom-right (Depth effect)
+            drawCircle(
+                color = Color.White.copy(alpha = 0.95f),
+                radius = r * 0.28f,
+                center = Offset(size.width * 0.72f, size.height * 0.72f)
+            )
+        }
+    }
 }
 
 // Utility Extensions for Shading
