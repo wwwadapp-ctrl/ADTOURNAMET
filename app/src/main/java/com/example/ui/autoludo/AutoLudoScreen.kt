@@ -64,12 +64,39 @@ fun AutoLudoScreen(
     var selectedFilter by remember { mutableStateOf("সব ম্যাচ") }
     
     // User Data for TransferModal
-    var userName by remember { mutableStateOf(user?.effectiveName ?: if (isPreview) "MD DALUAR" else "User") }
-    var userPhone by remember { mutableStateOf(user?.effectiveMobile ?: "") }
+    val authUser = remember { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser }
+    val currentUid = if (isPreview) {
+        "player_1"
+    } else {
+        authUser?.uid?.ifBlank { null }
+            ?: user?.uid?.ifBlank { null }
+            ?: wallet?.uid?.ifBlank { null } 
+            ?: wallet?.userId?.ifBlank { null } 
+            ?: ""
+    }
+    var userName by remember(user) { 
+        mutableStateOf(
+            user?.effectiveName?.ifBlank { null }
+                ?: authUser?.displayName?.ifBlank { null }
+                ?: if (isPreview) "MD DALUAR" else "User"
+        ) 
+    }
+    var userPhone by remember(user) { mutableStateOf(user?.effectiveMobile ?: authUser?.phoneNumber ?: "") }
+    
+    // Immediate sync with passed user object if available
+    LaunchedEffect(user) {
+        user?.let {
+            if (it.effectiveName.isNotBlank() && it.effectiveName != "User" && it.effectiveName != "Player") {
+                userName = it.effectiveName
+            }
+            if (it.effectiveMobile.isNotBlank()) {
+                userPhone = it.effectiveMobile
+            }
+        }
+    }
     
     // Live Game Wallet Balance
     var gameWalletBalance by remember { mutableDoubleStateOf(if (isPreview) 500.0 else 0.0) }
-    val currentUid = if (isPreview) "player_1" else (wallet?.uid ?: wallet?.userId ?: "")
 
     // Real-time matches with safe initial state and timeout fallback
     val liveMatchesResult = if (!isPreview) {
@@ -162,24 +189,32 @@ fun AutoLudoScreen(
 
         // Fetch user name and phone for transfer requests
         val userRef = db.getReference("users").child(currentUid)
-        val userListener = object : ValueEventListener {
+        val profileValueListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                val name = snapshot.child("name").getValue(String::class.java)
-                    ?: snapshot.child("fullName").getValue(String::class.java)
-                    ?: snapshot.child("displayName").getValue(String::class.java)
-                val phone = snapshot.child("mobileNumber").getValue(String::class.java)
-                    ?: snapshot.child("phoneNumber").getValue(String::class.java)
+                if (!snapshot.exists()) return
+                val fetchedName = snapshot.child("name").value?.toString()?.trim()
+                    ?: snapshot.child("displayName").value?.toString()?.trim()
+                    ?: snapshot.child("userName").value?.toString()?.trim()
+                    ?: authUser?.displayName?.trim()
+                    ?: "User"
+                val fetchedPhone = snapshot.child("phone").value?.toString()?.trim()
+                    ?: snapshot.child("mobile").value?.toString()?.trim()
+                    ?: snapshot.child("phoneNumber").value?.toString()?.trim()
+                    ?: authUser?.phoneNumber?.trim()
+                    ?: ""
                 
-                if (name != null) userName = name
-                if (phone != null) userPhone = phone
+                userName = if (fetchedName.isNotBlank() && fetchedName != "User" && fetchedName != "Player") fetchedName else userName
+                userPhone = if (fetchedPhone.isNotBlank()) fetchedPhone else userPhone
             }
             override fun onCancelled(error: DatabaseError) {}
         }
-        userRef.addValueEventListener(userListener)
+        
+        userRef.addListenerForSingleValueEvent(profileValueListener)
+        userRef.addValueEventListener(profileValueListener)
 
         onDispose {
             balanceRef.removeEventListener(balanceListener)
-            userRef.removeEventListener(userListener)
+            userRef.removeEventListener(profileValueListener)
         }
     }
     
@@ -365,6 +400,7 @@ fun AutoLudoScreen(
         TransferModal(
             uid = currentUid,
             userName = userName,
+            userPhone = userPhone,
             mainBalance = wallet?.availableAmount ?: (wallet?.balance ?: 0.0),
             gameBalance = gameWalletBalance,
             accentColor = Gold400,

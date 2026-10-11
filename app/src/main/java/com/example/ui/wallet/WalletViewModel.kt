@@ -31,6 +31,7 @@ import com.example.domain.model.UserEntity
 data class WalletUiState(
   val isLoading: Boolean = true,
   val wallet: WalletEntity? = null,
+  val user: UserEntity? = null,
   val mainBalance: Double = 0.0,
   val bonusBalance: Double = 0.0,
   val transactions: List<TransactionEntity> = emptyList(),
@@ -151,6 +152,7 @@ class WalletViewModel(
 
           _uiState.value = _uiState.value.copy(
             wallet = wallet,
+            user = user,
             mainBalance = mainBal,
             bonusBalance = bonusBal,
             isLoading = false

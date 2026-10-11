@@ -60,52 +60,77 @@ fun ScratchCardGameScreen(
     val walletState by walletViewModel.uiState.collectAsState()
     val mainBalance = walletState.mainBalance
 
-    val uid = remember { FirebaseManager.getAuth()?.currentUser?.uid ?: "" }
+    val authUser = remember { FirebaseManager.getAuth()?.currentUser }
+    val uid = remember { authUser?.uid ?: walletState.wallet?.uid ?: "" }
     var gameWalletBalance by remember { mutableDoubleStateOf(0.0) }
     var reservePool by remember { mutableDoubleStateOf(0.0) }
-    var userName by remember { mutableStateOf("") }
-    var userPhone by remember { mutableStateOf("") }
+    var userName by remember(walletState.user) { mutableStateOf(walletState.user?.effectiveName ?: authUser?.displayName?.ifBlank { null } ?: "User") }
+    var userPhone by remember(walletState.user) { mutableStateOf(walletState.user?.effectiveMobile ?: authUser?.phoneNumber ?: "") }
     var showTransferModal by remember { mutableStateOf(false) }
 
     // Observers (Synchronized with Dice and Wheel mini-games)
     DisposableEffect(uid) {
         if (uid.isBlank()) return@DisposableEffect onDispose {}
-        val database = FirebaseManager.getDatabase()
+        val database = com.google.firebase.database.FirebaseDatabase.getInstance(com.example.core.config.FirebaseConfig.DATABASE_URL)
         
-        val balanceRef = database?.getReference("gameWallets")?.child(uid)?.child("balance")
+        val balanceRef = database.getReference("gameWallets").child(uid).child("balance")
         val balanceListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 gameWalletBalance = snapshot.value?.toString()?.toDoubleOrNull() ?: 0.0
             }
             override fun onCancelled(error: DatabaseError) {}
         }
-        balanceRef?.addValueEventListener(balanceListener)
+        balanceRef.addValueEventListener(balanceListener)
 
-        val poolRef = database?.getReference("miniGames/vault/reservePool")
+        val poolRef = database.getReference("miniGames/vault/reservePool")
         val poolListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 reservePool = snapshot.value?.toString()?.toDoubleOrNull() ?: 0.0
             }
             override fun onCancelled(error: DatabaseError) {}
         }
-        poolRef?.addValueEventListener(poolListener)
+        poolRef.addValueEventListener(poolListener)
 
-        val userRef = database?.getReference("users")?.child(uid)
-        val userListener = object : ValueEventListener {
+        val userRef = database.getReference("users").child(uid)
+        val profileValueListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                userName = snapshot.child("name").getValue(String::class.java)
-                    ?: snapshot.child("fullName").getValue(String::class.java) ?: "User"
-                userPhone = snapshot.child("mobileNumber").getValue(String::class.java)
-                    ?: snapshot.child("phoneNumber").getValue(String::class.java) ?: ""
+                if (!snapshot.exists()) return
+                val fetchedName = snapshot.child("name").value?.toString()?.trim()
+                    ?: snapshot.child("displayName").value?.toString()?.trim()
+                    ?: snapshot.child("userName").value?.toString()?.trim()
+                    ?: authUser?.displayName?.trim()
+                    ?: "User"
+                val fetchedPhone = snapshot.child("phone").value?.toString()?.trim()
+                    ?: snapshot.child("mobile").value?.toString()?.trim()
+                    ?: snapshot.child("phoneNumber").value?.toString()?.trim()
+                    ?: authUser?.phoneNumber?.trim()
+                    ?: ""
+                
+                userName = if (fetchedName.isNotBlank() && fetchedName != "User" && fetchedName != "Player") fetchedName else userName
+                userPhone = if (fetchedPhone.isNotBlank()) fetchedPhone else userPhone
             }
             override fun onCancelled(error: DatabaseError) {}
         }
-        userRef?.addValueEventListener(userListener)
+        
+        userRef.addListenerForSingleValueEvent(profileValueListener)
+        userRef.addValueEventListener(profileValueListener)
 
         onDispose {
-            balanceRef?.removeEventListener(balanceListener)
-            poolRef?.removeEventListener(poolListener)
-            userRef?.removeEventListener(userListener)
+            balanceRef.removeEventListener(balanceListener)
+            poolRef.removeEventListener(poolListener)
+            userRef.removeEventListener(profileValueListener)
+        }
+    }
+
+    // Sync with walletState user profile
+    LaunchedEffect(walletState.user) {
+        walletState.user?.let {
+            if (it.effectiveName.isNotBlank() && it.effectiveName != "User" && it.effectiveName != "Player") {
+                userName = it.effectiveName
+            }
+            if (it.effectiveMobile.isNotBlank()) {
+                userPhone = it.effectiveMobile
+            }
         }
     }
 
@@ -348,6 +373,7 @@ fun ScratchCardGameScreen(
         TransferModal(
             uid = uid,
             userName = userName,
+            userPhone = userPhone,
             mainBalance = mainBalance,
             gameBalance = gameWalletBalance,
             accentColor = GoldMetallic,
@@ -356,8 +382,8 @@ fun ScratchCardGameScreen(
             onDismiss = { showTransferModal = false },
             onConfirm = { amount, type ->
                 showTransferModal = false
-                val database = FirebaseManager.getDatabase()
-                if (database != null && uid.isNotBlank()) {
+                val database = com.google.firebase.database.FirebaseDatabase.getInstance(com.example.core.config.FirebaseConfig.DATABASE_URL)
+                if (uid.isNotBlank()) {
                     val requestRef = database.getReference("miniGames/transferRequests").push()
                     val requestData = mapOf(
                         "uid" to uid,
@@ -366,11 +392,12 @@ fun ScratchCardGameScreen(
                         "amount" to amount,
                         "type" to type,
                         "status" to "PENDING",
-                        "timestamp" to ServerValue.TIMESTAMP
+                        "timestamp" to com.google.firebase.database.ServerValue.TIMESTAMP,
+                        "source" to "SCRATCH_CARD"
                     )
                     requestRef.setValue(requestData).addOnCompleteListener { task ->
                         if (task.isSuccessful) {
-                            Toast.makeText(context, "রিকোয়েস্ট সফলভাবে জমা হয়েছে!", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "অনুরোধটি সফলভাবে অ্যাডমিনের কাছে পাঠানো হয়েছে", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }

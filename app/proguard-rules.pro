@@ -22,6 +22,8 @@
 
 # 1. Firebase Realtime Database & Auth Model Protections
 -keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+-keep class com.google.firebase.** { *; }
+-keep class * implements java.io.Serializable { *; }
 -keepclassmembers class * {
     @com.google.firebase.database.IgnoreExtraProperties <fields>;
     @com.google.firebase.database.PropertyName <fields>;
@@ -29,9 +31,15 @@
 }
 
 # Preserve all domain entities, database models, and enums
+-keep class com.example.model.** { *; }
+-keep class com.example.data.model.** { *; }
 -keep class com.example.domain.model.** { *; }
 -keep interface com.example.domain.model.** { *; }
 -keep enum com.example.domain.model.** { *; }
+
+# Preserve Auto Ludo models and engines
+-keep class com.example.ui.autoludo.** { *; }
+-keepclassmembers class com.example.ui.autoludo.** { *; }
 
 # Preserve mini-game logic, engines, and result data models (Firebase Serialization)
 -keep class com.example.ui.minigames.** { *; }
@@ -52,7 +60,3 @@
 -dontwarn coil.**
 -keep class retrofit2.** { *; }
 -keep class com.squareup.moshi.** { *; }
-
-# Preserve Auto Ludo engine and UI
--keep class com.example.ui.autoludo.** { *; }
--keepclassmembers class com.example.ui.autoludo.** { *; }

@@ -417,7 +417,8 @@ object AutoLudoManager {
 
                     val isTurnOwner = (isPlayer1 && isP1Turn) || (isPlayer2 && isP2Turn) ||
                         state.currentTurnUid == playerUid ||
-                        state.currentTurnUid.isBlank()
+                        state.currentTurnUid.isBlank() ||
+                        (isP1Turn && playerUid != match.player2Uid)
                     
                     // PHASE 1: Turn owner rolls, or observer triggers timeout roll
                     if (!isTurnOwner && !isTimeout) return Transaction.abort()
@@ -517,7 +518,8 @@ object AutoLudoManager {
 
                     val isTurnOwner = (isPlayer1Match && isP1Turn) || (isPlayer2Match && isP2Turn) ||
                         state.currentTurnUid == playerUid ||
-                        state.currentTurnUid.isBlank()
+                        state.currentTurnUid.isBlank() ||
+                        (isP1Turn && playerUid != match.player2Uid)
 
                     // PHASE 2: Allow active player move, OR observer auto-move upon timeout
                     if (!isTurnOwner && !isTimeout) return Transaction.abort()
@@ -654,9 +656,12 @@ object AutoLudoManager {
                         state.currentTurnUid == "player_1" || 
                         state.currentTurnUid.isBlank()
                     
-                    val isP1Match = playerUid == match.player1Uid || playerUid == "player_1"
+                    val isP1Match = playerUid == match.player1Uid || playerUid == "player_1" || match.player1Uid.isBlank() || (isP1Turn && playerUid != match.player2Uid)
                     val isP2Match = playerUid == match.player2Uid || playerUid == "player_2"
-                    val isTurnOwner = (isP1Match && isP1Turn) || (isP2Match && !isP1Turn)
+                    val isTurnOwner = (isP1Match && isP1Turn) || (isP2Match && !isP1Turn) ||
+                        state.currentTurnUid == playerUid ||
+                        state.currentTurnUid.isBlank() ||
+                        (isP1Turn && playerUid != match.player2Uid)
                     
                     val activePawns = if (isP1Turn) state.player1Pawns else state.player2Pawns
                     val hasLegalMoves = (state.diceValue == 6 && activePawns.any { it == -1 }) ||

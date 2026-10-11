@@ -153,15 +153,12 @@ fun AutoLudoGameScreen(
         if (!isActuallyLocal) {
             val serverDice = currentMatch.gameState.diceValue
             val serverIsRolled = currentMatch.gameState.isDiceRolled
-            if (serverIsRolled) {
+            if (serverIsRolled && serverDice in 1..6) {
                 localDiceValue = serverDice
                 localIsDiceRolled = true
-            } else {
-                // Only accept false if turn actually passed or reset occurred on server
-                if (localDiceValue != serverDice || currentMatch.gameState.diceValue == 0) {
-                    localDiceValue = 0
-                    localIsDiceRolled = false
-                }
+            } else if (!serverIsRolled && serverDice == 0 && !localIsDiceRolled) {
+                localDiceValue = 0
+                localIsDiceRolled = false
             }
         }
     }
@@ -463,21 +460,29 @@ fun AutoLudoBoardScreen(
         else -> false
     }
 
+    val isActuallyLocal = isPreviewMode || match.matchId == "preview_match_123"
+    val isLocalOrBot = isActuallyLocal || 
+        match.matchId.contains("preview") || 
+        match.matchId.contains("mock") || 
+        match.player2Uid.isBlank() || 
+        match.player2Uid == "bot" || 
+        match.player2Uid == "computer" ||
+        match.player1Uid == "player_1" || 
+        match.player1Uid.isBlank() || 
+        currentUid == "player_1"
+
     // Interactive permission: allow control if it's our turn or if we are in local session
     val canControlPlayer1 = isPlayer1Turn && (
-        isPreviewMode || 
-        currentUid == "player_1" || 
-        match.player1Uid == currentUid || 
-        match.player1Uid == "player_1" || 
-        match.player1Uid.isBlank()
+        isLocalOrBot || 
+        currentUid == match.player1Uid || 
+        currentUid == gameState.currentTurnUid ||
+        (currentUid.isNotBlank() && currentUid != match.player2Uid)
     )
 
     val canControlPlayer2 = isPlayer2Turn && (
-        isPreviewMode || 
-        currentUid == "player_2" || 
-        match.player2Uid == currentUid || 
-        match.player2Uid == "player_2" || 
-        match.player2Uid.isBlank()
+        (isLocalOrBot && match.player2Uid != "bot" && match.player2Uid != "computer" && match.player2Uid.isNotBlank()) || 
+        currentUid == match.player2Uid || 
+        currentUid == gameState.currentTurnUid
     )
 
     val isMyTurn = if (isPlayer1Turn) canControlPlayer1 else canControlPlayer2

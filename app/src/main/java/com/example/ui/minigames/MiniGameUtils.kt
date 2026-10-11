@@ -208,6 +208,7 @@ fun PokerChip(
 fun TransferModal(
     uid: String,
     userName: String,
+    userPhone: String,
     mainBalance: Double,
     gameBalance: Double,
     accentColor: Color,
@@ -297,8 +298,17 @@ fun TransferModal(
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     LockedField(label = "ইউজার আইডি (UID)", value = uid)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    LockedField(label = "ইউজারের নাম", value = userName)
+                    val displayUserName = if (userName.isNotBlank() && userName != "Player" && userName != "User") userName 
+                        else (com.example.core.firebase.FirebaseManager.getAuth()?.currentUser?.displayName?.ifBlank { null } ?: "User")
+                    LockedField(label = "ইউজারের নাম", value = displayUserName)
+                    
+                    val displayPhone = if (userPhone.isNotBlank()) userPhone 
+                        else (com.example.core.firebase.FirebaseManager.getAuth()?.currentUser?.phoneNumber?.ifBlank { null } ?: "")
+                    
+                    if (displayPhone.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        LockedField(label = "মোবাইল নম্বর", value = displayPhone)
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
                     Surface(
                         shape = RoundedCornerShape(12.dp),

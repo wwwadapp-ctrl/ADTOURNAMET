@@ -61,6 +61,8 @@ import com.google.firebase.database.Transaction
 import com.google.firebase.database.ValueEventListener
 import java.security.SecureRandom
 import kotlin.math.PI
+import com.example.core.config.FirebaseConfig
+import com.google.firebase.database.FirebaseDatabase
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -90,10 +92,11 @@ fun SpinWheelScreen(
     val walletState by walletViewModel.uiState.collectAsState()
     val userBalance = walletState.mainBalance
     
-    val uid = remember { FirebaseManager.getAuth()?.currentUser?.uid ?: "" }
+    val authUser = remember { FirebaseManager.getAuth()?.currentUser }
+    val uid = remember { authUser?.uid ?: walletState.wallet?.uid ?: "" }
     var gameBalance by remember { mutableStateOf(0.0) }
-    var userPhone by remember { mutableStateOf("") }
-    var userName by remember { mutableStateOf("") }
+    var userPhone by remember(walletState.user) { mutableStateOf(walletState.user?.effectiveMobile ?: authUser?.phoneNumber ?: "") }
+    var userName by remember(walletState.user) { mutableStateOf(walletState.user?.effectiveName ?: authUser?.displayName?.ifBlank { null } ?: "User") }
     var isTransferModalVisible by remember { mutableStateOf(false) }
     var currentReservePool by remember { mutableStateOf(0.0) }
 
@@ -129,19 +132,44 @@ fun SpinWheelScreen(
     // Observe User Info (Phone & Name) for Transfer Requests
     DisposableEffect(uid) {
         if (uid.isBlank()) return@DisposableEffect onDispose {}
-        val database = FirebaseManager.getDatabase()
-        val ref = database?.getReference("users")?.child(uid)
-        val listener = object : ValueEventListener {
+        val database = FirebaseDatabase.getInstance(FirebaseConfig.DATABASE_URL)
+        val ref = database.getReference("users").child(uid)
+        
+        val profileValueListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                userPhone = snapshot.child("mobileNumber").getValue(String::class.java)
-                    ?: snapshot.child("phoneNumber").getValue(String::class.java) ?: ""
-                userName = snapshot.child("name").getValue(String::class.java)
-                    ?: snapshot.child("fullName").getValue(String::class.java) ?: "User"
+                if (!snapshot.exists()) return
+                val fetchedName = snapshot.child("name").value?.toString()?.trim()
+                    ?: snapshot.child("displayName").value?.toString()?.trim()
+                    ?: snapshot.child("userName").value?.toString()?.trim()
+                    ?: authUser?.displayName?.trim()
+                    ?: "User"
+                val fetchedPhone = snapshot.child("phone").value?.toString()?.trim()
+                    ?: snapshot.child("mobile").value?.toString()?.trim()
+                    ?: snapshot.child("phoneNumber").value?.toString()?.trim()
+                    ?: authUser?.phoneNumber?.trim()
+                    ?: ""
+                
+                userName = if (fetchedName.isNotBlank() && fetchedName != "User" && fetchedName != "Player") fetchedName else userName
+                userPhone = if (fetchedPhone.isNotBlank()) fetchedPhone else userPhone
             }
             override fun onCancelled(error: DatabaseError) {}
         }
-        ref?.addValueEventListener(listener)
-        onDispose { ref?.removeEventListener(listener) }
+        
+        ref.addListenerForSingleValueEvent(profileValueListener)
+        ref.addValueEventListener(profileValueListener)
+        onDispose { ref.removeEventListener(profileValueListener) }
+    }
+    
+    // Sync with walletState user profile
+    LaunchedEffect(walletState.user) {
+        walletState.user?.let {
+            if (it.effectiveName.isNotBlank() && it.effectiveName != "User" && it.effectiveName != "Player") {
+                userName = it.effectiveName
+            }
+            if (it.effectiveMobile.isNotBlank()) {
+                userPhone = it.effectiveMobile
+            }
+        }
     }
     
     var isSpinning by remember { mutableStateOf(false) }
@@ -566,6 +594,7 @@ fun SpinWheelScreen(
         TransferModal(
             uid = uid,
             userName = userName,
+            userPhone = userPhone,
             mainBalance = userBalance,
             gameBalance = gameBalance,
             accentColor = CasinoGold,
@@ -576,8 +605,8 @@ fun SpinWheelScreen(
                 // Dismiss dialog immediately
                 isTransferModalVisible = false
                 
-                val database = FirebaseManager.getDatabase()
-                if (database != null && uid.isNotBlank()) {
+                val database = FirebaseDatabase.getInstance(FirebaseConfig.DATABASE_URL)
+                if (uid.isNotBlank()) {
                     val requestRef = database.getReference("miniGames/transferRequests").push()
                     val requestData = mapOf(
                         "uid" to uid,
@@ -586,7 +615,8 @@ fun SpinWheelScreen(
                         "amount" to amount,
                         "type" to type, // ADD or WITHDRAW
                         "status" to "PENDING",
-                        "timestamp" to ServerValue.TIMESTAMP
+                        "timestamp" to ServerValue.TIMESTAMP,
+                        "source" to "SPIN_WHEEL"
                     )
                     
                     requestRef.setValue(requestData).addOnCompleteListener { task ->

@@ -139,7 +139,7 @@ fun AppNavigation(
   onLanguageChange: (AppLanguage) -> Unit = {},
 ) {
   val strings = LocalAppStrings.current
-        val startDestination = Destinations.SPLASH
+  val startDestination = Destinations.SPLASH
 
   val bottomNavItems = remember(strings) {
     listOf(
