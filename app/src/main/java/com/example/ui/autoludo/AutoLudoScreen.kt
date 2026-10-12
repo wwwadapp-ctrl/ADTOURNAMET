@@ -670,6 +670,34 @@ private fun CreateMatchBanner(
     }
 }
 
+private fun parseScheduledEpoch(formatted: String, createdAt: Long = 0L): Long {
+    return try {
+        val clean = formatted.replace("Today", "").trim()
+        val parts = clean.split(" ")
+        val timeParts = parts[0].split(":")
+        val h = timeParts[0].toInt()
+        val m = timeParts[1].toInt()
+        val amPm = parts.getOrNull(1) ?: "PM"
+
+        val hour24 = when {
+            amPm.equals("AM", ignoreCase = true) -> if (h == 12) 0 else h
+            else -> if (h == 12) 12 else h + 12
+        }
+
+        val cal = java.util.Calendar.getInstance()
+        if (createdAt > 0L) {
+            cal.timeInMillis = createdAt
+        }
+        cal.set(java.util.Calendar.HOUR_OF_DAY, hour24)
+        cal.set(java.util.Calendar.MINUTE, m)
+        cal.set(java.util.Calendar.SECOND, 0)
+        cal.set(java.util.Calendar.MILLISECOND, 0)
+        cal.timeInMillis
+    } catch (e: Exception) {
+        0L
+    }
+}
+
 @Composable
 private fun AutoLudoMatchCard(
     match: AutoLudoMatchEntity,
@@ -680,6 +708,24 @@ private fun AutoLudoMatchCard(
 ) {
     val isJoined = match.player1Uid == currentUid || match.player2Uid == currentUid
     val isFull = match.joinedPlayersCount >= match.maxPlayers || match.status != "WAITING"
+    
+    // Live reactive countdown ticker until match scheduled epoch
+    val targetEpoch = remember(match.scheduledTimeFormatted, match.createdAt) {
+        parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
+    }
+    var remainingMillis by remember(targetEpoch) {
+        mutableLongStateOf(if (targetEpoch > 0L) (targetEpoch - System.currentTimeMillis()).coerceAtLeast(0L) else 0L)
+    }
+
+    LaunchedEffect(targetEpoch) {
+        if (targetEpoch <= 0L) return@LaunchedEffect
+        while (true) {
+            val diff = targetEpoch - System.currentTimeMillis()
+            remainingMillis = diff.coerceAtLeast(0L)
+            if (remainingMillis <= 0L) break
+            delay(1000L)
+        }
+    }
     
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -867,17 +913,32 @@ private fun AutoLudoMatchCard(
                 var onClickAction: () -> Unit = {}
 
                 when {
-                    isJoined && match.status == "WAITING" -> {
+                    isJoined && match.status == "WAITING" && match.joinedPlayersCount < match.maxPlayers -> {
                         buttonText = "⏳ অপেক্ষায় আছেন"
                         buttonColor = Amber600.copy(alpha = 0.2f)
                         isEnabled = false
                         onClickAction = { }
                     }
-                    isJoined && match.status == "READY_COUNTDOWN" -> {
-                        buttonText = "🎮 খেলায় প্রবেশ করুন"
-                        buttonColor = Emerald600
-                        isEnabled = true
-                        onClickAction = { onEnterClick() }
+                    isJoined && (match.status == "READY_COUNTDOWN" || match.joinedPlayersCount >= match.maxPlayers) -> {
+                        if (remainingMillis > 0L) {
+                            val sec = (remainingMillis / 1000) % 60
+                            val min = (remainingMillis / (1000 * 60)) % 60
+                            val hrs = remainingMillis / (1000 * 60 * 60)
+                            val timeStr = if (hrs > 0) {
+                                String.format("%02d:%02d:%02d", hrs, min, sec)
+                            } else {
+                                String.format("%02d:%02d", min, sec)
+                            }
+                            buttonText = "⏳ শুরুর বাকি: $timeStr"
+                            buttonColor = Amber600.copy(alpha = 0.25f)
+                            isEnabled = false
+                            onClickAction = { }
+                        } else {
+                            buttonText = "🎮 খেলায় প্রবেশ করুন"
+                            buttonColor = Emerald600
+                            isEnabled = true
+                            onClickAction = { onEnterClick() }
+                        }
                     }
                     isFull -> {
                         buttonText = "✖ ম্যাচ ফুল"
@@ -943,14 +1004,63 @@ private fun CreateAutoLudoMatchDialog(
     val entryFee = entryFeeText.toIntOrNull() ?: 0
     val winnings = if (entryFee > 0) (entryFee * 1.8).toInt() else 0
 
+    // Smart default: Current time + 15 mins rounded up to nearest 5-minute interval
+    val initialTime = remember {
+        val cal = java.util.Calendar.getInstance().apply {
+            add(java.util.Calendar.MINUTE, 15)
+            val currentMin = get(java.util.Calendar.MINUTE)
+            val remainder = currentMin % 5
+            if (remainder != 0) {
+                add(java.util.Calendar.MINUTE, 5 - remainder)
+            }
+        }
+        val hour12 = when (val h = cal.get(java.util.Calendar.HOUR)) {
+            0 -> 12
+            else -> h
+        }
+        val minute = cal.get(java.util.Calendar.MINUTE)
+        val amPm = if (cal.get(java.util.Calendar.AM_PM) == java.util.Calendar.AM) "AM" else "PM"
+        Triple(
+            hour12.toString().padStart(2, '0'),
+            minute.toString().padStart(2, '0'),
+            amPm
+        )
+    }
+
     // Time Selection State
-    var selectedHour by remember { mutableStateOf("07") }
-    var selectedMinute by remember { mutableStateOf("30") }
-    var selectedAmPm by remember { mutableStateOf("PM") }
+    var selectedHour by remember { mutableStateOf(initialTime.first) }
+    var selectedMinute by remember { mutableStateOf(initialTime.second) }
+    var selectedAmPm by remember { mutableStateOf(initialTime.third) }
 
     val hours = (1..12).map { it.toString().padStart(2, '0') }
     val minutes = (0..55 step 5).map { it.toString().padStart(2, '0') }
     val amPmList = listOf("AM", "PM")
+
+    // Reactive Future Time Validation
+    val isFutureTime by remember(selectedHour, selectedMinute, selectedAmPm) {
+        derivedStateOf {
+            try {
+                val now = System.currentTimeMillis()
+                val h = selectedHour.toIntOrNull() ?: 12
+                val m = selectedMinute.toIntOrNull() ?: 0
+                val hour24 = when {
+                    selectedAmPm.equals("AM", ignoreCase = true) -> if (h == 12) 0 else h
+                    else -> if (h == 12) 12 else h + 12
+                }
+
+                val targetCal = java.util.Calendar.getInstance().apply {
+                    set(java.util.Calendar.HOUR_OF_DAY, hour24)
+                    set(java.util.Calendar.MINUTE, m)
+                    set(java.util.Calendar.SECOND, 0)
+                    set(java.util.Calendar.MILLISECOND, 0)
+                }
+
+                targetCal.timeInMillis > now
+            } catch (e: Exception) {
+                true
+            }
+        }
+    }
     
     Dialog(
         onDismissRequest = onDismiss,
@@ -1078,6 +1188,31 @@ private fun CreateAutoLudoMatchDialog(
                                 modifier = Modifier.weight(1f)
                             )
                         }
+
+                        if (!isFutureTime) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFFEF4444).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                    .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = Color(0xFFF87171),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "অনুগ্রহ করে বর্তমান সময়ের পরের সময় নির্বাচন করুন",
+                                    color = Color(0xFFFCA5A5),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                )
+                            }
+                        }
                     }
                     
                     Spacer(modifier = Modifier.height(20.dp))
@@ -1124,12 +1259,12 @@ private fun CreateAutoLudoMatchDialog(
                         
                         Button(
                             onClick = { 
-                                if (entryFee >= 10) {
+                                if (entryFee >= 10 && isFutureTime) {
                                     val timeStr = "$selectedHour:$selectedMinute $selectedAmPm"
                                     onConfirm(entryFee, timeStr)
                                 } 
                             },
-                            enabled = entryFee >= 10,
+                            enabled = entryFee >= 10 && isFutureTime,
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(

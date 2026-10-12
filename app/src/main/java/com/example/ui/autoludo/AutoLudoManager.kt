@@ -58,6 +58,7 @@ object AutoLudoManager {
     // Authorized path under miniGames node to ensure Firebase Security Rule compliance
     private const val NODE_MATCHES = "miniGames/autoLudo/matches"
     private const val NODE_GAME_WALLETS = "gameWallets"
+    private const val NODE_METADATA = "miniGames/autoLudo/metadata"
 
     private fun getDb(): FirebaseDatabase? {
         return try {
@@ -160,16 +161,47 @@ object AutoLudoManager {
             return Result.failure(IllegalStateException(deductionResult.second ?: "ব্যালেন্স ডিডাকশন ব্যর্থ হয়েছে"))
         }
 
-        // Step 2: Write Match to miniGames/autoLudo/matches/$matchId
+        // Step 2: Atomic Increment for Match Counter (#1, #2, #3, ...)
+        val counterRef = db.getReference(NODE_METADATA).child("matchCounter")
+        val nextMatchNumber = suspendCancellableCoroutine<Long> { cont ->
+            counterRef.runTransaction(object : Transaction.Handler {
+                override fun doTransaction(currentData: MutableData): Transaction.Result {
+                    val currentVal = when (val v = currentData.value) {
+                        is Number -> v.toLong()
+                        is String -> v.toLongOrNull() ?: 0L
+                        else -> 0L
+                    }
+                    val newVal = currentVal + 1L
+                    currentData.value = newVal
+                    return Transaction.success(currentData)
+                }
+
+                override fun onComplete(
+                    error: DatabaseError?,
+                    committed: Boolean,
+                    currentData: DataSnapshot?
+                ) {
+                    if (committed && error == null) {
+                        val res = (currentData?.value as? Number)?.toLong() ?: 1L
+                        cont.resume(res)
+                    } else {
+                        // Safe fallback in case of transient network issue
+                        cont.resume(System.currentTimeMillis() % 10000L)
+                    }
+                }
+            })
+        }
+
+        // Step 3: Write Match to miniGames/autoLudo/matches/$matchId
         val matchRef = db.getReference(NODE_MATCHES).push()
         val matchId = matchRef.key ?: "AL_${System.currentTimeMillis()}"
-        val matchNumber = (100..999).random().toString()
+        val matchNumber = nextMatchNumber.toString()
         val prizePool = (entryFee * 2.0) * 0.90 // 10% commission, 1.8x payout
 
         val matchData = hashMapOf<String, Any?>(
             "matchId" to matchId,
             "matchNumber" to matchNumber,
-            "title" to "Auto Ludo || Match No:- $matchNumber",
+            "title" to "Auto Ludo || Match No:- #$matchNumber",
             "entryFee" to entryFee,
             "prizePool" to prizePool,
             "creatorUid" to creatorUid,
@@ -812,6 +844,160 @@ object AutoLudoManager {
     fun getGlobalTrackPos(pos: Int, isPlayer1: Boolean): Int {
         val offset = if (isPlayer1) 39 else 13
         return (pos + offset) % 52
+    }
+
+    fun parseScheduledEpoch(formatted: String, createdAt: Long = 0L): Long {
+        return try {
+            val clean = formatted.replace("Today", "").trim()
+            val parts = clean.split(" ")
+            val timeParts = parts[0].split(":")
+            val h = timeParts[0].toInt()
+            val m = timeParts[1].toInt()
+            val amPm = parts.getOrNull(1) ?: "PM"
+
+            val hour24 = when {
+                amPm.equals("AM", ignoreCase = true) -> if (h == 12) 0 else h
+                else -> if (h == 12) 12 else h + 12
+            }
+
+            val cal = java.util.Calendar.getInstance()
+            if (createdAt > 0L) {
+                cal.timeInMillis = createdAt
+            }
+            cal.set(java.util.Calendar.HOUR_OF_DAY, hour24)
+            cal.set(java.util.Calendar.MINUTE, m)
+            cal.set(java.util.Calendar.SECOND, 0)
+            cal.set(java.util.Calendar.MILLISECOND, 0)
+            cal.timeInMillis
+        } catch (e: Exception) {
+            0L
+        }
+    }
+
+    /**
+     * Atomically adjudicates a match if the 10-minute post-schedule grace period expires without both players ready.
+     * Condition A: Player 1 ready, Player 2 absent -> Player 1 Walkover Win (100% prize pool)
+     * Condition B: Player 2 ready, Player 1 absent -> Player 2 Walkover Win (100% prize pool)
+     * Condition C: Neither player ready -> Cancelled, 90% entry fee refunded to both players (10% admin fee)
+     */
+    suspend fun adjudicateGracePeriodTimeout(matchId: String): Result<Unit> {
+        if (matchId.isBlank()) return Result.failure(IllegalArgumentException("Invalid matchId"))
+
+        val db = getDb() ?: return Result.failure(IllegalStateException("Database not available"))
+        val rootRef = db.reference
+
+        return suspendCancellableCoroutine { cont ->
+            rootRef.runTransaction(object : Transaction.Handler {
+                override fun doTransaction(currentData: MutableData): Transaction.Result {
+                    val matchNode = currentData.child(NODE_MATCHES).child(matchId)
+                    val match = matchNode.getValue(AutoLudoMatchEntity::class.java)
+                        ?: return Transaction.abort()
+
+                    // Guard: Only adjudicate if not already in game, completed, or cancelled
+                    if (match.status == "IN_GAME" || match.status == "COMPLETED" || match.status == "CANCELLED") {
+                        return Transaction.abort()
+                    }
+
+                    // Guard: Verify that the 10-minute grace period has actually expired
+                    val schedEpoch = parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
+                    val now = System.currentTimeMillis()
+                    val graceExpiry = if (schedEpoch > 0L) schedEpoch + (10 * 60 * 1000L) else match.createdAt + (10 * 60 * 1000L)
+                    if (now < graceExpiry) {
+                        return Transaction.abort() // Grace period not yet expired
+                    }
+
+                    val p1Ready = match.player1Ready
+                    val p2Ready = match.player2Ready
+
+                    when {
+                        // Condition A: Player 1 ready, Player 2 absent -> Player 1 Walkover Win
+                        p1Ready && !p2Ready -> {
+                            matchNode.child("status").value = "COMPLETED"
+                            matchNode.child("winnerUid").value = match.player1Uid
+                            matchNode.child("lastActionLog").value = "Player 2 No-Show. Player 1 Walkover Victory!"
+                            matchNode.child("updatedAt").value = ServerValue.TIMESTAMP
+
+                            // Credit winner wallet directly in root transaction
+                            if (!match.prizeDistributed && match.prizePool > 0.0) {
+                                matchNode.child("prizeDistributed").value = true
+                                val p1WalletRef = currentData.child(NODE_GAME_WALLETS).child(match.player1Uid).child("balance")
+                                val rawBal = p1WalletRef.value
+                                val curBal = when (rawBal) {
+                                    is Number -> rawBal.toDouble()
+                                    is String -> rawBal.toDoubleOrNull() ?: 0.0
+                                    else -> 0.0
+                                }
+                                p1WalletRef.value = curBal + match.prizePool
+                            }
+                        }
+
+                        // Condition B: Player 2 ready, Player 1 absent -> Player 2 Walkover Win
+                        !p1Ready && p2Ready -> {
+                            matchNode.child("status").value = "COMPLETED"
+                            matchNode.child("winnerUid").value = match.player2Uid
+                            matchNode.child("lastActionLog").value = "Player 1 No-Show. Player 2 Walkover Victory!"
+                            matchNode.child("updatedAt").value = ServerValue.TIMESTAMP
+
+                            // Credit winner wallet directly in root transaction
+                            if (!match.prizeDistributed && match.prizePool > 0.0) {
+                                matchNode.child("prizeDistributed").value = true
+                                val p2WalletRef = currentData.child(NODE_GAME_WALLETS).child(match.player2Uid).child("balance")
+                                val rawBal = p2WalletRef.value
+                                val curBal = when (rawBal) {
+                                    is Number -> rawBal.toDouble()
+                                    is String -> rawBal.toDoubleOrNull() ?: 0.0
+                                    else -> 0.0
+                                }
+                                p2WalletRef.value = curBal + match.prizePool
+                            }
+                        }
+
+                        // Condition C: Neither ready / Both absent -> 90% refund to both
+                        else -> {
+                            matchNode.child("status").value = "CANCELLED"
+                            matchNode.child("lastActionLog").value = "Both players absent. 90% fee refunded."
+                            matchNode.child("updatedAt").value = ServerValue.TIMESTAMP
+
+                            val refundAmount = match.entryFee * 0.90 // 10% admin fee withheld, 90% returned
+                            if (refundAmount > 0.0) {
+                                // Refund Player 1
+                                if (match.player1Uid.isNotBlank()) {
+                                    val p1WalletRef = currentData.child(NODE_GAME_WALLETS).child(match.player1Uid).child("balance")
+                                    val rawBal1 = p1WalletRef.value
+                                    val curBal1 = when (rawBal1) {
+                                        is Number -> rawBal1.toDouble()
+                                        is String -> rawBal1.toDoubleOrNull() ?: 0.0
+                                        else -> 0.0
+                                    }
+                                    p1WalletRef.value = curBal1 + refundAmount
+                                }
+                                // Refund Player 2
+                                if (match.player2Uid.isNotBlank()) {
+                                    val p2WalletRef = currentData.child(NODE_GAME_WALLETS).child(match.player2Uid).child("balance")
+                                    val rawBal2 = p2WalletRef.value
+                                    val curBal2 = when (rawBal2) {
+                                        is Number -> rawBal2.toDouble()
+                                        is String -> rawBal2.toDoubleOrNull() ?: 0.0
+                                        else -> 0.0
+                                    }
+                                    p2WalletRef.value = curBal2 + refundAmount
+                                }
+                            }
+                        }
+                    }
+
+                    return Transaction.success(currentData)
+                }
+
+                override fun onComplete(err: DatabaseError?, committed: Boolean, d: DataSnapshot?) {
+                    if (committed && err == null) {
+                        cont.resume(Result.success(Unit))
+                    } else {
+                        cont.resume(Result.failure(err?.toException() ?: Exception("Adjudication transaction aborted or failed")))
+                    }
+                }
+            })
+        }
     }
 
     private suspend fun compensateRefund(balanceRef: DatabaseReference, amount: Double) {

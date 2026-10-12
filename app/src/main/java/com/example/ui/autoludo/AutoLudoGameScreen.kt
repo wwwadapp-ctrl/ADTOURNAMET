@@ -1124,12 +1124,12 @@ fun LudoPawnView(
             .offset {
                 IntOffset(
                     x = (animOffset.value.x - 14.dp.toPx()).roundToInt(),
-                    y = (animOffset.value.y + jumpAnim.value - 19.dp.toPx()).roundToInt()
+                    y = (animOffset.value.y + jumpAnim.value - 25.dp.toPx()).roundToInt()
                 )
             }
             .graphicsLayer {
                 rotationZ = -boardRotation
-                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.5f)
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 25f / 38f)
                 scaleX = eligibleScale
                 scaleY = eligibleScale
             }
@@ -1449,20 +1449,23 @@ private fun getPawnOffset(
     totalInStack: Int = 1
 ): Offset {
     if (pos == -1) {
-        // Home positions
+        // Home yard positions aligned to exact 15x15 grid unit circle centers
+        val unit = boardSize / 15f
         return if (isPlayer1) {
+            // Red Yard Base Circles (Columns 1.5 & 3.5, Rows 10.5 & 12.5)
             when (index) {
-                0 -> Offset(boardSize * 0.133f, boardSize * 0.733f)
-                1 -> Offset(boardSize * 0.266f, boardSize * 0.733f)
-                2 -> Offset(boardSize * 0.133f, boardSize * 0.866f)
-                else -> Offset(boardSize * 0.266f, boardSize * 0.866f)
+                0 -> Offset(unit * 1.5f, unit * 10.5f)
+                1 -> Offset(unit * 3.5f, unit * 10.5f)
+                2 -> Offset(unit * 1.5f, unit * 12.5f)
+                else -> Offset(unit * 3.5f, unit * 12.5f)
             }
         } else {
+            // Yellow Yard Base Circles (Columns 10.5 & 12.5, Rows 1.5 & 3.5)
             when (index) {
-                0 -> Offset(boardSize * 0.733f, boardSize * 0.133f)
-                1 -> Offset(boardSize * 0.866f, boardSize * 0.133f)
-                2 -> Offset(boardSize * 0.733f, boardSize * 0.266f)
-                else -> Offset(boardSize * 0.866f, boardSize * 0.266f)
+                0 -> Offset(unit * 10.5f, unit * 1.5f)
+                1 -> Offset(unit * 12.5f, unit * 1.5f)
+                2 -> Offset(unit * 10.5f, unit * 3.5f)
+                else -> Offset(unit * 12.5f, unit * 3.5f)
             }
         }
     } else {

@@ -27,7 +27,12 @@
 -keepclassmembers class * {
     @com.google.firebase.database.IgnoreExtraProperties <fields>;
     @com.google.firebase.database.PropertyName <fields>;
+    @com.google.firebase.database.PropertyName <methods>;
+    @com.google.firebase.firestore.PropertyName <fields>;
+    @com.google.firebase.firestore.PropertyName <methods>;
     @com.google.firebase.database.Exclude <fields>;
+    @androidx.annotation.Keep <fields>;
+    @androidx.annotation.Keep <methods>;
 }
 
 # Preserve all domain entities, database models, and enums
@@ -37,12 +42,27 @@
 -keep interface com.example.domain.model.** { *; }
 -keep enum com.example.domain.model.** { *; }
 
-# Preserve Auto Ludo models and engines
--keep class com.example.ui.autoludo.** { *; }
--keepclassmembers class com.example.ui.autoludo.** { *; }
+# --- Firebase Realtime Database Data Models Preservation ---
+-keep class com.example.ui.autoludo.AutoLudoMatchEntity {
+    <init>(...);
+    public <methods>;
+    public <fields>;
+}
+-keepclassmembers class com.example.ui.autoludo.AutoLudoMatchEntity { *; }
 
-# Preserve mini-game logic, engines, and result data models (Firebase Serialization)
--keep class com.example.ui.minigames.** { *; }
+-keep class com.example.ui.autoludo.LudoGameState {
+    <init>(...);
+    public <methods>;
+    public <fields>;
+}
+-keepclassmembers class com.example.ui.autoludo.LudoGameState { *; }
+
+# Keep any nested or helper state data classes in AutoLudo / MiniGames
+-keep class com.example.ui.autoludo.**State { *; }
+-keep class com.example.ui.autoludo.**Model { *; }
+-keep class com.example.ui.minigames.**State { *; }
+-keep class com.example.ui.minigames.**Model { *; }
+-keep class com.example.ui.minigames.**Entity { *; }
 
 # Preserve all core data models, repositories, and config
 -keep class com.example.core.config.** { *; }

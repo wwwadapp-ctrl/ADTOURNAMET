@@ -33,16 +33,33 @@ fun AutoLudoReadyRoomDialog(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     
-    // Authoritative Timer Logic: (countdownStartedAt + 10 mins) - current
+    // 10-Minute Post-Schedule Grace Period Timer: (scheduledTimeMillis + 10 mins) - current
     var remainingSeconds by remember { mutableLongStateOf(0L) }
 
-    LaunchedEffect(match.countdownStartedAt) {
+    val schedEpoch = remember(match.scheduledTimeFormatted, match.createdAt) {
+        AutoLudoManager.parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
+    }
+
+    LaunchedEffect(schedEpoch, match.status) {
+        if (match.status == "IN_GAME" || match.status == "COMPLETED" || match.status == "CANCELLED") return@LaunchedEffect
+
+        val expiry = if (schedEpoch > 0L) {
+            schedEpoch + (10 * 60 * 1000L) // 10 minutes from scheduled match start
+        } else if (match.countdownStartedAt > 0L) {
+            match.countdownStartedAt + (10 * 60 * 1000L)
+        } else {
+            System.currentTimeMillis() + (10 * 60 * 1000L)
+        }
+
         while (true) {
             val now = System.currentTimeMillis()
-            val expiry = match.countdownStartedAt + (600 * 1000L) // 10 minutes
             val diff = (expiry - now) / 1000
             remainingSeconds = diff.coerceAtLeast(0L)
-            if (remainingSeconds <= 0) break
+            if (remainingSeconds <= 0) {
+                // Auto-adjudicate grace period timeout if not already in game
+                AutoLudoManager.adjudicateGracePeriodTimeout(match.matchId)
+                break
+            }
             delay(1000)
         }
     }
