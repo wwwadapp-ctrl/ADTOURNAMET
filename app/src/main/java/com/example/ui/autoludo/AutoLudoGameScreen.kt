@@ -38,12 +38,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
 import coil.compose.AsyncImage
 import com.example.R
-import android.media.ToneGenerator
+import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.SoundPool
+import android.media.ToneGenerator
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -461,7 +464,9 @@ fun AutoLudoBoardScreen(
     val isPlayer2 = currentUid == match.player2Uid
     val boardRotation = if (isPlayer2) 180f else 0f
 
-    // Native Ticking Sound via ToneGenerator
+    val context = LocalContext.current
+
+    // Native Ticking Sound via ToneGenerator (Preserved strictly for final 5-second countdown urgency)
     val toneGenerator = remember {
         try {
             ToneGenerator(AudioManager.STREAM_MUSIC, 75)
@@ -469,8 +474,45 @@ fun AutoLudoBoardScreen(
             null
         }
     }
+
+    // Modern Low-Latency SoundPool for authentic Game Sonification (Dice Roll & Pawn Step)
+    val soundPool = remember {
+        try {
+            val audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_GAME)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            SoundPool.Builder()
+                .setMaxStreams(6)
+                .setAudioAttributes(audioAttributes)
+                .build()
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    var diceSoundId by remember { mutableIntStateOf(0) }
+    var pawnSoundId by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(soundPool) {
+        soundPool?.let { pool ->
+            pool.setOnLoadCompleteListener { _, sampleId, status ->
+                if (status == 0) {
+                    android.util.Log.d("AutoLudoAudio", "Sample loaded successfully: $sampleId")
+                }
+            }
+            try {
+                diceSoundId = pool.load(context, R.raw.dice_roll, 1)
+                pawnSoundId = pool.load(context, R.raw.pawn_step, 1)
+            } catch (e: Exception) {
+                android.util.Log.e("AutoLudoAudio", "Failed to load audio assets: ${e.message}")
+            }
+        }
+    }
+
     DisposableEffect(Unit) {
         onDispose {
+            soundPool?.release()
             toneGenerator?.release()
         }
     }
@@ -706,6 +748,8 @@ fun AutoLudoBoardScreen(
                             boardRotation = boardRotation,
                             stackIndex = stackIdx,
                             totalInStack = total,
+                            soundPool = soundPool,
+                            pawnSoundId = pawnSoundId,
                             toneGenerator = toneGenerator,
                             onClick = {
                                 val dice = effectiveDiceValue
@@ -746,6 +790,8 @@ fun AutoLudoBoardScreen(
                             boardRotation = boardRotation,
                             stackIndex = stackIdx,
                             totalInStack = total,
+                            soundPool = soundPool,
+                            pawnSoundId = pawnSoundId,
                             toneGenerator = toneGenerator,
                             onClick = {
                                 val dice = effectiveDiceValue
@@ -768,13 +814,15 @@ fun AutoLudoBoardScreen(
             // 3. Bottom Battle Dock (Always visible)
             val canActivePlayerRoll = (isPlayer1Turn && canControlPlayer1) || (isPlayer2Turn && canControlPlayer2)
             LudoBottomBattleDock(
-                player1 = player1,
-                player2 = player2,
+                player1 = if (isPlayer2) player2 else player1,
+                player2 = if (isPlayer2) player1 else player2,
                 currentDiceValue = effectiveDiceValue,
                 isDiceRolled = isRolled,
                 canRoll = canActivePlayerRoll,
                 timerProgress = timerProgress,
                 onDiceRoll = { onDiceRoll(it, false) },
+                soundPool = soundPool,
+                diceSoundId = diceSoundId,
                 toneGenerator = toneGenerator,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -954,6 +1002,8 @@ fun LudoPawnView(
     boardRotation: Float = 0f,
     stackIndex: Int = 0,
     totalInStack: Int = 1,
+    soundPool: SoundPool? = null,
+    pawnSoundId: Int = 0,
     toneGenerator: android.media.ToneGenerator? = null,
     onClick: () -> Unit
 ) {
@@ -985,7 +1035,12 @@ fun LudoPawnView(
             animOffset.animateTo(startOffset, tween(360))
             visualPos = 0
             try {
-                toneGenerator?.startTone(android.media.ToneGenerator.TONE_DTMF_1, 60)
+                val streamId = if (soundPool != null && pawnSoundId > 0) {
+                    soundPool.play(pawnSoundId, 1f, 1f, 1, 0, 1f)
+                } else 0
+                if (streamId == 0) {
+                    toneGenerator?.startTone(android.media.ToneGenerator.TONE_DTMF_1, 60)
+                }
             } catch (e: Exception) { }
         }
         
@@ -1004,13 +1059,48 @@ fun LudoPawnView(
                 animOffset.animateTo(stepOffset, tween(300, easing = LinearEasing))
                 visualPos = step
                 try {
-                    toneGenerator?.startTone(android.media.ToneGenerator.TONE_DTMF_1, 60)
+                    val streamId = if (soundPool != null && pawnSoundId > 0) {
+                        soundPool.play(pawnSoundId, 1f, 1f, 1, 0, 1f)
+                    } else 0
+                    if (streamId == 0) {
+                        toneGenerator?.startTone(android.media.ToneGenerator.TONE_DTMF_1, 60)
+                    }
                 } catch (e: Exception) { }
             }
         } else if (targetPos < visualPos) {
-            // Captured or teleported back (yard)
-            animOffset.animateTo(getPawnOffset(targetPos, index, boardSizePx, isPlayer1, stackIndex, totalInStack), tween(500))
-            visualPos = targetPos
+            // Captured (Cut) or sent back to yard
+            if (targetPos == -1 && visualPos >= 0) {
+                // Play authentic pawn capture (cut) sound effect
+                try {
+                    val streamId = if (soundPool != null && pawnSoundId > 0) {
+                        soundPool.play(pawnSoundId, 1f, 1f, 1, 0, 1.6f) // High-pitch whip/cut sound
+                    } else 0
+                    if (streamId == 0) {
+                        toneGenerator?.startTone(android.media.ToneGenerator.TONE_DTMF_D, 180)
+                    }
+                } catch (e: Exception) { }
+
+                // High-speed reverse slide along the exact traveled track down to track coordinate 0 (40ms per step)
+                val startTrackPos = visualPos.coerceAtMost(56)
+                for (step in (startTrackPos - 1) downTo 0) {
+                    val rewindOffset = getPawnOffset(step, index, boardSizePx, isPlayer1)
+                    animOffset.animateTo(rewindOffset, tween(40, easing = LinearEasing))
+                    visualPos = step
+                }
+
+                // Final landing hop from track 0 into yard position -1
+                val yardOffset = getPawnOffset(-1, index, boardSizePx, isPlayer1, stackIndex, totalInStack)
+                launch {
+                    jumpAnim.animateTo(-16f, tween(110, easing = FastOutLinearInEasing))
+                    jumpAnim.animateTo(0f, tween(110, easing = LinearOutSlowInEasing))
+                }
+                animOffset.animateTo(yardOffset, tween(200, easing = FastOutSlowInEasing))
+                visualPos = -1
+            } else {
+                // Direct retreat fallback if negative or relative
+                animOffset.animateTo(getPawnOffset(targetPos, index, boardSizePx, isPlayer1, stackIndex, totalInStack), tween(300))
+                visualPos = targetPos
+            }
         }
     }
 
@@ -1034,11 +1124,12 @@ fun LudoPawnView(
             .offset {
                 IntOffset(
                     x = (animOffset.value.x - 14.dp.toPx()).roundToInt(),
-                    y = (animOffset.value.y + jumpAnim.value - 30.dp.toPx()).roundToInt()
+                    y = (animOffset.value.y + jumpAnim.value - 19.dp.toPx()).roundToInt()
                 )
             }
             .graphicsLayer {
                 rotationZ = -boardRotation
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.5f)
                 scaleX = eligibleScale
                 scaleY = eligibleScale
             }
@@ -1185,6 +1276,8 @@ fun LudoBottomBattleDock(
     canRoll: Boolean = true,
     timerProgress: Float = 0f,
     onDiceRoll: (Int) -> Unit,
+    soundPool: SoundPool? = null,
+    diceSoundId: Int = 0,
     toneGenerator: android.media.ToneGenerator? = null,
     modifier: Modifier = Modifier
 ) {
@@ -1227,7 +1320,7 @@ fun LudoBottomBattleDock(
                 horizontalAlignment = Alignment.Start
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    MiniPawnIcon(color = Color(0xFF9B0000))
+                    MiniPawnIcon(color = Color(player1.pawnColor))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         player1.name,
@@ -1274,7 +1367,7 @@ fun LudoBottomBattleDock(
                         )
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    MiniPawnIcon(color = Color(0xFFFF9100))
+                    MiniPawnIcon(color = Color(player2.pawnColor))
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 
@@ -1306,6 +1399,8 @@ fun LudoBottomBattleDock(
                 isPlayer1Turn = isPlayer1Turn,
                 diceColor = activeDiceColor,
                 onRoll = onDiceRoll,
+                soundPool = soundPool,
+                diceSoundId = diceSoundId,
                 toneGenerator = toneGenerator
             )
         }
@@ -1414,18 +1509,24 @@ private fun getGridPositionForPath(pos: Int, isPlayer1: Boolean): GridPos {
     if (pos >= 51) {
         val stretchIdx = (pos - 51).coerceIn(0, 5)
         return if (isPlayer1) {
-            // Player 1 (Red): Moves UP along Column 7 from bottom (Y: 13 down to 9), finishes at Center (7, 7)
-            if (stretchIdx >= 5) {
-                GridPos(7, 7)
-            } else {
-                GridPos(7, 13 - stretchIdx)
+            // Red: Column 7 moving UP: 51->(7,13), 52->(7,12), 53->(7,11), 54->(7,10), 55->(7,9), 56->(7,7)
+            when (stretchIdx) {
+                0 -> GridPos(7, 13)
+                1 -> GridPos(7, 12)
+                2 -> GridPos(7, 11)
+                3 -> GridPos(7, 10)
+                4 -> GridPos(7, 9)
+                else -> GridPos(7, 7) // Final Center Goal
             }
         } else {
-            // Player 2 (Yellow): Moves DOWN along Column 7 from top (Y: 1 up to 5), finishes at Center (7, 7)
-            if (stretchIdx >= 5) {
-                GridPos(7, 7)
-            } else {
-                GridPos(7, 1 + stretchIdx)
+            // Yellow: Column 7 moving DOWN: 51->(7,1), 52->(7,2), 53->(7,3), 54->(7,4), 55->(7,5), 56->(7,7)
+            when (stretchIdx) {
+                0 -> GridPos(7, 1)
+                1 -> GridPos(7, 2)
+                2 -> GridPos(7, 3)
+                3 -> GridPos(7, 4)
+                4 -> GridPos(7, 5)
+                else -> GridPos(7, 7) // Final Center Goal
             }
         }
     }
@@ -1449,12 +1550,16 @@ fun Luxury3DCubeDice(
     isPlayer1Turn: Boolean,
     diceColor: Color = if (isPlayer1Turn) Color(0xFFEF4444) else Color(0xFFF59E0B),
     onRoll: (Int) -> Unit,
+    soundPool: SoundPool? = null,
+    diceSoundId: Int = 0,
     toneGenerator: android.media.ToneGenerator? = null
 ) {
     val coroutineScope = rememberCoroutineScope()
     val localDensity = LocalDensity.current
     var isRolling by remember { mutableStateOf(false) }
     var displayValue by remember { mutableStateOf(if (diceValue in 1..6) diceValue else 1) }
+    var lastSettledValue by remember { mutableIntStateOf(diceValue) }
+    var isLocalRollInitiated by remember { mutableStateOf(false) }
     
     // Physical Animatables
     val jumpY = remember { Animatable(0f) }
@@ -1468,8 +1573,105 @@ fun Luxury3DCubeDice(
     val shadowAlpha = remember { Animatable(0.4f) }
     val shadowScale = remember { Animatable(1f) }
 
+    fun triggerRollAnimation(targetValue: Int, isLocal: Boolean) {
+        if (isRolling) return
+        isRolling = true
+        try {
+            val streamId = if (soundPool != null && diceSoundId > 0) {
+                soundPool.play(diceSoundId, 1f, 1f, 1, 0, 1f)
+            } else 0
+            if (streamId == 0) {
+                toneGenerator?.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 120)
+            }
+        } catch (_: Exception) { }
+
+        coroutineScope.launch {
+            val jumpTarget = -localDensity.run { 65.dp.toPx() }
+            
+            // Phase 1: Anticipation Squash
+            squashY.animateTo(0.82f, tween(60, easing = FastOutSlowInEasing))
+            squashX.animateTo(1.15f, tween(60, easing = FastOutSlowInEasing))
+
+            // Phase 2: Parabolic Tumbling Jump & Erratic Multi-axis Rotation
+            launch {
+                // shadow fading
+                launch {
+                    shadowAlpha.animateTo(0.12f, tween(250))
+                    shadowScale.animateTo(1.4f, tween(250))
+                }
+                jumpY.animateTo(jumpTarget, tween(250, easing = LinearOutSlowInEasing))
+                
+                // Return with shadow tightening
+                launch {
+                    shadowAlpha.animateTo(0.55f, tween(250))
+                    shadowScale.animateTo(0.85f, tween(250))
+                }
+                jumpY.animateTo(0f, tween(250, easing = FastOutLinearInEasing))
+                
+                // Phase 3: Impact Bounce & Settle
+                launch {
+                    shadowAlpha.animateTo(0.4f, spring(Spring.DampingRatioMediumBouncy))
+                    shadowScale.animateTo(1f, spring(Spring.DampingRatioMediumBouncy))
+                }
+                
+                squashY.animateTo(0.85f, tween(80))
+                squashY.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow))
+                squashX.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow))
+            }
+            
+            // Multi-axis Erratic Tumbling (Synchronized to not clash with initial squash)
+            launch {
+                squashY.animateTo(1f, tween(100))
+                squashX.animateTo(1f, tween(100))
+                rotX.animateTo(rotX.value + 720f, tween(500, easing = LinearEasing))
+            }
+            launch { rotY.animateTo(rotY.value + 1080f, tween(500, easing = LinearEasing)) }
+            launch { rotZ.animateTo(rotZ.value + 180f, tween(500, easing = LinearEasing)) }
+
+            // Rapid Number Shuffling
+            val tumbleJob = launch {
+                while (true) {
+                    displayValue = (1..6).random()
+                    delay(50)
+                }
+            }
+            
+            delay(500)
+            tumbleJob.cancel()
+            
+            // Final Settle Value
+            displayValue = targetValue
+            
+            // Snap tilt to neutral
+            launch { rotX.animateTo(0f, spring()) }
+            launch { rotY.animateTo(0f, spring()) }
+            launch { rotZ.animateTo(0f, spring()) }
+            
+            delay(200)
+            if (isLocal) {
+                onRoll(targetValue)
+            }
+            isRolling = false
+        }
+    }
+
     LaunchedEffect(diceValue) {
-        if (!isRolling && diceValue in 1..6) displayValue = diceValue
+        if (diceValue in 1..6) {
+            if (isLocalRollInitiated) {
+                // Local player already completed animation; sync state without replaying
+                isLocalRollInitiated = false
+                lastSettledValue = diceValue
+                if (!isRolling) displayValue = diceValue
+            } else if (diceValue != lastSettledValue && !isRolling) {
+                // Remote player roll or authoritative timeout roll: run 3D tumble & play audio
+                lastSettledValue = diceValue
+                triggerRollAnimation(targetValue = diceValue, isLocal = false)
+            }
+        } else if (diceValue == 0) {
+            // Reset for next turn roll
+            lastSettledValue = 0
+            isLocalRollInitiated = false
+        }
     }
 
     Box(
@@ -1514,77 +1716,10 @@ fun Luxury3DCubeDice(
                     indication = null
                 ) {
                     if (!isRolling) {
-                        isRolling = true
-                        try {
-                            toneGenerator?.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 120)
-                        } catch (e: Exception) { }
-                        coroutineScope.launch {
-                            val jumpTarget = -localDensity.run { 65.dp.toPx() }
-                            
-                            // Phase 1: Anticipation Squash
-                            squashY.animateTo(0.82f, tween(60, easing = FastOutSlowInEasing))
-                            squashX.animateTo(1.15f, tween(60, easing = FastOutSlowInEasing))
-
-                            // Phase 2: Parabolic Tumbling Jump & Erratic Multi-axis Rotation
-                            launch {
-                                // shadow fading
-                                launch {
-                                    shadowAlpha.animateTo(0.12f, tween(250))
-                                    shadowScale.animateTo(1.4f, tween(250))
-                                }
-                                jumpY.animateTo(jumpTarget, tween(250, easing = LinearOutSlowInEasing))
-                                
-                                // Return with shadow tightening
-                                launch {
-                                    shadowAlpha.animateTo(0.55f, tween(250))
-                                    shadowScale.animateTo(0.85f, tween(250))
-                                }
-                                jumpY.animateTo(0f, tween(250, easing = FastOutLinearInEasing))
-                                
-                                // Phase 3: Impact Bounce & Settle
-                                launch {
-                                    shadowAlpha.animateTo(0.4f, spring(Spring.DampingRatioMediumBouncy))
-                                    shadowScale.animateTo(1f, spring(Spring.DampingRatioMediumBouncy))
-                                }
-                                
-                                squashY.animateTo(0.85f, tween(80))
-                                squashY.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow))
-                                squashX.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow))
-                            }
-                            
-                            // Multi-axis Erratic Tumbling (Synchronized to not clash with initial squash)
-                            launch {
-                                squashY.animateTo(1f, tween(100))
-                                squashX.animateTo(1f, tween(100))
-                                rotX.animateTo(rotX.value + 720f, tween(500, easing = LinearEasing))
-                            }
-                            launch { rotY.animateTo(rotY.value + 1080f, tween(500, easing = LinearEasing)) }
-                            launch { rotZ.animateTo(rotZ.value + 180f, tween(500, easing = LinearEasing)) }
-
-                            // Rapid Number Shuffling
-                            val tumbleJob = launch {
-                                while (true) {
-                                    displayValue = (1..6).random()
-                                    delay(50)
-                                }
-                            }
-                            
-                            delay(500)
-                            tumbleJob.cancel()
-                            
-                            // Final Settle Value
-                            val finalValue = (1..6).random()
-                            displayValue = finalValue
-                            
-                            // Snap tilt to neutral
-                            launch { rotX.animateTo(0f, spring()) }
-                            launch { rotY.animateTo(0f, spring()) }
-                            launch { rotZ.animateTo(0f, spring()) }
-                            
-                            delay(200)
-                            onRoll(finalValue)
-                            isRolling = false
-                        }
+                        isLocalRollInitiated = true
+                        val localRoll = (1..6).random()
+                        lastSettledValue = localRoll
+                        triggerRollAnimation(targetValue = localRoll, isLocal = true)
                     }
                 },
             contentAlignment = Alignment.Center
