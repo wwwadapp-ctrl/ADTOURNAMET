@@ -51,6 +51,8 @@ data class AutoLudoMatchEntity(
     val player2Ready: Boolean = false,
     val gameStartedAt: Long = 0L,
     val prizeDistributed: Boolean = false,
+    val winReason: String = "",
+    val completedAt: Long = 0L,
     val gameState: LudoGameState = LudoGameState()
 )
 
@@ -519,13 +521,6 @@ object AutoLudoManager {
                     currentData.child("gameState").value = newState
                     currentData.child("status").value = status
 
-                    // Trigger atomic payout if completed
-                    if (status == "COMPLETED" && winnerUid.isNotBlank()) {
-                        kotlinx.coroutines.GlobalScope.launch {
-                            distributePrize(matchId, winnerUid)
-                        }
-                    }
-
                     return Transaction.success(currentData)
                 }
 
@@ -542,12 +537,13 @@ object AutoLudoManager {
      */
     suspend fun movePawn(matchId: String, playerUid: String, pawnIndex: Int, newPos: Int, isTimeout: Boolean = false): Result<Unit> {
         val db = getDb() ?: return Result.failure(IllegalStateException("Database not available"))
-        val matchRef = db.getReference(NODE_MATCHES).child(matchId)
+        val rootRef = db.reference
 
         return suspendCancellableCoroutine { cont ->
-            matchRef.runTransaction(object : Transaction.Handler {
+            rootRef.runTransaction(object : Transaction.Handler {
                 override fun doTransaction(currentData: MutableData): Transaction.Result {
-                    val match = currentData.getValue(AutoLudoMatchEntity::class.java) ?: return Transaction.abort()
+                    val matchNode = currentData.child(NODE_MATCHES).child(matchId)
+                    val match = matchNode.getValue(AutoLudoMatchEntity::class.java) ?: return Transaction.abort()
                     val state = match.gameState
                     
                     val isPlayer1Match = playerUid == match.player1Uid || playerUid == "player_1"
@@ -585,21 +581,17 @@ object AutoLudoManager {
                     var bonusRoll = (rolledValue == 6) || (newPos == 56) // Bonus for rolling 6 or reaching goal
 
                     // 2. Collision & Capture (Cutting) Engine
-                    // Check only if newPos is on the track (0-51) and NOT a safe zone
                     if (newPos in 0..51) {
                         val isSafe = isSafeCell(newPos, isPlayer1)
                         if (!isSafe) {
-                            // Map my track position to global track position to compare with opponent
                             val myGlobalPos = getGlobalTrackPos(newPos, isPlayer1)
-                            
                             oppPawns.forEachIndexed { idx, oppPos ->
                                 if (oppPos in 0..51) {
                                     val oppGlobalPos = getGlobalTrackPos(oppPos, !isPlayer1)
                                     if (myGlobalPos == oppGlobalPos) {
-                                        // CAPTURE! Opponent pawn sent back to yard (-1)
                                         oppPawns[idx] = -1
                                         captured = true
-                                        bonusRoll = true // Capturing grants a bonus roll
+                                        bonusRoll = true 
                                     }
                                 }
                             }
@@ -613,9 +605,40 @@ object AutoLudoManager {
                     if (allAtGoal) {
                         winnerUid = if (isPlayer1) match.player1Uid.ifBlank { "player_1" } else match.player2Uid.ifBlank { "player_2" }
                         status = "COMPLETED"
+                        
+                        // Centralized Resolve
+                        matchNode.child("status").value = "COMPLETED"
+                        matchNode.child("winnerUid").value = winnerUid
+                        matchNode.child("winReason").value = "GOAL_REACHED"
+                        matchNode.child("completedAt").value = ServerValue.TIMESTAMP
+                        matchNode.child("updatedAt").value = ServerValue.TIMESTAMP
+                        
+                        if (!match.prizeDistributed && match.prizePool > 0.0 && winnerUid.isNotBlank() && winnerUid != "player_1" && winnerUid != "player_2") {
+                            matchNode.child("prizeDistributed").value = true
+                            val walletRef = currentData.child(NODE_GAME_WALLETS).child(winnerUid)
+                            val rawBal = walletRef.child("balance").value
+                            val currentBal = when (rawBal) {
+                                is Number -> rawBal.toDouble()
+                                is String -> rawBal.toDoubleOrNull() ?: 0.0
+                                else -> 0.0
+                            }
+                            walletRef.child("balance").value = currentBal + match.prizePool
+                            
+                            val historyKey = "TX_WIN_${matchId}_${System.currentTimeMillis()}"
+                            val historyData = hashMapOf(
+                                "id" to historyKey,
+                                "type" to "WIN_PRIZE",
+                                "amount" to match.prizePool,
+                                "title" to "Auto Ludo Win - Match #${match.matchNumber}",
+                                "matchId" to matchId,
+                                "timestamp" to ServerValue.TIMESTAMP,
+                                "status" to "COMPLETED"
+                            )
+                            walletRef.child("transactions").child(historyKey).value = historyData
+                        }
                     }
 
-                    // 4. Turn Passing: If bonus roll (6, capture, or goal), retain active player's turn
+                    // 4. Turn Passing
                     val currentActiveUid = if (isPlayer1) {
                         match.player1Uid.ifBlank { "player_1" }
                     } else {
@@ -640,6 +663,37 @@ object AutoLudoManager {
                         if (p1Strikes >= 3 || p2Strikes >= 3) {
                             status = "COMPLETED"
                             winnerUid = if (p1Strikes >= 3) (match.player2Uid.ifBlank { "player_2" }) else (match.player1Uid.ifBlank { "player_1" })
+                            
+                            // Centralized Resolve
+                            matchNode.child("status").value = "COMPLETED"
+                            matchNode.child("winnerUid").value = winnerUid
+                            matchNode.child("winReason").value = "THREE_LIVES_EXHAUSTED"
+                            matchNode.child("completedAt").value = ServerValue.TIMESTAMP
+                            matchNode.child("updatedAt").value = ServerValue.TIMESTAMP
+                            
+                            if (!match.prizeDistributed && match.prizePool > 0.0 && winnerUid.isNotBlank() && winnerUid != "player_1" && winnerUid != "player_2") {
+                                matchNode.child("prizeDistributed").value = true
+                                val walletRef = currentData.child(NODE_GAME_WALLETS).child(winnerUid)
+                                val rawBal = walletRef.child("balance").value
+                                val currentBal = when (rawBal) {
+                                    is Number -> rawBal.toDouble()
+                                    is String -> rawBal.toDoubleOrNull() ?: 0.0
+                                    else -> 0.0
+                                }
+                                walletRef.child("balance").value = currentBal + match.prizePool
+                                
+                                val historyKey = "TX_WIN_${matchId}_${System.currentTimeMillis()}"
+                                val historyData = hashMapOf(
+                                    "id" to historyKey,
+                                    "type" to "WIN_PRIZE",
+                                    "amount" to match.prizePool,
+                                    "title" to "Auto Ludo Win - Match #${match.matchNumber}",
+                                    "matchId" to matchId,
+                                    "timestamp" to ServerValue.TIMESTAMP,
+                                    "status" to "COMPLETED"
+                                )
+                                walletRef.child("transactions").child(historyKey).value = historyData
+                            }
                         }
                     }
 
@@ -669,16 +723,9 @@ object AutoLudoManager {
                         lastActionLog = actionLogText
                     )
                     
-                    currentData.child("gameState").value = newState
-                    currentData.child("status").value = status
-                    currentData.child("updatedAt").value = ServerValue.TIMESTAMP
-
-                    // Trigger atomic payout if completed
-                    if (status == "COMPLETED" && winnerUid.isNotBlank()) {
-                        kotlinx.coroutines.GlobalScope.launch {
-                            distributePrize(matchId, winnerUid)
-                        }
-                    }
+                    matchNode.child("gameState").value = newState
+                    matchNode.child("status").value = status
+                    matchNode.child("updatedAt").value = ServerValue.TIMESTAMP
                     
                     return Transaction.success(currentData)
                 }
@@ -696,12 +743,13 @@ object AutoLudoManager {
      */
     suspend fun passTurn(matchId: String, playerUid: String, isTimeout: Boolean = false): Result<Unit> {
         val db = getDb() ?: return Result.failure(IllegalStateException("Database not available"))
-        val matchRef = db.getReference(NODE_MATCHES).child(matchId)
+        val rootRef = db.reference
 
         return suspendCancellableCoroutine { cont ->
-            matchRef.runTransaction(object : Transaction.Handler {
+            rootRef.runTransaction(object : Transaction.Handler {
                 override fun doTransaction(currentData: MutableData): Transaction.Result {
-                    val match = currentData.getValue(AutoLudoMatchEntity::class.java) ?: return Transaction.abort()
+                    val matchNode = currentData.child(NODE_MATCHES).child(matchId)
+                    val match = matchNode.getValue(AutoLudoMatchEntity::class.java) ?: return Transaction.abort()
                     val state = match.gameState
                     
                     val isP1Turn = state.currentTurnUid == match.player1Uid || 
@@ -719,10 +767,6 @@ object AutoLudoManager {
                     val hasLegalMoves = (state.diceValue == 6 && activePawns.any { it == -1 }) ||
                                        activePawns.any { it >= 0 && it + state.diceValue <= 56 }
 
-                    // Allow turn pass whenever:
-                    // 1. Turn owner requests pass
-                    // 2. OR dice is rolled and active player has NO legal moves (any connected observer or owner can pass)
-                    // 3. OR timeout is triggered (observer safety for offline/idle players)
                     val canRotate = isTurnOwner || (state.isDiceRolled && !hasLegalMoves) || isTimeout
                     
                     if (!canRotate) return Transaction.abort()
@@ -741,7 +785,6 @@ object AutoLudoManager {
                     
                     if (isTimeout) {
                         val elapsedSinceAction = System.currentTimeMillis() - state.actionStartedAt
-                        // Only register a strike if at least 14 seconds have genuinely elapsed
                         if (elapsedSinceAction >= 14000L) {
                             if (isP1Turn) p1Strikes++ else p2Strikes++
                             
@@ -749,6 +792,37 @@ object AutoLudoManager {
                                 status = "COMPLETED"
                                 winnerUid = if (p1Strikes >= 3) (match.player2Uid.ifBlank { "player_2" }) else (match.player1Uid.ifBlank { "player_1" })
                                 actionLog = "Player Disqualified (3 Misses)!"
+                                
+                                // Centralized Resolve
+                                matchNode.child("status").value = "COMPLETED"
+                                matchNode.child("winnerUid").value = winnerUid
+                                matchNode.child("winReason").value = "THREE_LIVES_EXHAUSTED"
+                                matchNode.child("completedAt").value = ServerValue.TIMESTAMP
+                                matchNode.child("updatedAt").value = ServerValue.TIMESTAMP
+                                
+                                if (!match.prizeDistributed && match.prizePool > 0.0 && winnerUid.isNotBlank() && winnerUid != "player_1" && winnerUid != "player_2") {
+                                    matchNode.child("prizeDistributed").value = true
+                                    val walletRef = currentData.child(NODE_GAME_WALLETS).child(winnerUid)
+                                    val rawBal = walletRef.child("balance").value
+                                    val currentBal = when (rawBal) {
+                                        is Number -> rawBal.toDouble()
+                                        is String -> rawBal.toDoubleOrNull() ?: 0.0
+                                        else -> 0.0
+                                    }
+                                    walletRef.child("balance").value = currentBal + match.prizePool
+                                    
+                                    val historyKey = "TX_WIN_${matchId}_${System.currentTimeMillis()}"
+                                    val historyData = hashMapOf(
+                                        "id" to historyKey,
+                                        "type" to "WIN_PRIZE",
+                                        "amount" to match.prizePool,
+                                        "title" to "Auto Ludo Win - Match #${match.matchNumber}",
+                                        "matchId" to matchId,
+                                        "timestamp" to ServerValue.TIMESTAMP,
+                                        "status" to "COMPLETED"
+                                    )
+                                    walletRef.child("transactions").child(historyKey).value = historyData
+                                }
                             }
                         }
                     }
@@ -766,16 +840,9 @@ object AutoLudoManager {
                         lastActionLog = actionLog
                     )
                     
-                    currentData.child("gameState").value = newState
-                    currentData.child("status").value = status
-                    currentData.child("updatedAt").value = ServerValue.TIMESTAMP
-
-                    // Trigger atomic payout if completed
-                    if (status == "COMPLETED" && winnerUid.isNotBlank()) {
-                        kotlinx.coroutines.GlobalScope.launch {
-                            distributePrize(matchId, winnerUid)
-                        }
-                    }
+                    matchNode.child("gameState").value = newState
+                    matchNode.child("status").value = status
+                    matchNode.child("updatedAt").value = ServerValue.TIMESTAMP
 
                     return Transaction.success(currentData)
                 }
@@ -789,51 +856,86 @@ object AutoLudoManager {
     }
 
     /**
-     * Atomically credits the prize pool to the winner and marks match as distributed.
+     * Authoritatively resolves a match winner, ends the game, and credits the prize pool.
+     * Centralizes victory triggers for Goal Reached, Timeout, and Forfeit.
      */
-    private suspend fun distributePrize(matchId: String, winnerUid: String) {
-        if (winnerUid.isBlank() || matchId.isBlank()) return
-        
-        val db = getDb() ?: return
+    suspend fun resolveMatchWinner(matchId: String, winnerUid: String, winReason: String): Result<Unit> {
+        if (matchId.isBlank() || winnerUid.isBlank()) return Result.failure(IllegalArgumentException("Invalid parameters"))
+
+        val db = getDb() ?: return Result.failure(IllegalStateException("Database not available"))
         val rootRef = db.reference
 
-        suspendCancellableCoroutine<Unit> { cont ->
+        return suspendCancellableCoroutine { cont ->
             rootRef.runTransaction(object : Transaction.Handler {
                 override fun doTransaction(currentData: MutableData): Transaction.Result {
                     val matchNode = currentData.child(NODE_MATCHES).child(matchId)
                     val match = matchNode.getValue(AutoLudoMatchEntity::class.java) ?: return Transaction.abort()
-                    
-                    // Validation: Must be completed and NOT already distributed
-                    if (match.status != "COMPLETED" || match.prizeDistributed) {
+
+                    // GUARD 1: Anti-Replay
+                    if (match.status == "COMPLETED" || match.status == "CANCELLED") {
                         return Transaction.abort()
                     }
-                    
-                    val prizeAmount = match.prizePool
-                    if (prizeAmount <= 0.0) return Transaction.abort()
-                    
-                    val walletRef = currentData.child(NODE_GAME_WALLETS).child(winnerUid)
-                    val rawBal = walletRef.child("balance").value
-                    val currentBal = when (rawBal) {
-                        is Number -> rawBal.toDouble()
-                        is String -> rawBal.toDoubleOrNull() ?: 0.0
-                        else -> 0.0
+
+                    // GUARD 2: Anti-Tamper
+                    if (winnerUid != match.player1Uid && winnerUid != match.player2Uid) {
+                        return Transaction.abort()
                     }
-                    
-                    // 1. Mark as distributed
-                    matchNode.child("prizeDistributed").value = true
-                    
-                    // 2. Credit Wallet
-                    walletRef.child("balance").value = currentBal + prizeAmount
-                    
+
+                    // MUTATION
+                    matchNode.child("status").value = "COMPLETED"
+                    matchNode.child("winnerUid").value = winnerUid
+                    matchNode.child("winReason").value = winReason
+                    matchNode.child("completedAt").value = ServerValue.TIMESTAMP
+                    matchNode.child("updatedAt").value = ServerValue.TIMESTAMP
+                    matchNode.child("gameState").child("winnerUid").value = winnerUid
+                    matchNode.child("gameState").child("lastActionLog").value = when(winReason) {
+                        "GOAL_REACHED" -> "Goal Reached! Victory!"
+                        "THREE_LIVES_EXHAUSTED" -> "Opponent Timeout (3 Misses)!"
+                        "OPPONENT_FORFEIT" -> "Opponent Forfeited!"
+                        else -> "Match Resolved"
+                    }
+
+                    // ATOMIC PRIZE CREDIT
+                    if (!match.prizeDistributed && match.prizePool > 0.0 && winnerUid != "player_1" && winnerUid != "player_2") {
+                        matchNode.child("prizeDistributed").value = true
+                        val walletRef = currentData.child(NODE_GAME_WALLETS).child(winnerUid)
+                        val rawBal = walletRef.child("balance").value
+                        val currentBal = when (rawBal) {
+                            is Number -> rawBal.toDouble()
+                            is String -> rawBal.toDoubleOrNull() ?: 0.0
+                            else -> 0.0
+                        }
+                        walletRef.child("balance").value = currentBal + match.prizePool
+
+                        // Append Transaction History
+                        val historyKey = "TX_WIN_${matchId}_${System.currentTimeMillis()}"
+                        val historyData = hashMapOf(
+                            "id" to historyKey,
+                            "type" to "WIN_PRIZE",
+                            "amount" to match.prizePool,
+                            "title" to "Auto Ludo Win - Match #${match.matchNumber}",
+                            "matchId" to matchId,
+                            "timestamp" to ServerValue.TIMESTAMP,
+                            "status" to "COMPLETED"
+                        )
+                        walletRef.child("transactions").child(historyKey).value = historyData
+                    }
+
                     return Transaction.success(currentData)
                 }
 
                 override fun onComplete(err: DatabaseError?, committed: Boolean, d: DataSnapshot?) {
-                    cont.resume(Unit)
+                    if (committed && err == null) {
+                        cont.resume(Result.success(Unit))
+                    } else {
+                        cont.resume(Result.failure(err?.toException() ?: Exception("Transaction failed")))
+                    }
                 }
             })
         }
     }
+
+
 
     fun isSafeCell(pos: Int, isPlayer1: Boolean): Boolean {
         // Safe cells in player-relative coordinates

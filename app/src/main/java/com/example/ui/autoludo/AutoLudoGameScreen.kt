@@ -178,6 +178,8 @@ fun AutoLudoGameScreen(
             isDiceRolled = localIsDiceRolled || currentMatch.gameState.isDiceRolled
         )
 
+        var showForfeitDialog by remember { mutableStateOf(false) }
+
         AutoLudoBoardScreen(
             match = currentMatch.copy(gameState = boardGameState),
             currentUid = currentUid,
@@ -297,7 +299,18 @@ fun AutoLudoGameScreen(
                     )
                 } else {
                     coroutineScope.launch {
-                        AutoLudoManager.movePawn(matchId, currentUid, pawnIndex, newPos, isTimeout)
+                        // 56-Goal Destination Finish Trigger
+                        if (newPos == 56) {
+                            val myPawns = (if (currentUid == currentMatch.player1Uid) boardGameState.player1Pawns else boardGameState.player2Pawns).toMutableList()
+                            myPawns[pawnIndex] = 56
+                            if (myPawns.all { it == 56 }) {
+                                AutoLudoManager.resolveMatchWinner(matchId, currentUid, "GOAL_REACHED")
+                            } else {
+                                AutoLudoManager.movePawn(matchId, currentUid, pawnIndex, newPos, isTimeout)
+                            }
+                        } else {
+                            AutoLudoManager.movePawn(matchId, currentUid, pawnIndex, newPos, isTimeout)
+                        }
                     }
                 }
             },
@@ -339,12 +352,53 @@ fun AutoLudoGameScreen(
                     }
                 }
             },
-            onBackClick = onBackClick
+            onBackClick = {
+                if (currentMatch.status == "PLAYING" || currentMatch.status == "IN_GAME") {
+                    showForfeitDialog = true
+                } else {
+                    onBackClick()
+                }
+            }
         )
         
         // Handle back press to exit game
         androidx.activity.compose.BackHandler {
-            onBackClick()
+            if (currentMatch.status == "PLAYING" || currentMatch.status == "IN_GAME") {
+                showForfeitDialog = true
+            } else {
+                onBackClick()
+            }
+        }
+
+        // Forfeit Confirmation Dialog
+        if (showForfeitDialog) {
+            AlertDialog(
+                onDismissRequest = { showForfeitDialog = false },
+                title = { Text("ম্যাচ ছেড়ে বের হবেন?", fontWeight = FontWeight.Bold) },
+                text = { Text("আপনি ম্যাচ ছেড়ে বের হলে প্রতিপক্ষ বিজয়ী হবে এবং এন্ট্রি ফি ফেরত পাবেন না।") },
+                dismissButton = {
+                    TextButton(onClick = { showForfeitDialog = false }) {
+                        Text("না", color = Color.Gray)
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showForfeitDialog = false
+                            val opponentUid = if (currentUid == currentMatch.player1Uid) currentMatch.player2Uid else currentMatch.player1Uid
+                            coroutineScope.launch {
+                                if (opponentUid.isNotBlank() && !isActuallyLocal) {
+                                    AutoLudoManager.resolveMatchWinner(matchId, opponentUid, "OPPONENT_FORFEIT")
+                                }
+                                onBackClick()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                    ) {
+                        Text("হ্যাঁ", color = Color.White)
+                    }
+                }
+            )
         }
 
         // Winner Dialog
@@ -356,12 +410,18 @@ fun AutoLudoGameScreen(
                     val winnerUid = currentMatch.gameState.winnerUid
                     val isMe = currentUid == winnerUid
                     val winnerName = if (winnerUid == currentMatch.player1Uid) currentMatch.player1Name else if (winnerUid == currentMatch.player2Uid) currentMatch.player2Name else "বিজয়ী"
+                    val winReasonText = when(currentMatch.winReason) {
+                        "GOAL_REACHED" -> "সব গুটি গন্তব্যে পৌঁছে"
+                        "THREE_LIVES_EXHAUSTED" -> "৩ বার সময় শেষ হওয়ায়"
+                        "OPPONENT_FORFEIT" -> "প্রতিপক্ষ ম্যাচ ছেড়ে দেওয়ায়"
+                        else -> ""
+                    }
                     
                     Column {
                         if (isMe) {
-                            Text("অভিনন্দন! আপনি ৳${String.format("%.2f", currentMatch.prizePool)} জিতেছেন এবং তা আপনার ওয়ালেটে যোগ হয়েছে!")
+                            Text("অভিনন্দন! $winReasonText আপনি ৳${String.format("%.2f", currentMatch.prizePool)} জিতেছেন এবং তা আপনার ওয়ালেটে যোগ হয়েছে!")
                         } else {
-                            Text("দুঃখিত! $winnerName গেমটি জিতেছেন। ভালো খেলার জন্য ধন্যবাদ।")
+                            Text("দুঃখিত! $winReasonText $winnerName গেমটি জিতেছেন। ভালো খেলার জন্য ধন্যবাদ।")
                         }
                     }
                 },
@@ -1118,22 +1178,25 @@ fun LudoPawnView(
         rememberUpdatedState(1.0f)
     }
 
+    val pawnWidth = 24.dp
+    val pawnHeight = 34.dp
+
     Box(
         modifier = Modifier
             .zIndex(if (isEligibleToMove) 100f else (stackIndex.toFloat() + 1f))
             .offset {
                 IntOffset(
-                    x = (animOffset.value.x - 14.dp.toPx()).roundToInt(),
-                    y = (animOffset.value.y + jumpAnim.value - 25.dp.toPx()).roundToInt()
+                    x = (animOffset.value.x - (pawnWidth / 2).toPx()).roundToInt(),
+                    y = (animOffset.value.y + jumpAnim.value - pawnHeight.toPx()).roundToInt()
                 )
             }
             .graphicsLayer {
                 rotationZ = -boardRotation
-                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 25f / 38f)
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1.0f)
                 scaleX = eligibleScale
                 scaleY = eligibleScale
             }
-            .size(width = 28.dp, height = 38.dp)
+            .size(width = pawnWidth, height = pawnHeight)
             .clickable(
                 enabled = isEligibleToMove,
                 indication = null,
@@ -1145,7 +1208,7 @@ fun LudoPawnView(
         LudoKingPawnToken(
             pawnColor = pawnColor,
             isEligible = isEligibleToMove,
-            modifier = Modifier.align(Alignment.Center)
+            modifier = Modifier.fillMaxSize()
         )
     }
 }
@@ -1158,7 +1221,7 @@ fun LudoKingPawnToken(
     modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = modifier.size(width = 24.dp, height = 34.dp),
+        modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -1168,7 +1231,7 @@ fun LudoKingPawnToken(
 
             // Layer 0: Restored Selection / Eligible Pulse Ring
             if (isEligible) {
-                val pulseBaseY = h - 5.dp.toPx()
+                val pulseBaseY = h - 2.dp.toPx()
                 // Outer pulse circle: Player color with alpha 0.4f
                 drawOval(
                     color = pawnColor.copy(alpha = 0.4f),
@@ -1187,13 +1250,13 @@ fun LudoKingPawnToken(
             // 1. Soft Floor Contact Shadow
             drawOval(
                 color = Color.Black.copy(alpha = 0.22f),
-                topLeft = Offset(1.5.dp.toPx(), h - 5.dp.toPx()),
-                size = Size(w - 3.dp.toPx(), 5.dp.toPx())
+                topLeft = Offset(1.5.dp.toPx(), h - 4.dp.toPx()),
+                size = Size(w - 3.dp.toPx(), 4.dp.toPx())
             )
 
             // 2. 3D Pedestal Base Disc
-            val baseTopY = h - 8.dp.toPx()
-            val baseH = 6.dp.toPx()
+            val baseTopY = h - 6.dp.toPx()
+            val baseH = 5.dp.toPx()
             drawOval(
                 brush = Brush.verticalGradient(
                     colors = listOf(Color(0xFFE0E0E0), Color.White, Color(0xFFB0B0B0)),
@@ -1209,10 +1272,10 @@ fun LudoKingPawnToken(
                 size = Size(w - 8.dp.toPx(), baseH - 2.dp.toPx())
             )
 
-            // 3. Upright Bulbous White Teardrop Pin (Slimmed)
-            val headCenterY = 9.dp.toPx()
+            // 3. Upright Bulbous White Teardrop Pin (Slimmed) - Anchored at H
+            val headCenterY = 13.dp.toPx()
             val headRadius = 7.5.dp.toPx()
-            val pinBaseY = h - 6.dp.toPx()
+            val pinBaseY = h 
 
             val pinPath = Path().apply {
                 moveTo(cx, pinBaseY)
@@ -1439,6 +1502,25 @@ fun MiniPawnIcon(color: Color) {
     }
 }
 
+/**
+ * Calibrated home base 4-circle coordinates for all 4 colors (Red, Yellow, Green, Blue)
+ * Exactly concentric within the 15x15 Ludo board artwork discs.
+ */
+fun getHomeBaseCircleOffset(colorName: String, index: Int, boardSize: Float): Offset {
+    val unit = boardSize / 15f
+    val (baseCol, baseRow) = when (colorName.uppercase()) {
+        "GREEN" -> Pair(0f, 0f)
+        "YELLOW" -> Pair(9f, 0f)
+        "RED" -> Pair(0f, 9f)
+        "BLUE" -> Pair(9f, 9f)
+        else -> Pair(0f, 9f)
+    }
+    // Each 6x6 base has 4 concentric circle spots at relative (1.5, 1.5), (4.5, 1.5), (1.5, 4.5), (4.5, 4.5)
+    val colOffset = if (index % 2 == 0) 1.5f else 4.5f
+    val rowOffset = if (index < 2) 1.5f else 4.5f
+    return Offset((baseCol + colOffset) * unit, (baseRow + rowOffset) * unit)
+}
+
 // Helper to calculate a single pawn offset
 private fun getPawnOffset(
     pos: Int, 
@@ -1449,24 +1531,11 @@ private fun getPawnOffset(
     totalInStack: Int = 1
 ): Offset {
     if (pos == -1) {
-        // Home yard positions aligned to exact 15x15 grid unit circle centers
-        val unit = boardSize / 15f
+        // Home yard positions aligned to exact 15x15 grid concentric circle centers
         return if (isPlayer1) {
-            // Red Yard Base Circles (Columns 1.5 & 3.5, Rows 10.5 & 12.5)
-            when (index) {
-                0 -> Offset(unit * 1.5f, unit * 10.5f)
-                1 -> Offset(unit * 3.5f, unit * 10.5f)
-                2 -> Offset(unit * 1.5f, unit * 12.5f)
-                else -> Offset(unit * 3.5f, unit * 12.5f)
-            }
+            getHomeBaseCircleOffset("RED", index, boardSize)
         } else {
-            // Yellow Yard Base Circles (Columns 10.5 & 12.5, Rows 1.5 & 3.5)
-            when (index) {
-                0 -> Offset(unit * 10.5f, unit * 1.5f)
-                1 -> Offset(unit * 12.5f, unit * 1.5f)
-                2 -> Offset(unit * 10.5f, unit * 3.5f)
-                else -> Offset(unit * 12.5f, unit * 3.5f)
-            }
+            getHomeBaseCircleOffset("YELLOW", index, boardSize)
         }
     } else {
         // Real path mapping logic

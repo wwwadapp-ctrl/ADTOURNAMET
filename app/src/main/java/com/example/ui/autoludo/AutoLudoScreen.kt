@@ -138,16 +138,31 @@ fun AutoLudoScreen(
         )
     }
 
-    val liveMatches = if (liveMatchesResult.value.isEmpty() && !isPreview) {
-        // Use a temporary state to show mock data after a delay if live matches are empty
-        var showMock by remember { mutableStateOf(false) }
-        LaunchedEffect(Unit) {
-            delay(4000L)
-            showMock = true
+    // Live ticker to refresh list for auto-purging COMPLETED matches
+    var tickerTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30000L) // Refresh every 30 seconds for purge accuracy
+            tickerTime = System.currentTimeMillis()
         }
-        if (showMock) mockMatches else emptyList()
-    } else {
-        liveMatchesResult.value
+    }
+
+    val liveMatches = remember(liveMatchesResult.value, tickerTime) {
+        val rawList = if (liveMatchesResult.value.isEmpty() && !isPreview) {
+            // No mock data logic here for brevity, keeping it simple as per original
+            emptyList<AutoLudoMatchEntity>()
+        } else {
+            liveMatchesResult.value
+        }
+        
+        rawList.filter { match ->
+            if (match.status == "COMPLETED") {
+                val age = tickerTime - match.completedAt
+                age < (5 * 60 * 1000L) // Keep if less than 5 minutes old
+            } else {
+                true // Always keep WAITING, PLAYING, etc.
+            }
+        }
     }
 
     // Observe specific match for Ready Room
@@ -913,6 +928,12 @@ private fun AutoLudoMatchCard(
                 var onClickAction: () -> Unit = {}
 
                 when {
+                    match.status == "COMPLETED" -> {
+                        buttonText = "🏆 ম্যাচ সমাপ্ত"
+                        buttonColor = Slate700.copy(alpha = 0.4f)
+                        isEnabled = false
+                        onClickAction = { }
+                    }
                     isJoined && match.status == "WAITING" && match.joinedPlayersCount < match.maxPlayers -> {
                         buttonText = "⏳ অপেক্ষায় আছেন"
                         buttonColor = Amber600.copy(alpha = 0.2f)
@@ -958,6 +979,7 @@ private fun AutoLudoMatchCard(
                     "● জয়েন করুন" -> Icons.Default.PlayArrow
                     "🎮 খেলায় প্রবেশ করুন" -> Icons.Default.Games
                     "✖ ম্যাচ ফুল" -> Icons.Default.Close
+                    "🏆 ম্যাচ সমাপ্ত" -> Icons.Default.EmojiEvents
                     else -> Icons.Default.HourglassEmpty
                 }
 
