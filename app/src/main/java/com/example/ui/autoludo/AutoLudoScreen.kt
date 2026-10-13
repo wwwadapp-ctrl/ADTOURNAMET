@@ -126,6 +126,13 @@ fun AutoLudoScreen(
     
     val liveMatches = liveMatchesResult.value
 
+    // Auto-Recovery on Match List / App Launch: Idempotently claim refunds for cancelled matches
+    LaunchedEffect(liveMatches, currentUid) {
+        if (!isPreview && currentUid.isNotBlank()) {
+            AutoLudoManager.autoRefundCancelledMatches(liveMatches, currentUid)
+        }
+    }
+
     // Observe specific match for Ready Room
     val activeReadyRoomMatchResult = if (!isPreview) {
         remember(activeReadyRoomMatchId) {
@@ -307,8 +314,13 @@ fun AutoLudoScreen(
                         match = match,
                         currentUid = currentUid,
                         onJoinClick = {
-                            selectedMatchToJoin = match
-                            showJoinConfirmDialog = true
+                            val epoch = if (match.scheduledTimeMillis > 0L) match.scheduledTimeMillis else parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
+                            if (epoch > 0L && System.currentTimeMillis() >= epoch) {
+                                Toast.makeText(context, "ম্যাচ শুরুর সময় উত্তীর্ণ হয়ে গেছে!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                selectedMatchToJoin = match
+                                showJoinConfirmDialog = true
+                            }
                         },
                         onEnterClick = {
                             activeReadyRoomMatchId = match.matchId
@@ -327,14 +339,15 @@ fun AutoLudoScreen(
             wallet = wallet,
             gameWalletBalance = gameWalletBalance,
             onDismiss = { showCreateMatchDialog = false },
-            onConfirm = { fee, selectedTimeText ->
+            onConfirm = { fee, selectedTimeText, scheduledEpochMillis ->
                 showCreateMatchDialog = false
                 scope.launch {
                     val res = AutoLudoManager.createMatch(
                         creatorUid = currentUid,
                         creatorName = user?.effectiveName ?: "Player",
                         entryFee = fee.toDouble(),
-                        scheduledTimeFormatted = "Today $selectedTimeText"
+                        scheduledTimeFormatted = "Today $selectedTimeText",
+                        scheduledTimeMillis = scheduledEpochMillis
                     )
                     if (res.isSuccess) {
                         Toast.makeText(context, "ম্যাচ সফলভাবে তৈরি হয়েছে", Toast.LENGTH_SHORT).show()
@@ -442,6 +455,12 @@ fun AutoLudoScreen(
             }
             "CANCELLED" -> {
                 if (activeReadyRoomMatchId != null) {
+                    val cancelMatchId = activeReadyRoomMatchId
+                    if (!cancelMatchId.isNullOrBlank() && currentUid.isNotBlank()) {
+                        AutoLudoManager.claimRefund(cancelMatchId, currentUid) {
+                            // Successfully claimed
+                        }
+                    }
                     Toast.makeText(context, "উভয় প্লেয়ার প্রস্তুত না থাকায় ম্যাচ বাতিল করা হয়েছে।", Toast.LENGTH_LONG).show()
                     activeReadyRoomMatchId = null
                 }
@@ -682,12 +701,14 @@ private fun AutoLudoMatchCard(
     val isFull = match.joinedPlayersCount >= match.maxPlayers || match.status != "WAITING"
     
     // Live reactive countdown ticker until match scheduled epoch
-    val targetEpoch = remember(match.scheduledTimeFormatted, match.createdAt) {
-        parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
+    val targetEpoch = remember(match.scheduledTimeMillis, match.scheduledTimeFormatted, match.createdAt) {
+        if (match.scheduledTimeMillis > 0L) match.scheduledTimeMillis
+        else parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
     }
     var remainingMillis by remember(targetEpoch) {
         mutableLongStateOf(if (targetEpoch > 0L) (targetEpoch - System.currentTimeMillis()).coerceAtLeast(0L) else 0L)
     }
+    val isExpired = targetEpoch > 0L && remainingMillis <= 0L
 
     LaunchedEffect(targetEpoch) {
         if (targetEpoch <= 0L) return@LaunchedEffect
@@ -918,6 +939,12 @@ private fun AutoLudoMatchCard(
                         isEnabled = false
                         onClickAction = { }
                     }
+                    isExpired -> {
+                        buttonText = "সময় শেষ"
+                        buttonColor = Rose600.copy(alpha = 0.25f)
+                        isEnabled = false
+                        onClickAction = { }
+                    }
                     else -> {
                         buttonText = "● জয়েন করুন"
                         buttonColor = Emerald600
@@ -930,6 +957,7 @@ private fun AutoLudoMatchCard(
                     "● জয়েন করুন" -> Icons.Default.PlayArrow
                     "🎮 খেলায় প্রবেশ করুন" -> Icons.Default.Games
                     "✖ ম্যাচ ফুল" -> Icons.Default.Close
+                    "সময় শেষ" -> Icons.Default.HourglassEmpty
                     else -> Icons.Default.HourglassEmpty
                 }
 
@@ -970,7 +998,7 @@ private fun CreateAutoLudoMatchDialog(
     wallet: WalletEntity?,
     gameWalletBalance: Double,
     onDismiss: () -> Unit,
-    onConfirm: (Int, String) -> Unit
+    onConfirm: (Int, String, Long) -> Unit
 ) {
     var entryFeeText by remember { mutableStateOf("") }
     val entryFee = entryFeeText.toIntOrNull() ?: 0
@@ -1269,7 +1297,20 @@ private fun CreateAutoLudoMatchDialog(
                             onClick = { 
                                 if (entryFee >= 10 && isFutureTime && hasSufficientBalance) {
                                     val timeStr = "$selectedHour:$selectedMinute $selectedAmPm"
-                                    onConfirm(entryFee, timeStr)
+                                    val h = selectedHour.toIntOrNull() ?: 12
+                                    val m = selectedMinute.toIntOrNull() ?: 0
+                                    val hour24 = when {
+                                        selectedAmPm.equals("AM", ignoreCase = true) -> if (h == 12) 0 else h
+                                        else -> if (h == 12) 12 else h + 12
+                                    }
+                                    val targetCal = java.util.Calendar.getInstance().apply {
+                                        set(java.util.Calendar.HOUR_OF_DAY, hour24)
+                                        set(java.util.Calendar.MINUTE, m)
+                                        set(java.util.Calendar.SECOND, 0)
+                                        set(java.util.Calendar.MILLISECOND, 0)
+                                    }
+                                    val epochMillis = targetCal.timeInMillis
+                                    onConfirm(entryFee, timeStr, epochMillis)
                                 } 
                             },
                             enabled = entryFee >= 10 && isFutureTime && hasSufficientBalance,
@@ -1296,6 +1337,12 @@ private fun JoinMatchConfirmDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
+    val targetEpoch = remember(match.scheduledTimeMillis, match.scheduledTimeFormatted, match.createdAt) {
+        if (match.scheduledTimeMillis > 0L) match.scheduledTimeMillis
+        else parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
+    }
+    val isExpired = targetEpoch > 0L && System.currentTimeMillis() >= targetEpoch
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(24.dp),
@@ -1344,7 +1391,22 @@ private fun JoinMatchConfirmDialog(
                 
                 val hasSufficientBalance = gameWalletBalance >= match.entryFee
                 
-                if (!hasSufficientBalance) {
+                if (isExpired) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "ম্যাচ শুরুর সময় উত্তীর্ণ হয়ে গেছে!",
+                        color = Color(0xFFFCA5A5),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFFEF4444).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                            .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                            .padding(8.dp)
+                    )
+                } else if (!hasSufficientBalance) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         "আপনার গেম ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই\n(প্রয়োজন: ৳ %.2f)".format(match.entryFee),
@@ -1378,7 +1440,7 @@ private fun JoinMatchConfirmDialog(
                     
                     Button(
                         onClick = onConfirm,
-                        enabled = hasSufficientBalance,
+                        enabled = hasSufficientBalance && !isExpired,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(

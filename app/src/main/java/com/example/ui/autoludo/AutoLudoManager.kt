@@ -45,6 +45,7 @@ data class AutoLudoMatchEntity(
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L,
     val scheduledTimeFormatted: String = "Today",
+    val scheduledTimeMillis: Long = 0L,
     val readyTimerStartedAt: Long = 0L,
     val countdownStartedAt: Long = 0L,
     val player1Ready: Boolean = false,
@@ -218,6 +219,19 @@ object AutoLudoManager {
         })
     }
 
+    /**
+     * Scans and auto-refunds all CANCELLED matches for the current user if not already refunded.
+     * Safe and idempotent via Firebase Transaction on refundClaimed_$currentUid.
+     */
+    fun autoRefundCancelledMatches(matches: List<AutoLudoMatchEntity>, currentUid: String) {
+        if (currentUid.isBlank()) return
+        matches.filter { match ->
+            match.status == "CANCELLED" && (match.player1Uid == currentUid || match.player2Uid == currentUid)
+        }.forEach { match ->
+            claimRefund(match.matchId, currentUid)
+        }
+    }
+
     // Authorized path under miniGames node to ensure Firebase Security Rule compliance
     private const val NODE_MATCHES = "miniGames/autoLudo/matches"
     private const val NODE_GAME_WALLETS = "gameWallets"
@@ -270,7 +284,8 @@ object AutoLudoManager {
         creatorUid: String,
         creatorName: String,
         entryFee: Double,
-        scheduledTimeFormatted: String
+        scheduledTimeFormatted: String,
+        scheduledTimeMillis: Long = 0L
     ): Result<String> {
         if (creatorUid.isBlank()) return Result.failure(IllegalArgumentException("User ID is required"))
         if (entryFee < 10.0 || entryFee > 10000.0) {
@@ -355,6 +370,12 @@ object AutoLudoManager {
         val matchNumber = nextMatchNumber.toString()
         val prizePool = (entryFee * 2.0) * 0.90 // 10% commission, 1.8x payout
 
+        val computedScheduledMillis = if (scheduledTimeMillis > 0L) {
+            scheduledTimeMillis
+        } else {
+            parseScheduledEpoch(scheduledTimeFormatted)
+        }
+
         val matchData = hashMapOf<String, Any?>(
             "matchId" to matchId,
             "matchNumber" to matchNumber,
@@ -373,6 +394,7 @@ object AutoLudoManager {
             "createdAt" to ServerValue.TIMESTAMP,
             "updatedAt" to ServerValue.TIMESTAMP,
             "scheduledTimeFormatted" to scheduledTimeFormatted,
+            "scheduledTimeMillis" to computedScheduledMillis,
             "readyTimerStartedAt" to 0L
         )
 
@@ -433,6 +455,16 @@ object AutoLudoManager {
         }
         if (match.player1Uid == playerUid || match.player2Uid == playerUid) {
             return Result.failure(IllegalStateException("আপনি ইতোমধ্যে এই ম্যাচে যুক্ত আছেন"))
+        }
+
+        // Expiration Guard: Reject expired joins before wallet deductions
+        val targetEpoch = if (match.scheduledTimeMillis > 0L) {
+            match.scheduledTimeMillis
+        } else {
+            parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
+        }
+        if (targetEpoch > 0L && System.currentTimeMillis() >= targetEpoch) {
+            return Result.failure(IllegalStateException("ম্যাচ শুরুর সময় উত্তীর্ণ হয়ে গেছে!"))
         }
 
         val entryFee = match.entryFee
@@ -1025,7 +1057,11 @@ object AutoLudoManager {
                     }
 
                     // Guard: Verify that the 10-minute grace period has actually expired
-                    val schedEpoch = parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
+                    val schedEpoch = if (match.scheduledTimeMillis > 0L) {
+                        match.scheduledTimeMillis
+                    } else {
+                        parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
+                    }
                     val now = System.currentTimeMillis()
                     val graceExpiry = if (schedEpoch > 0L) schedEpoch + (10 * 60 * 1000L) else match.createdAt + (10 * 60 * 1000L)
                     
@@ -1081,6 +1117,7 @@ object AutoLudoManager {
                                 val walletRef = currentData.child(NODE_GAME_WALLETS).child(currentUid).child("balance")
                                 val currentBal = (walletRef.value as? Number)?.toDouble() ?: 0.0
                                 walletRef.value = currentBal + refundAmount
+                                matchNode.child("refundClaimed_$currentUid").value = true
                             }
                         }
                     }
