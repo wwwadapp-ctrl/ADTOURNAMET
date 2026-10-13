@@ -51,10 +51,173 @@ data class AutoLudoMatchEntity(
     val player2Ready: Boolean = false,
     val gameStartedAt: Long = 0L,
     val prizeDistributed: Boolean = false,
-    val gameState: LudoGameState = LudoGameState()
+    val gameState: LudoGameState = LudoGameState(),
+    val forfeitedByUid: String = "",
+    val winnerUid: String = "",
+    val prizeClaimed: Boolean = false,
+    val refundClaimed: Map<String, Boolean> = emptyMap()
 )
 
 object AutoLudoManager {
+    /**
+     * Authoritatively forfeits a match and declares the opponent as the winner.
+     */
+    fun forfeitMatch(matchId: String, forfeitingUid: String, onComplete: (Boolean, String?) -> Unit) {
+        if (matchId.isBlank() || forfeitingUid.isBlank()) {
+            onComplete(false, "Invalid arguments")
+            return
+        }
+
+        val db = getDb()
+        if (db == null) {
+            onComplete(false, "Database not available")
+            return
+        }
+
+        val matchRef = db.getReference(NODE_MATCHES).child(matchId)
+        matchRef.runTransaction(object : Transaction.Handler {
+            override fun doTransaction(currentData: MutableData): Transaction.Result {
+                val match = currentData.getValue(AutoLudoMatchEntity::class.java) ?: return Transaction.abort()
+
+                // Only allow forfeiting if the game is active or in lobby
+                if (match.status != "IN_GAME" && match.status != "READY_COUNTDOWN" && match.status != "WAITING") {
+                    return Transaction.abort()
+                }
+
+                val opponentUid = if (forfeitingUid == match.player1Uid) match.player2Uid else match.player1Uid
+                val winnerUid = if (opponentUid.isNotBlank()) opponentUid else forfeitingUid
+                
+                // If in game, there must be an opponent to win
+                if (match.status == "IN_GAME" && opponentUid.isBlank()) {
+                     return Transaction.abort()
+                }
+
+                currentData.child("status").value = "COMPLETED"
+                currentData.child("winnerUid").value = winnerUid
+                currentData.child("forfeitedByUid").value = forfeitingUid
+                currentData.child("prizeClaimed").value = false
+                currentData.child("updatedAt").value = ServerValue.TIMESTAMP
+                currentData.child("lastActionLog").value = "Player surrendered. Opponent declared winner."
+                
+                // Also update gameState for engine compatibility
+                currentData.child("gameState").child("winnerUid").value = winnerUid
+                
+                return Transaction.success(currentData)
+            }
+
+            override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {
+                if (committed && error == null) {
+                    onComplete(true, null)
+                } else {
+                    onComplete(false, error?.message ?: "Forfeit failed")
+                }
+            }
+        })
+    }
+
+    /**
+     * Credit prize to current user's OWN wallet atomically.
+     */
+    fun claimWinPrize(matchId: String, currentUid: String, onComplete: (Boolean) -> Unit = {}) {
+        val db = getDb() ?: run { onComplete(false); return }
+        val matchRef = db.getReference(NODE_MATCHES).child(matchId)
+        matchRef.child("prizeClaimed").runTransaction(object : Transaction.Handler {
+            override fun doTransaction(mutableData: MutableData): Transaction.Result {
+                if (mutableData.getValue(Boolean::class.java) == true) {
+                    return Transaction.abort() // Prevent double claim
+                }
+                mutableData.value = true
+                return Transaction.success(mutableData)
+            }
+            override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {
+                if (committed) {
+                    matchRef.child("prizePool").get().addOnSuccessListener { prizeSnap ->
+                        val prize = when (val v = prizeSnap.value) {
+                            is Number -> v.toDouble()
+                            is String -> v.toDoubleOrNull() ?: 0.0
+                            else -> 0.0
+                        }
+                        if (prize > 0) {
+                            val walletRef = db.getReference(NODE_GAME_WALLETS).child(currentUid).child("balance")
+                            walletRef.runTransaction(object : Transaction.Handler {
+                                override fun doTransaction(walletData: MutableData): Transaction.Result {
+                                    val currentBal = when (val b = walletData.value) {
+                                        is Number -> b.toDouble()
+                                        is String -> b.toDoubleOrNull() ?: 0.0
+                                        else -> 0.0
+                                    }
+                                    walletData.value = currentBal + prize
+                                    return Transaction.success(walletData)
+                                }
+                                override fun onComplete(wErr: DatabaseError?, wCom: Boolean, wSnap: DataSnapshot?) {
+                                    onComplete(wCom)
+                                }
+                            })
+                        } else {
+                            onComplete(false)
+                        }
+                    }.addOnFailureListener {
+                        onComplete(false)
+                    }
+                } else {
+                    onComplete(false)
+                }
+            }
+        })
+    }
+
+    /**
+     * Refund entry fee to current user's OWN wallet when match is CANCELLED.
+     */
+    fun claimRefund(matchId: String, currentUid: String, onComplete: (Boolean) -> Unit = {}) {
+        val db = getDb() ?: run { onComplete(false); return }
+        val matchRef = db.getReference(NODE_MATCHES).child(matchId)
+        val refundFlagRef = matchRef.child("refundClaimed_$currentUid")
+        refundFlagRef.runTransaction(object : Transaction.Handler {
+            override fun doTransaction(mutableData: MutableData): Transaction.Result {
+                if (mutableData.getValue(Boolean::class.java) == true) {
+                    return Transaction.abort()
+                }
+                mutableData.value = true
+                return Transaction.success(mutableData)
+            }
+            override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {
+                if (committed) {
+                    matchRef.child("entryFee").get().addOnSuccessListener { feeSnap ->
+                        val fee = when (val v = feeSnap.value) {
+                            is Number -> v.toDouble()
+                            is String -> v.toDoubleOrNull() ?: 0.0
+                            else -> 0.0
+                        }
+                        if (fee > 0) {
+                            val walletRef = db.getReference(NODE_GAME_WALLETS).child(currentUid).child("balance")
+                            walletRef.runTransaction(object : Transaction.Handler {
+                                override fun doTransaction(walletData: MutableData): Transaction.Result {
+                                    val currentBal = when (val b = walletData.value) {
+                                        is Number -> b.toDouble()
+                                        is String -> b.toDoubleOrNull() ?: 0.0
+                                        else -> 0.0
+                                    }
+                                    walletData.value = currentBal + fee
+                                    return Transaction.success(walletData)
+                                }
+                                override fun onComplete(wErr: DatabaseError?, wCom: Boolean, wSnap: DataSnapshot?) {
+                                    onComplete(wCom)
+                                }
+                            })
+                        } else {
+                            onComplete(false)
+                        }
+                    }.addOnFailureListener {
+                        onComplete(false)
+                    }
+                } else {
+                    onComplete(false)
+                }
+            }
+        })
+    }
+
     // Authorized path under miniGames node to ensure Firebase Security Rule compliance
     private const val NODE_MATCHES = "miniGames/autoLudo/matches"
     private const val NODE_GAME_WALLETS = "gameWallets"
@@ -793,46 +956,7 @@ object AutoLudoManager {
      */
     private suspend fun distributePrize(matchId: String, winnerUid: String) {
         if (winnerUid.isBlank() || matchId.isBlank()) return
-        
-        val db = getDb() ?: return
-        val rootRef = db.reference
-
-        suspendCancellableCoroutine<Unit> { cont ->
-            rootRef.runTransaction(object : Transaction.Handler {
-                override fun doTransaction(currentData: MutableData): Transaction.Result {
-                    val matchNode = currentData.child(NODE_MATCHES).child(matchId)
-                    val match = matchNode.getValue(AutoLudoMatchEntity::class.java) ?: return Transaction.abort()
-                    
-                    // Validation: Must be completed and NOT already distributed
-                    if (match.status != "COMPLETED" || match.prizeDistributed) {
-                        return Transaction.abort()
-                    }
-                    
-                    val prizeAmount = match.prizePool
-                    if (prizeAmount <= 0.0) return Transaction.abort()
-                    
-                    val walletRef = currentData.child(NODE_GAME_WALLETS).child(winnerUid)
-                    val rawBal = walletRef.child("balance").value
-                    val currentBal = when (rawBal) {
-                        is Number -> rawBal.toDouble()
-                        is String -> rawBal.toDoubleOrNull() ?: 0.0
-                        else -> 0.0
-                    }
-                    
-                    // 1. Mark as distributed
-                    matchNode.child("prizeDistributed").value = true
-                    
-                    // 2. Credit Wallet
-                    walletRef.child("balance").value = currentBal + prizeAmount
-                    
-                    return Transaction.success(currentData)
-                }
-
-                override fun onComplete(err: DatabaseError?, committed: Boolean, d: DataSnapshot?) {
-                    cont.resume(Unit)
-                }
-            })
-        }
+        claimWinPrize(matchId, winnerUid) {}
     }
 
     fun isSafeCell(pos: Int, isPlayer1: Boolean): Boolean {
@@ -876,12 +1000,11 @@ object AutoLudoManager {
 
     /**
      * Atomically adjudicates a match if the 10-minute post-schedule grace period expires without both players ready.
-     * Condition A: Player 1 ready, Player 2 absent -> Player 1 Walkover Win (100% prize pool)
-     * Condition B: Player 2 ready, Player 1 absent -> Player 2 Walkover Win (100% prize pool)
-     * Condition C: Neither player ready -> Cancelled, 90% entry fee refunded to both players (10% admin fee)
+     * Case A: One player ready, other absent -> Ready player wins (100% prize pool).
+     * Case B: Neither player ready -> Cancelled, entry fee refunded to caller only (to satisfy security rules).
      */
-    suspend fun adjudicateGracePeriodTimeout(matchId: String): Result<Unit> {
-        if (matchId.isBlank()) return Result.failure(IllegalArgumentException("Invalid matchId"))
+    suspend fun adjudicateGracePeriodTimeout(matchId: String, currentUid: String): Result<Unit> {
+        if (matchId.isBlank() || currentUid.isBlank()) return Result.failure(IllegalArgumentException("Invalid arguments"))
 
         val db = getDb() ?: return Result.failure(IllegalStateException("Database not available"))
         val rootRef = db.reference
@@ -902,6 +1025,7 @@ object AutoLudoManager {
                     val schedEpoch = parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
                     val now = System.currentTimeMillis()
                     val graceExpiry = if (schedEpoch > 0L) schedEpoch + (10 * 60 * 1000L) else match.createdAt + (10 * 60 * 1000L)
+                    
                     if (now < graceExpiry) {
                         return Transaction.abort() // Grace period not yet expired
                     }
@@ -910,78 +1034,50 @@ object AutoLudoManager {
                     val p2Ready = match.player2Ready
 
                     when {
-                        // Condition A: Player 1 ready, Player 2 absent -> Player 1 Walkover Win
+                        // Case A: Player 1 ready, Player 2 absent -> Player 1 Wins
                         p1Ready && !p2Ready -> {
                             matchNode.child("status").value = "COMPLETED"
                             matchNode.child("winnerUid").value = match.player1Uid
                             matchNode.child("lastActionLog").value = "Player 2 No-Show. Player 1 Walkover Victory!"
                             matchNode.child("updatedAt").value = ServerValue.TIMESTAMP
+                            matchNode.child("prizeDistributed").value = true
 
-                            // Credit winner wallet directly in root transaction
-                            if (!match.prizeDistributed && match.prizePool > 0.0) {
-                                matchNode.child("prizeDistributed").value = true
-                                val p1WalletRef = currentData.child(NODE_GAME_WALLETS).child(match.player1Uid).child("balance")
-                                val rawBal = p1WalletRef.value
-                                val curBal = when (rawBal) {
-                                    is Number -> rawBal.toDouble()
-                                    is String -> rawBal.toDoubleOrNull() ?: 0.0
-                                    else -> 0.0
-                                }
-                                p1WalletRef.value = curBal + match.prizePool
+                            // Credit winner wallet (only if winner is current caller, else background distributePrize handles it)
+                            if (currentUid == match.player1Uid && match.prizePool > 0.0) {
+                                val walletRef = currentData.child(NODE_GAME_WALLETS).child(match.player1Uid).child("balance")
+                                val currentBal = (walletRef.value as? Number)?.toDouble() ?: 0.0
+                                walletRef.value = currentBal + match.prizePool
                             }
                         }
 
-                        // Condition B: Player 2 ready, Player 1 absent -> Player 2 Walkover Win
+                        // Case A: Player 2 ready, Player 1 absent -> Player 2 Wins
                         !p1Ready && p2Ready -> {
                             matchNode.child("status").value = "COMPLETED"
                             matchNode.child("winnerUid").value = match.player2Uid
                             matchNode.child("lastActionLog").value = "Player 1 No-Show. Player 2 Walkover Victory!"
                             matchNode.child("updatedAt").value = ServerValue.TIMESTAMP
+                            matchNode.child("prizeDistributed").value = true
 
-                            // Credit winner wallet directly in root transaction
-                            if (!match.prizeDistributed && match.prizePool > 0.0) {
-                                matchNode.child("prizeDistributed").value = true
-                                val p2WalletRef = currentData.child(NODE_GAME_WALLETS).child(match.player2Uid).child("balance")
-                                val rawBal = p2WalletRef.value
-                                val curBal = when (rawBal) {
-                                    is Number -> rawBal.toDouble()
-                                    is String -> rawBal.toDoubleOrNull() ?: 0.0
-                                    else -> 0.0
-                                }
-                                p2WalletRef.value = curBal + match.prizePool
+                            // Credit winner wallet
+                            if (currentUid == match.player2Uid && match.prizePool > 0.0) {
+                                val walletRef = currentData.child(NODE_GAME_WALLETS).child(match.player2Uid).child("balance")
+                                val currentBal = (walletRef.value as? Number)?.toDouble() ?: 0.0
+                                walletRef.value = currentBal + match.prizePool
                             }
                         }
 
-                        // Condition C: Neither ready / Both absent -> 90% refund to both
+                        // Case B: Neither ready / Both absent -> Cancelled & Self-Refund
                         else -> {
                             matchNode.child("status").value = "CANCELLED"
-                            matchNode.child("lastActionLog").value = "Both players absent. 90% fee refunded."
+                            matchNode.child("lastActionLog").value = "Both players absent. Match Cancelled."
                             matchNode.child("updatedAt").value = ServerValue.TIMESTAMP
 
-                            val refundAmount = match.entryFee * 0.90 // 10% admin fee withheld, 90% returned
+                            // Refund ONLY the current caller's entry fee (Hacker-proof: don't touch opponent's node)
+                            val refundAmount = match.entryFee // Refund 100% since no game happened
                             if (refundAmount > 0.0) {
-                                // Refund Player 1
-                                if (match.player1Uid.isNotBlank()) {
-                                    val p1WalletRef = currentData.child(NODE_GAME_WALLETS).child(match.player1Uid).child("balance")
-                                    val rawBal1 = p1WalletRef.value
-                                    val curBal1 = when (rawBal1) {
-                                        is Number -> rawBal1.toDouble()
-                                        is String -> rawBal1.toDoubleOrNull() ?: 0.0
-                                        else -> 0.0
-                                    }
-                                    p1WalletRef.value = curBal1 + refundAmount
-                                }
-                                // Refund Player 2
-                                if (match.player2Uid.isNotBlank()) {
-                                    val p2WalletRef = currentData.child(NODE_GAME_WALLETS).child(match.player2Uid).child("balance")
-                                    val rawBal2 = p2WalletRef.value
-                                    val curBal2 = when (rawBal2) {
-                                        is Number -> rawBal2.toDouble()
-                                        is String -> rawBal2.toDoubleOrNull() ?: 0.0
-                                        else -> 0.0
-                                    }
-                                    p2WalletRef.value = curBal2 + refundAmount
-                                }
+                                val walletRef = currentData.child(NODE_GAME_WALLETS).child(currentUid).child("balance")
+                                val currentBal = (walletRef.value as? Number)?.toDouble() ?: 0.0
+                                walletRef.value = currentBal + refundAmount
                             }
                         }
                     }
@@ -993,7 +1089,7 @@ object AutoLudoManager {
                     if (committed && err == null) {
                         cont.resume(Result.success(Unit))
                     } else {
-                        cont.resume(Result.failure(err?.toException() ?: Exception("Adjudication transaction aborted or failed")))
+                        cont.resume(Result.failure(err?.toException() ?: Exception("Adjudication failed")))
                     }
                 }
             })

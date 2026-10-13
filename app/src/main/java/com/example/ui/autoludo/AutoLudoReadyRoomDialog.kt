@@ -19,7 +19,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.core.config.FirebaseConfig
 import com.example.ui.theme.*
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ServerValue
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -32,15 +35,22 @@ fun AutoLudoReadyRoomDialog(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    val isPlayer1 = match.player1Uid == currentUid
+    val isPlayer2 = match.player2Uid == currentUid
+    val iAmReady = if (isPlayer1) match.player1Ready else if (isPlayer2) match.player2Ready else false
+    val opponentReady = if (isPlayer1) match.player2Ready else match.player1Ready
+    val opponentName = if (isPlayer1) match.player2Name else match.player1Name
     
     // 10-Minute Post-Schedule Grace Period Timer: (scheduledTimeMillis + 10 mins) - current
     var remainingSeconds by remember { mutableLongStateOf(0L) }
+    var isAdjudicating by remember { mutableStateOf(false) }
 
     val schedEpoch = remember(match.scheduledTimeFormatted, match.createdAt) {
         AutoLudoManager.parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
     }
 
-    LaunchedEffect(schedEpoch, match.status) {
+    LaunchedEffect(schedEpoch, match.status, iAmReady, opponentReady) {
         if (match.status == "IN_GAME" || match.status == "COMPLETED" || match.status == "CANCELLED") return@LaunchedEffect
 
         val expiry = if (schedEpoch > 0L) {
@@ -56,19 +66,44 @@ fun AutoLudoReadyRoomDialog(
             val diff = (expiry - now) / 1000
             remainingSeconds = diff.coerceAtLeast(0L)
             if (remainingSeconds <= 0) {
-                // Auto-adjudicate grace period timeout if not already in game
-                AutoLudoManager.adjudicateGracePeriodTimeout(match.matchId)
+                isAdjudicating = true
+                val db = try { FirebaseDatabase.getInstance(FirebaseConfig.DATABASE_URL) } catch (_: Exception) { null }
+                if (db != null) {
+                    val matchRef = db.getReference("miniGames/autoLudo/matches").child(match.matchId)
+                    if (iAmReady && !opponentReady) {
+                        val updates = hashMapOf<String, Any?>(
+                            "status" to "COMPLETED",
+                            "winnerUid" to currentUid,
+                            "updatedAt" to ServerValue.TIMESTAMP,
+                            "lastActionLog" to "Opponent absent. Walkover victory declared."
+                        )
+                        matchRef.updateChildren(updates) { _, _ ->
+                            AutoLudoManager.claimWinPrize(match.matchId, currentUid) {
+                                onDismiss()
+                            }
+                        }
+                    } else if (!iAmReady && !opponentReady) {
+                        val updates = hashMapOf<String, Any?>(
+                            "status" to "CANCELLED",
+                            "updatedAt" to ServerValue.TIMESTAMP,
+                            "lastActionLog" to "Both players absent. Match cancelled."
+                        )
+                        matchRef.updateChildren(updates) { _, _ ->
+                            AutoLudoManager.claimRefund(match.matchId, currentUid) {
+                                onDismiss()
+                            }
+                        }
+                    } else {
+                        onDismiss()
+                    }
+                } else {
+                    onDismiss()
+                }
                 break
             }
             delay(1000)
         }
     }
-
-    val isPlayer1 = match.player1Uid == currentUid
-    val isPlayer2 = match.player2Uid == currentUid
-    val iAmReady = if (isPlayer1) match.player1Ready else if (isPlayer2) match.player2Ready else false
-    val opponentReady = if (isPlayer1) match.player2Ready else match.player1Ready
-    val opponentName = if (isPlayer1) match.player2Name else match.player1Name
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -147,17 +182,27 @@ fun AutoLudoReadyRoomDialog(
 
                 // Action Button
                 if (!iAmReady) {
+                    val canPlay = remainingSeconds > 0 && !isAdjudicating
                     Button(
                         onClick = { onReadyClick(match.matchId) },
+                        enabled = canPlay,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(64.dp),
                         shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Emerald600)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Emerald600,
+                            disabledContainerColor = Slate700
+                        )
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = if (canPlay) Color.White else Slate500)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("▶ প্লে করুন", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = if (remainingSeconds <= 0) "সময় শেষ" else "▶ প্লে করুন",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (canPlay) Color.White else Slate500
+                        )
                     }
                 } else {
                     Box(
@@ -168,7 +213,7 @@ fun AutoLudoReadyRoomDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (opponentReady) "ম্যাচ শুরু হচ্ছে..." else "⏳ প্রতিপক্ষের জন্য অপেক্ষা করুন",
+                            text = if (isAdjudicating) "ফলাফল যাচাই করা হচ্ছে..." else if (opponentReady) "ম্যাচ শুরু হচ্ছে..." else "⏳ প্রতিপক্ষের জন্য অপেক্ষা করুন",
                             color = Color.White,
                             fontWeight = FontWeight.Medium
                         )

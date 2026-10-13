@@ -124,31 +124,7 @@ fun AutoLudoScreen(
         }
     }
     
-    val mockMatches = remember {
-        listOf(
-            AutoLudoMatchEntity(
-                matchId = "mock_match_ludo",
-                title = "Auto Ludo || Match No:- 777",
-                entryFee = 100.0,
-                prizePool = 180.0,
-                joinedPlayersCount = 1,
-                status = "WAITING",
-                scheduledTimeFormatted = "Today 09:00 PM"
-            )
-        )
-    }
-
-    val liveMatches = if (liveMatchesResult.value.isEmpty() && !isPreview) {
-        // Use a temporary state to show mock data after a delay if live matches are empty
-        var showMock by remember { mutableStateOf(false) }
-        LaunchedEffect(Unit) {
-            delay(4000L)
-            showMock = true
-        }
-        if (showMock) mockMatches else emptyList()
-    } else {
-        liveMatchesResult.value
-    }
+    val liveMatches = liveMatchesResult.value
 
     // Observe specific match for Ready Room
     val activeReadyRoomMatchResult = if (!isPreview) {
@@ -385,11 +361,9 @@ fun AutoLudoScreen(
                         playerName = userName
                     )
                     if (res.isSuccess) {
-                        Toast.makeText(context, "ম্যাচে সফলভাবে জয়েন করেছেন!", Toast.LENGTH_SHORT).show()
-                        activeReadyRoomMatchId = targetMatchId
+                        Toast.makeText(context, "ম্যাচে সফলভাবে জয়েন করেছেন! নির্ধারিত সময়ে প্রবেশ করুন।", Toast.LENGTH_LONG).show()
                     } else {
-                        // In preview or offline mode, seamlessly open Ready Room
-                        activeReadyRoomMatchId = targetMatchId
+                        Toast.makeText(context, res.exceptionOrNull()?.message ?: "জয়েন করতে ব্যর্থ হয়েছে", Toast.LENGTH_LONG).show()
                     }
                 }
             }
@@ -434,23 +408,7 @@ fun AutoLudoScreen(
         )
     }
 
-    val currentMatch = activeReadyRoomMatch ?: if (activeReadyRoomMatchId != null) {
-        AutoLudoMatchEntity(
-            matchId = activeReadyRoomMatchId ?: "preview_match_123",
-            matchNumber = "777",
-            title = "Auto Ludo || Match No:- 777",
-            entryFee = 50.0,
-            prizePool = 90.0,
-            player1Uid = currentUid,
-            player1Name = userName,
-            player2Uid = "opponent_player",
-            player2Name = "MISS AYSHA",
-            status = "READY_COUNTDOWN",
-            countdownStartedAt = System.currentTimeMillis() - 10000L,
-            player1Ready = false,
-            player2Ready = true
-        )
-    } else null
+    val currentMatch = activeReadyRoomMatch
     
     if (currentMatch != null) {
         AutoLudoReadyRoomDialog(
@@ -469,11 +427,25 @@ fun AutoLudoScreen(
         )
     }
 
-    // Auto-navigate to game if status is IN_GAME
+    // Auto-navigate to game or dismiss lobby based on status
     LaunchedEffect(currentMatch?.status) {
-        if (currentMatch?.status == "IN_GAME") {
-            onPlayMatch(currentMatch.matchId)
-            activeReadyRoomMatchId = null
+        when (currentMatch?.status) {
+            "IN_GAME" -> {
+                onPlayMatch(currentMatch.matchId)
+                activeReadyRoomMatchId = null
+            }
+            "COMPLETED" -> {
+                if (activeReadyRoomMatchId != null) {
+                    Toast.makeText(context, "ম্যাচ শেষ হয়েছে! ফলাফল নির্ধারিত হয়েছে।", Toast.LENGTH_LONG).show()
+                    activeReadyRoomMatchId = null
+                }
+            }
+            "CANCELLED" -> {
+                if (activeReadyRoomMatchId != null) {
+                    Toast.makeText(context, "উভয় প্লেয়ার প্রস্তুত না থাকায় ম্যাচ বাতিল করা হয়েছে।", Toast.LENGTH_LONG).show()
+                    activeReadyRoomMatchId = null
+                }
+            }
         }
     }
 }
@@ -1334,6 +1306,25 @@ private fun JoinMatchConfirmDialog(
                     }
                 }
                 
+                val hasSufficientBalance = gameWalletBalance >= match.entryFee
+                
+                if (!hasSufficientBalance) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "আপনার গেম ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই\n(প্রয়োজন: ৳ %.2f)".format(match.entryFee),
+                        color = Color(0xFFFCA5A5),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFFEF4444).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                            .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                            .padding(8.dp)
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
                 
                 Row(
@@ -1351,9 +1342,13 @@ private fun JoinMatchConfirmDialog(
                     
                     Button(
                         onClick = onConfirm,
+                        enabled = hasSufficientBalance,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Emerald600)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Emerald600,
+                            disabledContainerColor = Emerald600.copy(alpha = 0.3f)
+                        )
                     ) {
                         Text("নিশ্চিত করুন", fontWeight = FontWeight.Bold)
                     }

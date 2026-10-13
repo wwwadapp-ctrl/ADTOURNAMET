@@ -47,6 +47,7 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.SoundPool
 import android.media.ToneGenerator
+import com.example.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -68,26 +69,10 @@ fun AutoLudoGameScreen(
 ) {
     val isPreviewMode = LocalInspectionMode.current || matchId.contains("preview") || matchId.contains("mock")
     val coroutineScope = rememberCoroutineScope()
-    val mockMatch = remember {
-        AutoLudoMatchEntity(
-            matchId = "preview_match_123",
-            player1Uid = "player_1",
-            player1Name = "MD DALUAR",
-            player2Uid = "player_2",
-            player2Name = "MISS AYSHA",
-            status = "IN_GAME",
-            gameState = LudoGameState(
-                currentTurnUid = "player_1",
-                diceValue = 0,
-                isDiceRolled = false,
-                player1Pawns = listOf(-1, -1, -1, -1),
-                player2Pawns = listOf(-1, -1, -1, -1)
-            )
-        )
-    }
 
-    var match by remember { mutableStateOf<AutoLudoMatchEntity?>(if (isPreviewMode) mockMatch else null) }
+    var match by remember { mutableStateOf<AutoLudoMatchEntity?>(null) }
     var showBoard by remember { mutableStateOf(isPreviewMode) } 
+    var showExitConfirmDialog by remember { mutableStateOf(false) }
 
     // Observe real-time match state from Firebase with safety
     LaunchedEffect(matchId) {
@@ -99,34 +84,21 @@ fun AutoLudoGameScreen(
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.e("AutoLudo", "Firebase Observation Error: ${e.message}")
-                if (match == null) match = mockMatch
-            }
-        } else {
-            match = mockMatch
-        }
-    }
-
-    // Immediate fallback if still null after a short timeout
-    LaunchedEffect(Unit) {
-        if (!isPreviewMode) {
-            delay(1500)
-            if (match == null) {
-                match = mockMatch
-                android.util.Log.d("AutoLudo", "Falling back to mock match (Offline/Loading)")
+                match = null
             }
         }
     }
 
-    if (match == null && !isPreviewMode) {
+
+    if (match == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = Color(0xFFBF953F))
         }
         return
     }
 
-    val currentMatch = match ?: mockMatch
-    val isActuallyLocal = isPreviewMode || currentMatch.matchId == "preview_match_123"
+    val currentMatch = match!!
+    val isActuallyLocal = isPreviewMode || currentMatch.matchId.contains("preview")
     
     val currentUid = remember(currentMatch, isActuallyLocal) { 
         try { 
@@ -339,40 +311,106 @@ fun AutoLudoGameScreen(
                     }
                 }
             },
-            onBackClick = onBackClick
+            onBackClick = { showExitConfirmDialog = true }
         )
         
-        // Handle back press to exit game
+        // Handle back press to exit game with forfeit confirmation
         androidx.activity.compose.BackHandler {
-            onBackClick()
+            showExitConfirmDialog = true
+        }
+
+        // Automatic prize claim when match is completed and current user is winner
+        val isWinner = currentMatch.status == "COMPLETED" && 
+            (currentMatch.winnerUid == currentUid || currentMatch.gameState.winnerUid == currentUid)
+
+        LaunchedEffect(isWinner) {
+            if (isWinner && !isActuallyLocal) {
+                AutoLudoManager.claimWinPrize(currentMatch.matchId, currentUid) { _ -> }
+            }
         }
 
         // Winner Dialog
         if (currentMatch.status == "COMPLETED") {
+            val winnerUid = if (currentMatch.winnerUid.isNotBlank()) currentMatch.winnerUid else currentMatch.gameState.winnerUid
+            val isMe = currentUid == winnerUid
+            val isOpponentForfeit = currentMatch.forfeitedByUid.isNotBlank() && currentMatch.forfeitedByUid != currentUid
+            val winnerName = if (winnerUid == currentMatch.player1Uid) currentMatch.player1Name else if (winnerUid == currentMatch.player2Uid) currentMatch.player2Name else "বিজয়ী"
+
             AlertDialog(
                 onDismissRequest = { onBackClick() },
-                title = { Text("গেম সমাপ্ত!", fontWeight = FontWeight.Bold) },
+                title = { 
+                    Text(
+                        if (isMe) "অভিনন্দন! আপনি বিজয়ী!" else "গেম সমাপ্ত!", 
+                        fontWeight = FontWeight.Bold 
+                    ) 
+                },
                 text = {
-                    val winnerUid = currentMatch.gameState.winnerUid
-                    val isMe = currentUid == winnerUid
-                    val winnerName = if (winnerUid == currentMatch.player1Uid) currentMatch.player1Name else if (winnerUid == currentMatch.player2Uid) currentMatch.player2Name else "বিজয়ী"
-                    
                     Column {
                         if (isMe) {
-                            Text("অভিনন্দন! আপনি ৳${String.format("%.2f", currentMatch.prizePool)} জিতেছেন এবং তা আপনার ওয়ালেটে যোগ হয়েছে!")
+                            if (isOpponentForfeit || currentMatch.forfeitedByUid.isNotBlank()) {
+                                Text(
+                                    "বিপক্ষ খেলোয়াড় সারেন্ডার করেছেন! আপনি বিজয়ী হয়েছেন!",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            } else {
+                                Text(
+                                    "অভিনন্দন! আপনি বিজয়ী হয়েছেন! ৳${String.format("%.2f", currentMatch.prizePool)} আপনার গেম ওয়ালেটে যোগ হয়েছে!",
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                            }
                         } else {
                             Text("দুঃখিত! $winnerName গেমটি জিতেছেন। ভালো খেলার জন্য ধন্যবাদ।")
                         }
                     }
                 },
                 confirmButton = {
-                    Button(onClick = { onBackClick() }) {
-                        Text("ঠিক আছে")
+                    Button(
+                        onClick = { onBackClick() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Emerald600)
+                    ) {
+                        Text("ওকে", fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 },
                 containerColor = Color(0xFF1565C0),
                 titleContentColor = Color(0xFFFFD700),
                 textContentColor = Color.White
+            )
+        }
+
+        // Forfeit / Exit Confirmation Dialog
+        if (showExitConfirmDialog) {
+            val opponentName = if (currentUid == currentMatch.player1Uid) {
+                currentMatch.player2Name.ifBlank { "প্লেয়ার ২" }
+            } else {
+                currentMatch.player1Name.ifBlank { "প্লেয়ার ১" }
+            }
+
+            AlertDialog(
+                onDismissRequest = { showExitConfirmDialog = false },
+                title = { Text("আপনি কি ম্যাচ থেকে বের হতে চান?", fontWeight = FontWeight.Bold) },
+                text = { Text("আপনি বের হয়ে গেলে $opponentName-কে বিজয়ী ঘোষণা করা হবে।") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showExitConfirmDialog = false
+                            AutoLudoManager.forfeitMatch(currentMatch.matchId, currentUid) { _, _ ->
+                                onBackClick()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                    ) {
+                        Text("হ্যাঁ", color = Color.White)
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(onClick = { showExitConfirmDialog = false }) {
+                        Text("না")
+                    }
+                },
+                containerColor = Color(0xFF1565C0),
+                titleContentColor = Color.White,
+                textContentColor = Color.White.copy(alpha = 0.9f)
             )
         }
     }
@@ -530,10 +568,8 @@ fun AutoLudoBoardScreen(
         else -> false
     }
 
-    val isActuallyLocal = isPreviewMode || match.matchId == "preview_match_123"
+    val isActuallyLocal = isPreviewMode || match.matchId.contains("preview") || match.matchId.contains("mock")
     val isLocalOrBot = isActuallyLocal || 
-        match.matchId.contains("preview") || 
-        match.matchId.contains("mock") || 
         match.player2Uid.isBlank() || 
         match.player2Uid == "bot" || 
         match.player2Uid == "computer" ||
