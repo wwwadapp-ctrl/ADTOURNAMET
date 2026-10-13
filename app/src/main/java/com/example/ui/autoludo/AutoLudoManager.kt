@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import java.util.Calendar
 import kotlin.coroutines.resume
 
 data class LudoGameState(
@@ -220,13 +221,88 @@ object AutoLudoManager {
     }
 
     /**
+     * Checks if a solo match has expired without an opponent, cancels it atomically in Firebase,
+     * and triggers refund for the creator.
+     */
+    fun cancelExpiredSoloMatch(match: AutoLudoMatchEntity, onComplete: ((Boolean) -> Unit)? = null) {
+        val targetEpoch = if (match.scheduledTimeMillis > 0L) match.scheduledTimeMillis else parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
+        if (targetEpoch <= 0L || System.currentTimeMillis() < targetEpoch) {
+            onComplete?.invoke(false)
+            return
+        }
+        if (match.status != "WAITING" || match.joinedPlayersCount >= 2) {
+            onComplete?.invoke(false)
+            return
+        }
+
+        val db = getDb() ?: run {
+            onComplete?.invoke(false)
+            return
+        }
+
+        val matchRef = db.getReference(NODE_MATCHES).child(match.matchId)
+        matchRef.runTransaction(object : Transaction.Handler {
+            override fun doTransaction(currentData: MutableData): Transaction.Result {
+                val currentStatus = currentData.child("status").getValue(String::class.java)
+                val joinedCount = currentData.child("joinedPlayersCount").getValue(Int::class.java) ?: 1
+                if (currentStatus == "WAITING" && joinedCount < 2) {
+                    currentData.child("status").value = "CANCELLED"
+                    currentData.child("gameState").child("lastActionLog").value = "Opponent not found in time. Cancelled."
+                    currentData.child("updatedAt").value = System.currentTimeMillis()
+                    return Transaction.success(currentData)
+                }
+                return Transaction.abort()
+            }
+
+            override fun onComplete(error: DatabaseError?, committed: Boolean, currentData: DataSnapshot?) {
+                val targetUid = match.creatorUid.ifBlank { match.player1Uid }
+                if (committed) {
+                    if (targetUid.isNotBlank()) {
+                        claimRefund(match.matchId, targetUid) {
+                            onComplete?.invoke(true)
+                        }
+                    } else {
+                        onComplete?.invoke(true)
+                    }
+                } else {
+                    val status = currentData?.child("status")?.getValue(String::class.java)
+                    if (status == "CANCELLED" && targetUid.isNotBlank()) {
+                        claimRefund(match.matchId, targetUid) {
+                            onComplete?.invoke(false)
+                        }
+                    } else {
+                        onComplete?.invoke(false)
+                    }
+                }
+            }
+        })
+    }
+
+    /**
+     * Checks a list of matches, auto-cancels any expired waiting solo matches,
+     * and auto-refunds cancelled matches for current user.
+     */
+    fun checkAndCancelExpiredSoloMatches(matches: List<AutoLudoMatchEntity>, currentUid: String) {
+        val now = System.currentTimeMillis()
+        matches.forEach { match ->
+            val targetEpoch = if (match.scheduledTimeMillis > 0L) match.scheduledTimeMillis else parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
+            if (match.status == "WAITING" && match.joinedPlayersCount < 2 && targetEpoch > 0L && now >= targetEpoch) {
+                cancelExpiredSoloMatch(match)
+            }
+        }
+        if (currentUid.isNotBlank()) {
+            autoRefundCancelledMatches(matches, currentUid)
+        }
+    }
+
+    /**
      * Scans and auto-refunds all CANCELLED matches for the current user if not already refunded.
      * Safe and idempotent via Firebase Transaction on refundClaimed_$currentUid.
      */
     fun autoRefundCancelledMatches(matches: List<AutoLudoMatchEntity>, currentUid: String) {
         if (currentUid.isBlank()) return
         matches.filter { match ->
-            match.status == "CANCELLED" && (match.player1Uid == currentUid || match.player2Uid == currentUid)
+            match.status == "CANCELLED" && (match.player1Uid == currentUid || match.player2Uid == currentUid || match.creatorUid == currentUid)
         }.forEach { match ->
             claimRefund(match.matchId, currentUid)
         }

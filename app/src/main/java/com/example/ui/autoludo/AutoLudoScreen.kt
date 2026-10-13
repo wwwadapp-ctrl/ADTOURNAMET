@@ -126,10 +126,10 @@ fun AutoLudoScreen(
     
     val liveMatches = liveMatchesResult.value
 
-    // Auto-Recovery on Match List / App Launch: Idempotently claim refunds for cancelled matches
+    // Auto-Recovery on Match List / App Launch: Cancel expired solo matches & claim refunds
     LaunchedEffect(liveMatches, currentUid) {
-        if (!isPreview && currentUid.isNotBlank()) {
-            AutoLudoManager.autoRefundCancelledMatches(liveMatches, currentUid)
+        if (!isPreview) {
+            AutoLudoManager.checkAndCancelExpiredSoloMatches(liveMatches, currentUid)
         }
     }
 
@@ -461,7 +461,13 @@ fun AutoLudoScreen(
                             // Successfully claimed
                         }
                     }
-                    Toast.makeText(context, "উভয় প্লেয়ার প্রস্তুত না থাকায় ম্যাচ বাতিল করা হয়েছে।", Toast.LENGTH_LONG).show()
+                    val actionLog = currentMatch.gameState.lastActionLog
+                    val msg = if (actionLog.contains("Opponent", ignoreCase = true)) {
+                        "প্রতিপক্ষ না পাওয়ায় ম্যাচ বাতিল ও টাকা ফেরত দেওয়া হয়েছে।"
+                    } else {
+                        "উভয় প্লেয়ার প্রস্তুত না থাকায় ম্যাচ বাতিল করা হয়েছে।"
+                    }
+                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                     activeReadyRoomMatchId = null
                 }
             }
@@ -709,13 +715,28 @@ private fun AutoLudoMatchCard(
         mutableLongStateOf(if (targetEpoch > 0L) (targetEpoch - System.currentTimeMillis()).coerceAtLeast(0L) else 0L)
     }
     val isExpired = targetEpoch > 0L && remainingMillis <= 0L
+    val isMissingOpponent = (match.status == "CANCELLED" && match.joinedPlayersCount < 2) || (match.joinedPlayersCount < match.maxPlayers && isExpired)
+    val isInactivityCancelled = match.status == "CANCELLED" && match.joinedPlayersCount >= 2
 
-    LaunchedEffect(targetEpoch) {
+    LaunchedEffect(targetEpoch, match.status, match.joinedPlayersCount) {
         if (targetEpoch <= 0L) return@LaunchedEffect
+        val initialDiff = targetEpoch - System.currentTimeMillis()
+        if (initialDiff <= 0L) {
+            remainingMillis = 0L
+            if (match.status == "WAITING" && match.joinedPlayersCount < 2) {
+                AutoLudoManager.cancelExpiredSoloMatch(match)
+            }
+            return@LaunchedEffect
+        }
         while (true) {
             val diff = targetEpoch - System.currentTimeMillis()
             remainingMillis = diff.coerceAtLeast(0L)
-            if (remainingMillis <= 0L) break
+            if (remainingMillis <= 0L) {
+                if (match.status == "WAITING" && match.joinedPlayersCount < 2) {
+                    AutoLudoManager.cancelExpiredSoloMatch(match)
+                }
+                break
+            }
             delay(1000L)
         }
     }
@@ -844,6 +865,8 @@ private fun AutoLudoMatchCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val progressText = when {
+                        isMissingOpponent -> "❌ প্রতিপক্ষ আসেনি"
+                        isInactivityCancelled -> "❌ প্লেয়ার অনুপস্থিত"
                         match.status == "READY_COUNTDOWN" -> "ম্যাচ শুরু হচ্ছে..."
                         match.status == "PLAYING" -> "ম্যাচ চলছে"
                         isFull && !isJoined -> "ম্যাচ পূর্ণ হয়েছে"
@@ -906,6 +929,18 @@ private fun AutoLudoMatchCard(
                 var onClickAction: () -> Unit = {}
 
                 when {
+                    isMissingOpponent -> {
+                        buttonText = "বাতিল (টাকা ফেরত)"
+                        buttonColor = Rose600.copy(alpha = 0.25f)
+                        isEnabled = false
+                        onClickAction = { }
+                    }
+                    isInactivityCancelled -> {
+                        buttonText = "অনুপস্থিত (টাকা ফেরত)"
+                        buttonColor = Rose600.copy(alpha = 0.25f)
+                        isEnabled = false
+                        onClickAction = { }
+                    }
                     isJoined && match.status == "WAITING" && match.joinedPlayersCount < match.maxPlayers -> {
                         buttonText = "⏳ অপেক্ষায় আছেন"
                         buttonColor = Amber600.copy(alpha = 0.2f)
@@ -958,6 +993,8 @@ private fun AutoLudoMatchCard(
                     "🎮 খেলায় প্রবেশ করুন" -> Icons.Default.Games
                     "✖ ম্যাচ ফুল" -> Icons.Default.Close
                     "সময় শেষ" -> Icons.Default.HourglassEmpty
+                    "বাতিল (টাকা ফেরত)" -> Icons.Default.Close
+                    "অনুপস্থিত (টাকা ফেরত)" -> Icons.Default.Close
                     else -> Icons.Default.HourglassEmpty
                 }
 
@@ -974,16 +1011,26 @@ private fun AutoLudoMatchCard(
                     ),
                     contentPadding = PaddingValues(0.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    ) {
                         Icon(
                             buttonIcon,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp),
+                            tint = if (isEnabled) (if (buttonText == "🎮 খেলায় প্রবেশ করুন") Color(0xFF0D47A1) else Color.White) else Slate400
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            buttonText,
-                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black)
+                            text = buttonText,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = if (buttonText.length > 15) 10.sp else 12.sp
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }

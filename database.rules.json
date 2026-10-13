@@ -152,7 +152,7 @@
         "matches": {
           ".read": "auth != null",
           "$matchId": {
-            ".write": "auth != null && (!data.exists() || data.child('creatorUid').val() == auth.uid || (root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true)"
+            ".write": "auth != null && ((root.child('admins').child(auth.uid).child('role').val() == 'SUPER_ADMIN' && root.child('admins').child(auth.uid).child('isActive').val() == true) || root.child('adminUsers').child(auth.uid).val() == true || (root.child('users').child(auth.uid).child('status').val() != 'BLOCKED' && root.child('users').child(auth.uid).child('accountStatus').val() != 'BLOCKED' && (!data.exists() || data.child('creatorUid').val() == auth.uid || ((data.child('status').val() == 'AVAILABLE' || data.child('status').val() == 'WAITING') && (data.child('joinedPlayersCount').val() < 2 || !data.child('player2Uid').exists())))))"
           }
         }
       }
