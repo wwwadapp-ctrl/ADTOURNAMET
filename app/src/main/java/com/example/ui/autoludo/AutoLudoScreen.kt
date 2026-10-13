@@ -975,6 +975,7 @@ private fun CreateAutoLudoMatchDialog(
     var entryFeeText by remember { mutableStateOf("") }
     val entryFee = entryFeeText.toIntOrNull() ?: 0
     val winnings = if (entryFee > 0) (entryFee * 1.8).toInt() else 0
+    val hasSufficientBalance = gameWalletBalance >= entryFee
 
     // Smart default: Current time + 15 mins rounded up to nearest 5-minute interval
     val initialTime = remember {
@@ -1079,18 +1080,27 @@ private fun CreateAutoLudoMatchDialog(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         color = Color(0xFF0D47A1).copy(alpha = 0.4f),
-                        border = BorderStroke(0.5.dp, Slate800)
+                        border = BorderStroke(1.dp, Gold400.copy(alpha = 0.5f))
                     ) {
                         Row(
-                            modifier = Modifier.padding(12.dp),
+                            modifier = Modifier.padding(14.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("আপনার বর্তমান ব্যালেন্স", style = MaterialTheme.typography.labelMedium, color = Slate300)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.AccountBalanceWallet,
+                                    contentDescription = null,
+                                    tint = Gold400,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("গেম ওয়ালেট ব্যালেন্স", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold), color = Slate200)
+                            }
                             Text(
                                 "৳ %.2f".format(gameWalletBalance),
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                color = Emerald400
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                color = if (gameWalletBalance > 0.0) Gold400 else Rose400
                             )
                         }
                     }
@@ -1213,6 +1223,32 @@ private fun CreateAutoLudoMatchDialog(
                         }
                     }
                     
+                    // Visual Warning Banner when balance is insufficient
+                    if (entryFee >= 10 && !hasSufficientBalance) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFFEF4444).copy(alpha = 0.15f), RoundedCornerShape(10.dp))
+                                .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 12.dp, vertical = 10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = Color(0xFFF87171),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "আপনার গেম ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই (প্রয়োজন: ৳${entryFee}, বর্তমান ব্যালেন্স: ৳${gameWalletBalance.toInt()})",
+                                color = Color(0xFFFCA5A5),
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(24.dp))
                     
                     // Actions
@@ -1231,12 +1267,12 @@ private fun CreateAutoLudoMatchDialog(
                         
                         Button(
                             onClick = { 
-                                if (entryFee >= 10 && isFutureTime) {
+                                if (entryFee >= 10 && isFutureTime && hasSufficientBalance) {
                                     val timeStr = "$selectedHour:$selectedMinute $selectedAmPm"
                                     onConfirm(entryFee, timeStr)
                                 } 
                             },
-                            enabled = entryFee >= 10 && isFutureTime,
+                            enabled = entryFee >= 10 && isFutureTime && hasSufficientBalance,
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(

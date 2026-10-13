@@ -284,20 +284,14 @@ object AutoLudoManager {
         val deductionResult = suspendCancellableCoroutine<Pair<Boolean, String?>> { cont ->
             walletBalanceRef.runTransaction(object : Transaction.Handler {
                 override fun doTransaction(currentData: MutableData): Transaction.Result {
-                    // CRITICAL FIX: If currentData is null, return success to let Firebase fetch authoritative server value
-                    if (currentData.value == null) {
-                        return Transaction.success(currentData)
-                    }
-
-                    val rawBal = currentData.value
-                    val currentBal = when (rawBal) {
-                        is Number -> rawBal.toDouble()
-                        is String -> rawBal.toDoubleOrNull() ?: 0.0
+                    val currentBal = when (val v = currentData.value) {
+                        is Number -> v.toDouble()
+                        is String -> v.toDoubleOrNull() ?: 0.0
                         else -> 0.0
                     }
 
                     if (currentBal < entryFee) {
-                        return Transaction.abort() // Legitimate insufficient balance from server snapshot
+                        return Transaction.abort() // Strictly abort if null or insufficient balance
                     }
 
                     // Deduct entry fee
@@ -448,9 +442,7 @@ object AutoLudoManager {
         val deductionResult = suspendCancellableCoroutine<Pair<Boolean, String?>> { cont ->
             walletBalanceRef.runTransaction(object : Transaction.Handler {
                 override fun doTransaction(currentData: MutableData): Transaction.Result {
-                    if (currentData.value == null) return Transaction.success(currentData)
-                    val rawBal = currentData.value
-                    val cur = when (rawBal) {
+                    val cur = when (val rawBal = currentData.value) {
                         is Number -> rawBal.toDouble()
                         is String -> rawBal.toDoubleOrNull() ?: 0.0
                         else -> 0.0
@@ -647,7 +639,7 @@ object AutoLudoManager {
                             
                             if (p1Strikes >= 3 || p2Strikes >= 3) {
                                 status = "COMPLETED"
-                                winnerUid = if (p1Strikes >= 3) (match.player2Uid.ifBlank { "player_2" }) else (match.player1Uid.ifBlank { "player_1" })
+                                winnerUid = if (p1Strikes >= 3) match.player2Uid else match.player1Uid
                                 actionLog = "Player Disqualified (3 Misses)!"
                             }
                         }
@@ -681,9 +673,13 @@ object AutoLudoManager {
                     
                     currentData.child("gameState").value = newState
                     currentData.child("status").value = status
-
-                    // Trigger atomic payout if completed
                     if (status == "COMPLETED" && winnerUid.isNotBlank()) {
+                        currentData.child("winnerUid").value = winnerUid
+                    }
+                    currentData.child("updatedAt").value = ServerValue.TIMESTAMP
+
+                    // Trigger atomic payout if completed and caller is the winner
+                    if (status == "COMPLETED" && winnerUid.isNotBlank() && winnerUid == playerUid) {
                         kotlinx.coroutines.GlobalScope.launch {
                             distributePrize(matchId, winnerUid)
                         }
@@ -774,7 +770,7 @@ object AutoLudoManager {
                     var winnerUid = state.winnerUid
                     var status = match.status
                     if (allAtGoal) {
-                        winnerUid = if (isPlayer1) match.player1Uid.ifBlank { "player_1" } else match.player2Uid.ifBlank { "player_2" }
+                        winnerUid = if (isPlayer1) match.player1Uid else match.player2Uid
                         status = "COMPLETED"
                     }
 
@@ -802,7 +798,7 @@ object AutoLudoManager {
                         
                         if (p1Strikes >= 3 || p2Strikes >= 3) {
                             status = "COMPLETED"
-                            winnerUid = if (p1Strikes >= 3) (match.player2Uid.ifBlank { "player_2" }) else (match.player1Uid.ifBlank { "player_1" })
+                            winnerUid = if (p1Strikes >= 3) match.player2Uid else match.player1Uid
                         }
                     }
 
@@ -834,10 +830,13 @@ object AutoLudoManager {
                     
                     currentData.child("gameState").value = newState
                     currentData.child("status").value = status
+                    if (status == "COMPLETED" && winnerUid.isNotBlank()) {
+                        currentData.child("winnerUid").value = winnerUid
+                    }
                     currentData.child("updatedAt").value = ServerValue.TIMESTAMP
 
-                    // Trigger atomic payout if completed
-                    if (status == "COMPLETED" && winnerUid.isNotBlank()) {
+                    // Trigger atomic payout if completed and caller is the winner
+                    if (status == "COMPLETED" && winnerUid.isNotBlank() && winnerUid == playerUid) {
                         kotlinx.coroutines.GlobalScope.launch {
                             distributePrize(matchId, winnerUid)
                         }
@@ -910,7 +909,7 @@ object AutoLudoManager {
                             
                             if (p1Strikes >= 3 || p2Strikes >= 3) {
                                 status = "COMPLETED"
-                                winnerUid = if (p1Strikes >= 3) (match.player2Uid.ifBlank { "player_2" }) else (match.player1Uid.ifBlank { "player_1" })
+                                winnerUid = if (p1Strikes >= 3) match.player2Uid else match.player1Uid
                                 actionLog = "Player Disqualified (3 Misses)!"
                             }
                         }
@@ -931,10 +930,13 @@ object AutoLudoManager {
                     
                     currentData.child("gameState").value = newState
                     currentData.child("status").value = status
+                    if (status == "COMPLETED" && winnerUid.isNotBlank()) {
+                        currentData.child("winnerUid").value = winnerUid
+                    }
                     currentData.child("updatedAt").value = ServerValue.TIMESTAMP
 
-                    // Trigger atomic payout if completed
-                    if (status == "COMPLETED" && winnerUid.isNotBlank()) {
+                    // Trigger atomic payout if completed and caller is the winner
+                    if (status == "COMPLETED" && winnerUid.isNotBlank() && winnerUid == playerUid) {
                         kotlinx.coroutines.GlobalScope.launch {
                             distributePrize(matchId, winnerUid)
                         }
@@ -955,7 +957,8 @@ object AutoLudoManager {
      * Atomically credits the prize pool to the winner and marks match as distributed.
      */
     private suspend fun distributePrize(matchId: String, winnerUid: String) {
-        if (winnerUid.isBlank() || matchId.isBlank()) return
+        val authUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+        if (winnerUid.isBlank() || matchId.isBlank() || authUid != winnerUid) return
         claimWinPrize(matchId, winnerUid) {}
     }
 

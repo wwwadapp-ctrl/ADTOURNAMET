@@ -175,22 +175,10 @@ fun AppNavigation(
   )
 
   val authCurrentUser by authViewModel.currentUser.collectAsState()
-  val previewFallbackUser = remember {
-    UserEntity(
-      uid = "preview_user_123",
-      userId = "preview_user_123",
-      name = "AD Player",
-      fullName = "AD Player",
-      displayName = "AD Player",
-      walletBalance = 50000.0,
-      totalMatches = 150,
-      wins = 85
-    )
-  }
-  val currentUser = authCurrentUser ?: previewFallbackUser
+  val currentUser = authCurrentUser
 
-  LaunchedEffect(currentUser.isAccountBlocked) {
-    if (currentUser.isAccountBlocked) {
+  LaunchedEffect(currentUser?.isAccountBlocked) {
+    if (currentUser?.isAccountBlocked == true) {
       container.authRepository.signOut()
     }
   }
@@ -204,8 +192,8 @@ fun AppNavigation(
   val initialAuthUid = remember { 
     try { 
       val uid = FirebaseAuth.getInstance().currentUser?.uid
-      if (uid.isNullOrBlank()) "preview_user_123" else uid
-    } catch (_: Exception) { "preview_user_123" }
+      if (uid.isNullOrBlank()) "" else uid
+    } catch (_: Exception) { "" }
   }
   val lastKnownUid = remember { java.util.concurrent.atomic.AtomicReference(initialAuthUid) }
   var currentAuthUid by remember { mutableStateOf(initialAuthUid) }
@@ -372,7 +360,13 @@ fun AppNavigation(
       composable(Destinations.SPLASH) {
         SplashScreen(
           onSplashFinished = {
-            navController.navigate(Destinations.HOME) {
+            val isAuth = try {
+              FirebaseAuth.getInstance().currentUser != null
+            } catch (_: Exception) {
+              false
+            }
+            val destination = if (isAuth) Destinations.HOME else Destinations.LOGIN
+            navController.navigate(destination) {
               popUpTo(Destinations.SPLASH) { inclusive = true }
             }
           },

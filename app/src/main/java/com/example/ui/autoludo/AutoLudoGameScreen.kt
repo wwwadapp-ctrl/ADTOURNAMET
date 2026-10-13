@@ -325,7 +325,8 @@ fun AutoLudoGameScreen(
 
         LaunchedEffect(isWinner) {
             if (isWinner && !isActuallyLocal) {
-                AutoLudoManager.claimWinPrize(currentMatch.matchId, currentUid) { _ -> }
+                val targetMatchId = if (currentMatch.matchId.isNotBlank()) currentMatch.matchId else matchId
+                AutoLudoManager.claimWinPrize(targetMatchId, currentUid) { _ -> }
             }
         }
 
@@ -334,6 +335,9 @@ fun AutoLudoGameScreen(
             val winnerUid = if (currentMatch.winnerUid.isNotBlank()) currentMatch.winnerUid else currentMatch.gameState.winnerUid
             val isMe = currentUid == winnerUid
             val isOpponentForfeit = currentMatch.forfeitedByUid.isNotBlank() && currentMatch.forfeitedByUid != currentUid
+            val isOpponentDisqualified = currentMatch.gameState.player1Strikes >= 3 || 
+                currentMatch.gameState.player2Strikes >= 3 || 
+                currentMatch.gameState.lastActionLog.contains("Disqualified")
             val winnerName = if (winnerUid == currentMatch.player1Uid) currentMatch.player1Name else if (winnerUid == currentMatch.player2Uid) currentMatch.player2Name else "বিজয়ী"
 
             AlertDialog(
@@ -349,7 +353,13 @@ fun AutoLudoGameScreen(
                         if (isMe) {
                             if (isOpponentForfeit || currentMatch.forfeitedByUid.isNotBlank()) {
                                 Text(
-                                    "বিপক্ষ খেলোয়াড় সারেন্ডার করেছেন! আপনি বিজয়ী হয়েছেন!",
+                                    "বিপক্ষ খেলোয়াড় সারেন্ডার করেছেন! আপনি বিজয়ী হয়েছেন! ৳${String.format("%.2f", currentMatch.prizePool)} আপনার গেম ওয়ালেটে যোগ হয়েছে!",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            } else if (isOpponentDisqualified) {
+                                Text(
+                                    "বিপক্ষ খেলোয়াড় ডিসকোয়ালিফাই হয়েছেন! আপনি বিজয়ী হয়েছেন! ৳${String.format("%.2f", currentMatch.prizePool)} আপনার গেম ওয়ালেটে যোগ হয়েছে!",
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -360,7 +370,11 @@ fun AutoLudoGameScreen(
                                 )
                             }
                         } else {
-                            Text("দুঃখিত! $winnerName গেমটি জিতেছেন। ভালো খেলার জন্য ধন্যবাদ।")
+                            if (isOpponentDisqualified) {
+                                Text("আপনি ৩ বার চাল মিস করায় ডিসকোয়ালিফাই হয়েছেন! $winnerName গেমটি জিতেছেন।")
+                            } else {
+                                Text("দুঃখিত! $winnerName গেমটি জিতেছেন। ভালো খেলার জন্য ধন্যবাদ।")
+                            }
                         }
                     }
                 },
