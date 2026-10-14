@@ -44,7 +44,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-suspend fun <T> Task<T>.awaitTask(timeoutMs: Long = 25_000L): T = withTimeout(timeoutMs) {
+suspend fun <T> Task<T>.awaitTask(timeoutMs: Long = 60_000L): T = withTimeout(timeoutMs) {
   suspendCancellableCoroutine { cont ->
     addOnSuccessListener { result ->
       if (cont.isActive) cont.resume(result)
@@ -2052,9 +2052,9 @@ class FirebaseWalletRepository : WalletRepository {
     )
 
     return if (compensated) {
-      Resource.Error(AppError.FirebaseUnavailable("Network error during withdrawal submission. Your balance was safely restored."))
+      Resource.Error(AppError.FirebaseUnavailable("Network error during withdrawal submission. Your balance was safely restored. Please try again."))
     } else {
-      Resource.Error(AppError.FirebaseUnavailable("Network error during withdrawal submission. Please check your wallet balance."))
+      Resource.Error(AppError.FirebaseUnavailable("Network error during withdrawal submission. Please check your wallet balance and retry."))
     }
   }
 
@@ -5129,7 +5129,8 @@ class FirebaseAuthRepository(
       } catch (e: Exception) {
         AppLogger.w(tag, "Realtime Database profile creation error: ${e.message}")
         try {
-          createdFirebaseUser?.delete()?.awaitTask(10_000L)
+          // createdFirebaseUser?.delete()?.awaitTask(10_000L)
+          AppLogger.i(tag, "Profile setup timed out. Firebase user delete bypassed to allow offline persistence sync.")
         } catch (cleanupEx: Exception) {
           AppLogger.w(tag, "Compensating auth user delete failed: ${cleanupEx.message}")
         }
