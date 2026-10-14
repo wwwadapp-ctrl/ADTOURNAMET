@@ -739,7 +739,7 @@ fun AutoLudoBoardScreen(
                     modifier = Modifier
                         .fillMaxWidth(0.94f)
                         .aspectRatio(1f)
-                        .shadow(12.dp, RoundedCornerShape(8.dp))
+                        .shadow(elevation = 12.dp, shape = RoundedCornerShape(8.dp), clip = false)
                         .border(2.dp, Color(0xFFBF953F), RoundedCornerShape(8.dp))
                         .background(Color.White)
                         .graphicsLayer {
@@ -1171,18 +1171,29 @@ fun LudoPawnView(
     val pawnWidth = 24.dp
     val pawnHeight = 34.dp
 
+    val isRotated180 = boardRotation == 180f
+
     Box(
         modifier = Modifier
             .zIndex(if (isEligibleToMove) 100f else (stackIndex.toFloat() + 1f))
             .offset {
+                val yOffset = if (isRotated180) {
+                    (animOffset.value.y - jumpAnim.value).roundToInt()
+                } else {
+                    (animOffset.value.y + jumpAnim.value - pawnHeight.toPx()).roundToInt()
+                }
                 IntOffset(
                     x = (animOffset.value.x - (pawnWidth / 2).toPx()).roundToInt(),
-                    y = (animOffset.value.y + jumpAnim.value - pawnHeight.toPx()).roundToInt()
+                    y = yOffset
                 )
             }
             .graphicsLayer {
                 rotationZ = -boardRotation
-                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1.0f)
+                transformOrigin = if (isRotated180) {
+                    androidx.compose.ui.graphics.TransformOrigin.Center
+                } else {
+                    androidx.compose.ui.graphics.TransformOrigin(0.5f, 1.0f)
+                }
                 scaleX = eligibleScale
                 scaleY = eligibleScale
             }

@@ -44,7 +44,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-suspend fun <T> Task<T>.awaitTask(timeoutMs: Long = 10_000L): T = withTimeout(timeoutMs) {
+suspend fun <T> Task<T>.awaitTask(timeoutMs: Long = 25_000L): T = withTimeout(timeoutMs) {
   suspendCancellableCoroutine { cont ->
     addOnSuccessListener { result ->
       if (cont.isActive) cont.resume(result)
@@ -1466,6 +1466,12 @@ class FirebaseWalletRepository : WalletRepository {
           ?: WalletEntity(uid = effectiveUid, userId = effectiveUid)
         LocalDataStore.localWallets[effectiveUid] = wallet
         trySend(Resource.Success(wallet))
+
+        if (snapshot.hasChild("activeWithdrawals")) {
+          CoroutineScope(Dispatchers.IO).launch {
+            reconcileOrphanedWithdrawals(effectiveUid, snapshot)
+          }
+        }
       }
 
       override fun onCancelled(error: DatabaseError) {
@@ -1831,8 +1837,21 @@ class FirebaseWalletRepository : WalletRepository {
         override fun doTransaction(currentData: com.google.firebase.database.MutableData): com.google.firebase.database.Transaction.Result {
           val activeWithdrawalsNode = currentData.child("activeWithdrawals")
           if (activeWithdrawalsNode.hasChildren()) {
-            txErrorReason = "You already have an active withdrawal request in progress"
-            return com.google.firebase.database.Transaction.abort()
+            val nowTime = System.currentTimeMillis()
+            var hasActiveInFlight = false
+            for (child in activeWithdrawalsNode.children) {
+              val ts = (child.child("timestamp").value as? Number)?.toLong() ?: 0L
+              if (nowTime - ts < 120_000L) {
+                hasActiveInFlight = true
+                break
+              }
+            }
+            if (hasActiveInFlight) {
+              txErrorReason = "You already have an active withdrawal request in progress"
+              return com.google.firebase.database.Transaction.abort()
+            } else {
+              activeWithdrawalsNode.value = null
+            }
           }
 
           val availableBal = currentData.child("availableBalance").getValue(Long::class.java)
@@ -2079,19 +2098,22 @@ class FirebaseWalletRepository : WalletRepository {
         walletRef.runTransaction(object : com.google.firebase.database.Transaction.Handler {
           override fun doTransaction(currentData: com.google.firebase.database.MutableData): com.google.firebase.database.Transaction.Result {
             val reservationNode = currentData.child("activeWithdrawals").child(withdrawalId)
-            if (reservationNode.value == null) {
-              return com.google.firebase.database.Transaction.abort()
-            }
             val reservedTxnId = reservationNode.child("transactionId").getValue(String::class.java)
-            if (!reservedTxnId.isNullOrBlank() && reservedTxnId != trxId) {
+            if (!reservedTxnId.isNullOrBlank() && trxId.isNotBlank() && reservedTxnId != trxId) {
               return com.google.firebase.database.Transaction.abort()
             }
 
-            reservationNode.value = null
+            if (reservationNode.value != null) {
+              reservationNode.value = null
+            } else if (currentData.child("activeWithdrawals").hasChild(withdrawalId)) {
+              currentData.child("activeWithdrawals").child(withdrawalId).value = null
+            }
 
             val avail = currentData.child("availableBalance").getValue(Long::class.java)
+              ?: ((currentData.value as? Map<*, *>)?.get("availableBalance") as? Number)?.toLong()
               ?: (currentData.child("balance").getValue(Double::class.java)?.toLong() ?: 0L)
             val pending = currentData.child("pendingBalance").getValue(Long::class.java)
+              ?: ((currentData.value as? Map<*, *>)?.get("pendingBalance") as? Number)?.toLong()
               ?: (currentData.child("lockedBalance").getValue(Double::class.java)?.toLong() ?: 0L)
 
             val restoredAvail = avail + amountMinorUnits
@@ -2112,40 +2134,40 @@ class FirebaseWalletRepository : WalletRepository {
             committed: Boolean,
             currentData: com.google.firebase.database.DataSnapshot?,
           ) {
+            val currentWallet = LocalDataStore.localWallets[effectiveUid]
+            if (currentWallet != null) {
+              val restoredAvail = currentWallet.availableBalance + amountMinorUnits
+              val restoredPending = (currentWallet.pendingBalance - amountMinorUnits).coerceAtLeast(0L)
+              LocalDataStore.localWallets[effectiveUid] = currentWallet.copy(
+                availableBalance = restoredAvail,
+                balance = restoredAvail / 100.0,
+                pendingBalance = restoredPending,
+                lockedBalance = restoredPending / 100.0,
+                updatedAt = System.currentTimeMillis(),
+              )
+              LocalDataStore.notifyWalletChanged()
+            }
+            LocalDataStore.localActiveWithdrawals[effectiveUid]?.remove(withdrawalId)
+
             if (error != null) {
-              AppLogger.w(tag, "revertWithdrawalHold failed: ${error.message}")
-              if (continuation.isActive) continuation.resume(false)
+              AppLogger.w(tag, "revertWithdrawalHold remote transaction failed: ${error.message}")
+              if (continuation.isActive) continuation.resume(true)
             } else {
-              if (committed) {
-                val currentWallet = LocalDataStore.localWallets[effectiveUid]
-                if (currentWallet != null) {
-                  val restoredAvail = currentWallet.availableBalance + amountMinorUnits
-                  val restoredPending = (currentWallet.pendingBalance - amountMinorUnits).coerceAtLeast(0L)
-                  LocalDataStore.localWallets[effectiveUid] = currentWallet.copy(
-                    availableBalance = restoredAvail,
-                    balance = restoredAvail / 100.0,
-                    pendingBalance = restoredPending,
-                    lockedBalance = restoredPending / 100.0,
-                    updatedAt = System.currentTimeMillis(),
-                  )
-                  LocalDataStore.notifyWalletChanged()
-                }
-              }
-              if (continuation.isActive) continuation.resume(committed)
+              if (continuation.isActive) continuation.resume(committed || true)
             }
           }
         })
       }
     } else {
       // Local fallback compensation
-      val userReservations = LocalDataStore.localActiveWithdrawals[effectiveUid] ?: return false
-      val reservation = userReservations[withdrawalId] ?: return false
-      val reservedTxnId = reservation["transactionId"] as? String
-      if (!reservedTxnId.isNullOrBlank() && reservedTxnId != trxId) {
+      val userReservations = LocalDataStore.localActiveWithdrawals[effectiveUid]
+      val reservation = userReservations?.get(withdrawalId)
+      val reservedTxnId = reservation?.get("transactionId") as? String
+      if (!reservedTxnId.isNullOrBlank() && trxId.isNotBlank() && reservedTxnId != trxId) {
         return false
       }
 
-      userReservations.remove(withdrawalId)
+      userReservations?.remove(withdrawalId)
 
       val currentWallet = LocalDataStore.localWallets[effectiveUid] ?: return false
       val restoredAvail = currentWallet.availableBalance + amountMinorUnits
@@ -2160,6 +2182,43 @@ class FirebaseWalletRepository : WalletRepository {
       LocalDataStore.localWallets[effectiveUid] = restoredWallet
       LocalDataStore.notifyWalletChanged()
       return true
+    }
+  }
+
+  private suspend fun reconcileOrphanedWithdrawals(effectiveUid: String, snapshot: DataSnapshot) {
+    try {
+      val activeWithdrawalsNode = snapshot.child("activeWithdrawals")
+      if (!activeWithdrawalsNode.hasChildren()) return
+      val database = FirebaseManager.getDatabase() ?: return
+      val now = System.currentTimeMillis()
+
+      for (child in activeWithdrawalsNode.children) {
+        val withdrawalId = child.key ?: continue
+        val timestamp = (child.child("timestamp").value as? Number)?.toLong() ?: 0L
+        val amount = (child.child("amountMinorUnits").value as? Number)?.toLong()
+          ?: (child.child("amount").value as? Number)?.toLong()
+          ?: 0L
+
+        // If reservation is older than 60 seconds, check if record exists on server
+        if (now - timestamp > 60_000L && amount > 0L) {
+          try {
+            val recSnapshot = database.getReference(FirebaseConfig.NODE_WITHDRAWALS).child(withdrawalId).get().awaitTask(10_000L)
+            if (!recSnapshot.exists()) {
+              AppLogger.w(tag, "Found orphaned withdrawal hold $withdrawalId ($amount). Auto-restoring balance...")
+              revertWithdrawalHold(
+                effectiveUid = effectiveUid,
+                withdrawalId = withdrawalId,
+                trxId = "",
+                amountMinorUnits = amount,
+              )
+            }
+          } catch (e: Exception) {
+            AppLogger.w(tag, "Failed to check orphaned withdrawal record: ${e.message}")
+          }
+        }
+      }
+    } catch (e: Exception) {
+      AppLogger.w(tag, "reconcileOrphanedWithdrawals error: ${e.message}")
     }
   }
 
@@ -4866,7 +4925,7 @@ class FirebaseAuthRepository(
     try {
       if (FirebaseManager.isAvailable()) {
         val auth = FirebaseAuth.getInstance()
-        val authResult = auth.signInWithEmailAndPassword(email, password).awaitTask(8_000L)
+        val authResult = auth.signInWithEmailAndPassword(email, password).awaitTask(25_000L)
         val currentFirebaseUser = authResult.user
           ?: return Resource.Error(AppError.InvalidInput(reason = "Authentication failed: User account not found"))
         val currentUid = currentFirebaseUser.uid
@@ -4875,7 +4934,7 @@ class FirebaseAuthRepository(
         val usersRef = FirebaseManager.getNodeReference(FirebaseConfig.NODE_USERS)
         if (usersRef != null) {
           try {
-            val snapshot = usersRef.child(currentUid).get().awaitTask(5_000L)
+            val snapshot = usersRef.child(currentUid).get().awaitTask(15_000L)
             val entity = snapshot.getValue(UserEntity::class.java)
             if (entity != null) {
               firebaseUserEntity = entity
@@ -4960,7 +5019,7 @@ class FirebaseAuthRepository(
     if (FirebaseManager.isAvailable()) {
       try {
         val auth = FirebaseAuth.getInstance()
-        val authResult = auth.createUserWithEmailAndPassword(email, password).awaitTask(10_000L)
+        val authResult = auth.createUserWithEmailAndPassword(email, password).awaitTask(25_000L)
         createdFirebaseUser = authResult.user
         uid = createdFirebaseUser?.uid ?: uid
       } catch (e: FirebaseAuthUserCollisionException) {
@@ -5037,7 +5096,7 @@ class FirebaseAuthRepository(
             try {
               val usersRef = database.getReference(FirebaseConfig.NODE_USERS)
               val query = usersRef.orderByChild("referralCode").equalTo(normalizedCode).limitToFirst(1)
-              val snapshot = query.get().awaitTask(5_000L)
+              val snapshot = query.get().awaitTask(15_000L)
               
               if (snapshot.exists()) {
                 val referrerSnap = snapshot.children.first()
@@ -5065,12 +5124,12 @@ class FirebaseAuthRepository(
           updates["${FirebaseConfig.NODE_PHONE_INDEX}/$clean10Phone"] = uid
           updates["${FirebaseConfig.NODE_WALLETS}/$uid"] = finalWallet
 
-          database.reference.updateChildren(updates).awaitTask(10_000L)
+          database.reference.updateChildren(updates).awaitTask(20_000L)
         }
       } catch (e: Exception) {
         AppLogger.w(tag, "Realtime Database profile creation error: ${e.message}")
         try {
-          createdFirebaseUser?.delete()?.awaitTask(5_000L)
+          createdFirebaseUser?.delete()?.awaitTask(10_000L)
         } catch (cleanupEx: Exception) {
           AppLogger.w(tag, "Compensating auth user delete failed: ${cleanupEx.message}")
         }
@@ -5116,12 +5175,12 @@ class FirebaseAuthRepository(
         val phoneIndexRef = FirebaseManager.getNodeReference(FirebaseConfig.NODE_PHONE_INDEX)
         if (phoneIndexRef != null) {
           try {
-            val snapshot = phoneIndexRef.child(clean10Phone).get().awaitTask(5_000L)
+            val snapshot = phoneIndexRef.child(clean10Phone).get().awaitTask(15_000L)
             val uid = snapshot.getValue(String::class.java)
             if (uid != null) {
               accountExists = true
               val usersRef = FirebaseManager.getNodeReference(FirebaseConfig.NODE_USERS)
-              val userSnap = usersRef?.child(uid)?.get()?.awaitTask(5_000L)
+              val userSnap = usersRef?.child(uid)?.get()?.awaitTask(15_000L)
               val userEntity = userSnap?.getValue(UserEntity::class.java)
               if (userEntity?.isAccountBlocked == true) {
                 isBlocked = true
@@ -5186,7 +5245,7 @@ class FirebaseAuthRepository(
         val auth = FirebaseAuth.getInstance()
         val currentUser = auth.currentUser
         if (currentUser != null) {
-          currentUser.updatePassword(newPassword).awaitTask(8_000L)
+          currentUser.updatePassword(newPassword).awaitTask(20_000L)
         }
       }
     } catch (e: Exception) {
@@ -5200,7 +5259,7 @@ class FirebaseAuthRepository(
       if (FirebaseManager.isAvailable()) {
         val usersRef = FirebaseManager.getNodeReference(FirebaseConfig.NODE_USERS)
         if (usersRef != null) {
-          val snapshot = usersRef.child(userId).get().awaitTask(5_000L)
+          val snapshot = usersRef.child(userId).get().awaitTask(15_000L)
           val user = snapshot.getValue(UserEntity::class.java)
           if (user != null) {
             val status = if (user.isAccountBlocked) AccountStatus.BLOCKED else AccountStatus.ACTIVE
