@@ -79,7 +79,12 @@ class AndroidNetworkMonitor(
   override fun isCurrentlyConnected(): Boolean {
     val activeNetwork = connectivityManager?.activeNetwork ?: return false
     val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
-    return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-      capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    
+    val hasInternet = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    val hasTransport = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+            
+    return hasInternet && hasTransport
   }
 }

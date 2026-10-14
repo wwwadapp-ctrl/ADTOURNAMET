@@ -10,8 +10,8 @@ class TournamentApplication : Application() {
 
   override fun onCreate() {
     super.onCreate()
-    System.setProperty("java.net.preferIPv4Stack", "true")
-    System.setProperty("java.net.preferIPv6Addresses", "false")
+    // System.setProperty("java.net.preferIPv4Stack", "true")
+    // System.setProperty("java.net.preferIPv6Addresses", "false")
     container = DefaultAppContainer(this)
   }
 }

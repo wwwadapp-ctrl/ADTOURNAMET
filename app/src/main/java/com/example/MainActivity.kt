@@ -38,8 +38,8 @@ import com.example.ui.theme.AdTournamentTheme
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
-    System.setProperty("java.net.preferIPv4Stack", "true")
-    System.setProperty("java.net.preferIPv6Addresses", "false")
+    // System.setProperty("java.net.preferIPv4Stack", "true")
+    // System.setProperty("java.net.preferIPv6Addresses", "false")
 
     try {
       com.google.firebase.database.FirebaseDatabase.getInstance().apply {
