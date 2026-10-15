@@ -4957,31 +4957,7 @@ class FirebaseAuthRepository(
       return Resource.Error(AppError.InvalidInput(reason = e.message ?: "Authentication failed"))
     }
 
-    val resolvedUid = uid ?: "AD-USER-${clean10Phone.takeLast(4)}"
-    val user = firebaseUserEntity ?: UserEntity(
-      uid = resolvedUid,
-      name = "Player",
-      mobileNumber = userFacingPhone,
-      joinDate = System.currentTimeMillis(),
-      status = AccountStatus.ACTIVE.name,
-      profilePhotoUrl = null,
-      userId = resolvedUid,
-      fullName = "Player",
-      profilePhoto = "",
-      accountStatus = AccountStatus.ACTIVE.name,
-      totalMatches = 0,
-      wins = 0,
-      losses = 0,
-      totalWinnings = 0.0,
-      role = "PLAYER",
-      walletBalance = 0.0,
-      lastActiveAt = System.currentTimeMillis(),
-      displayName = "Player",
-      phoneNumber = userFacingPhone,
-      avatarUrl = "",
-      isBlocked = false,
-      createdAt = System.currentTimeMillis(),
-    )
+    val user = firebaseUserEntity ?: return Resource.Error(AppError.InvalidInput(reason = "User profile not found. Please register."))
 
     if (user.isAccountBlocked) {
       signOutSync()

@@ -88,25 +88,6 @@ class WalletViewModel(
         _uiState.value = _uiState.value.copy(isLoading = true)
       }
 
-      // Safety timeout for Wallet loading in preview/slow network
-      val timeoutTask = launch {
-        delay(3500L)
-        if (_uiState.value.isLoading || _uiState.value.wallet == null) {
-          _uiState.update { it.copy(
-            isLoading = false,
-            mainBalance = 500.0,
-            bonusBalance = 50.0,
-            wallet = WalletEntity(
-              uid = userId.ifBlank { "preview_user_123" },
-              userId = userId.ifBlank { "preview_user_123" },
-              availableBalance = 50000L,
-              balance = 500.0,
-              bonusBalance = 50.0
-            ),
-            errorMessage = null
-          )}
-        }
-      }
       
       // Auto-unlock referral bonus in detached background coroutine so it never blocks or delays wallet observation
       if (userId.isNotBlank()) {
@@ -118,13 +99,11 @@ class WalletViewModel(
       }
       
       val walletFlow = walletRepository.getWallet(userId)
-      val userFlow = authRepository?.getCurrentUser() ?: flowOf(null)
-
-      combine(walletFlow, userFlow) { walletRes, user ->
-        Pair(walletRes, user)
+       val userFlow = authRepository?.getCurrentUser() ?: flowOf(null)
+       combine(walletFlow, userFlow) { walletRes, user ->
+         Pair(walletRes, user)
       }.collect { (walletRes, user) ->
         if (walletRes is Resource.Success) {
-          timeoutTask.cancel()
           val wallet = walletRes.data
           // 1. Primary: Use wallet.availableAmount (or availableBalance converted to Taka), with fallback to w.balance or user.walletBalance
           val mainBal: Double = wallet?.let { w ->
