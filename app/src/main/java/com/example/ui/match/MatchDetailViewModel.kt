@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 
 data class MatchDetailUiState(
   val isLoading: Boolean = true,
@@ -191,6 +192,43 @@ class MatchDetailViewModel(
         else -> {
           _uiState.value = _uiState.value.copy(isSubmittingResult = false)
         }
+      }
+    }
+  }
+
+  fun logRoomCodeCopy(
+    matchId: String,
+    matchNumber: String,
+    roomCode: String,
+    userUid: String,
+    userName: String,
+    userPhone: String
+  ) {
+    if (matchId.isBlank() || userUid.isBlank()) return
+
+    viewModelScope.launch(Dispatchers.IO) {
+      try {
+        val logPayload = mapOf(
+          "roomCode" to roomCode,
+          "copiedByUid" to userUid,
+          "copiedByName" to userName.ifBlank { "Unknown Player" },
+          "copiedByPhone" to userPhone.ifBlank { "N/A" },
+          "matchId" to matchId,
+          "matchNumber" to matchNumber,
+          "copiedAtTimestamp" to com.google.firebase.database.ServerValue.TIMESTAMP,
+          "deviceInfo" to "Android User App"
+        )
+
+        // Write to dedicated audit node: /auditLogs/roomCodeCopies/$matchId/$userUid
+        val database = com.google.firebase.database.FirebaseDatabase.getInstance()
+        database.reference
+          .child("auditLogs")
+          .child("roomCodeCopies")
+          .child(matchId)
+          .child(userUid)
+          .setValue(logPayload)
+      } catch (e: Exception) {
+        // Silent catch to protect user experience - never crash or block UI
       }
     }
   }

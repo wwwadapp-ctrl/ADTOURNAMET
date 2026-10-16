@@ -350,6 +350,8 @@ data class WithdrawalEntity(
   val paymentMethod: String = method,
   val paymentDetails: String = recipientNumber,
   val requestedAt: Long = createdAt,
+  val userName: String = "",
+  val userPhone: String = "",
 ) {
   val amountInCurrency: Double get() = amount / 100.0
 }

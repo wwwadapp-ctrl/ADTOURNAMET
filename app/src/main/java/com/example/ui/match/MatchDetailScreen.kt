@@ -462,6 +462,16 @@ fun MatchDetailScreen(
                   onClick = {
                     clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(match.gameCode))
                     Toast.makeText(context, strings.roomCodeCopiedNotice, Toast.LENGTH_SHORT).show()
+
+                    // Authoritative Anti-Cheat Audit Log (Fire-and-forget)
+                    viewModel.logRoomCodeCopy(
+                      matchId = match.matchId,
+                      matchNumber = match.matchNumber.toString(),
+                      roomCode = match.gameCode,
+                      userUid = activeUid,
+                      userName = currentUser?.effectiveName ?: "",
+                      userPhone = currentUser?.effectiveMobile ?: ""
+                    )
                   },
                   variant = TournamentButtonVariant.SECONDARY,
                   modifier = Modifier.widthIn(min = 120.dp),

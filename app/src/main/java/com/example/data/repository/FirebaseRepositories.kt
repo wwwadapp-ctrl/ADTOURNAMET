@@ -1922,14 +1922,26 @@ class FirebaseWalletRepository : WalletRepository {
 
     // 2. Prepare withdrawal entity and transaction record
     val now = System.currentTimeMillis()
+    val cachedUser = LocalDataStore.localUsers[effectiveUid]
+    val resolvedUserName = cachedUser?.effectiveName?.takeIf { it.isNotBlank() }
+        ?: cachedUser?.name?.takeIf { it.isNotBlank() }
+        ?: FirebaseManager.getAuth()?.currentUser?.displayName.orEmpty()
+
+    val resolvedUserPhone = cachedUser?.effectiveMobile?.takeIf { it.isNotBlank() }
+        ?: cachedUser?.mobileNumber?.takeIf { it.isNotBlank() }
+        ?: cachedUser?.phoneNumber?.takeIf { it.isNotBlank() }
+        ?: FirebaseManager.getAuth()?.currentUser?.phoneNumber.orEmpty()
+
     val withdrawal = WithdrawalEntity(
       withdrawalId = withdrawalId,
       uid = effectiveUid,
       userId = effectiveUid,
+      userName = resolvedUserName,
+      userPhone = resolvedUserPhone,
       amount = amountMinorUnits,
       method = method.uppercase(),
       recipientNumber = recipientNumber.trim(),
-      status = WithdrawalStatus.REQUESTED.name,
+      status = WithdrawalStatus.PENDING.name,
       createdAt = now,
       processedAt = 0L,
     )
@@ -1962,6 +1974,8 @@ class FirebaseWalletRepository : WalletRepository {
       "referenceId" to withdrawalId,
       "uid" to effectiveUid,
       "userId" to effectiveUid,
+      "userName" to resolvedUserName,
+      "userPhone" to resolvedUserPhone,
       "createdAt" to now,
     )
 
@@ -1969,8 +1983,9 @@ class FirebaseWalletRepository : WalletRepository {
     val updates = hashMapOf<String, Any>(
       "${FirebaseConfig.NODE_WITHDRAWALS}/$withdrawalId" to withdrawal,
       "${FirebaseConfig.NODE_USER_WITHDRAWALS}/$effectiveUid/$withdrawalId" to withdrawal,
-      "${FirebaseConfig.NODE_TRANSACTIONS}/$trxId" to transaction,
+      "${FirebaseConfig.NODE_TRANSACTIONS}/$withdrawalId" to pendingWithdrawalTxn,
       "${FirebaseConfig.NODE_USER_TRANSACTIONS}/$effectiveUid/$withdrawalId" to pendingWithdrawalTxn,
+
     )
 
     var updateSucceeded = false
