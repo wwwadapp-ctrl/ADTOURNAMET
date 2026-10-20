@@ -80,3 +80,7 @@
 -dontwarn coil.**
 -keep class retrofit2.** { *; }
 -keep class com.squareup.moshi.** { *; }
+
+# Ktor & Google AI SDK rules
+-dontwarn io.ktor.**
+-dontwarn com.google.ai.client.generativeai.**

@@ -133,28 +133,20 @@ object AutoLudoManager {
             }
             override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {
                 if (committed) {
-                    matchRef.child("prizePool").get().addOnSuccessListener { prizeSnap ->
-                        val prize = when (val v = prizeSnap.value) {
-                            is Number -> v.toDouble()
-                            is String -> v.toDoubleOrNull() ?: 0.0
-                            else -> 0.0
-                        }
+                    matchRef.get().addOnSuccessListener { matchSnap ->
+                        val match = matchSnap.getValue(AutoLudoMatchEntity::class.java)
+                        val prize = match?.prizePool ?: 0.0
+                        val entryFee = match?.entryFee ?: 0.0
+
                         if (prize > 0) {
-                            val walletRef = db.getReference(NODE_GAME_WALLETS).child(currentUid).child("balance")
-                            walletRef.runTransaction(object : Transaction.Handler {
-                                override fun doTransaction(walletData: MutableData): Transaction.Result {
-                                    val currentBal = when (val b = walletData.value) {
-                                        is Number -> b.toDouble()
-                                        is String -> b.toDoubleOrNull() ?: 0.0
-                                        else -> 0.0
-                                    }
-                                    walletData.value = currentBal + prize
-                                    return Transaction.success(walletData)
-                                }
-                                override fun onComplete(wErr: DatabaseError?, wCom: Boolean, wSnap: DataSnapshot?) {
-                                    onComplete(wCom)
-                                }
-                            })
+                            val adminCommission = (entryFee * 2.0) * 0.10
+                            val updates = hashMapOf<String, Any>(
+                                "$NODE_GAME_WALLETS/$currentUid/balance" to ServerValue.increment(prize),
+                                "miniGames/vault/adminProfit" to ServerValue.increment(adminCommission)
+                            )
+                            db.reference.updateChildren(updates).addOnCompleteListener { task ->
+                                onComplete(task.isSuccessful)
+                            }
                         } else {
                             onComplete(false)
                         }
@@ -1162,6 +1154,12 @@ object AutoLudoManager {
                                 val walletRef = currentData.child(NODE_GAME_WALLETS).child(match.player1Uid).child("balance")
                                 val currentBal = (walletRef.value as? Number)?.toDouble() ?: 0.0
                                 walletRef.value = currentBal + match.prizePool
+
+                                // Atomically route 10% commission to Admin Profit
+                                val adminCommission = (match.entryFee * 2.0) * 0.10
+                                val profitRef = currentData.child("miniGames/vault/adminProfit")
+                                val currentProfit = (profitRef.value as? Number)?.toDouble() ?: 0.0
+                                profitRef.value = currentProfit + adminCommission
                             }
                         }
 
@@ -1178,6 +1176,12 @@ object AutoLudoManager {
                                 val walletRef = currentData.child(NODE_GAME_WALLETS).child(match.player2Uid).child("balance")
                                 val currentBal = (walletRef.value as? Number)?.toDouble() ?: 0.0
                                 walletRef.value = currentBal + match.prizePool
+
+                                // Atomically route 10% commission to Admin Profit
+                                val adminCommission = (match.entryFee * 2.0) * 0.10
+                                val profitRef = currentData.child("miniGames/vault/adminProfit")
+                                val currentProfit = (profitRef.value as? Number)?.toDouble() ?: 0.0
+                                profitRef.value = currentProfit + adminCommission
                             }
                         }
 
