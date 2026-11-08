@@ -739,6 +739,27 @@ class FirebaseMatchRepository(private val customDatabase: FirebaseDatabase? = nu
     }
   }
 
+  override fun getRoomCode(matchId: String): Flow<String> = callbackFlow {
+    val ref = FirebaseManager.getNodeReference("matchSecrets")?.child(matchId)?.child("gameCode")
+    if (ref == null) {
+      trySend("")
+      awaitClose { }
+      return@callbackFlow
+    }
+    val listener = object : ValueEventListener {
+      override fun onDataChange(snapshot: DataSnapshot) {
+        trySend(snapshot.getValue(String::class.java).orEmpty())
+      }
+
+      override fun onCancelled(error: DatabaseError) {
+        AppLogger.d(tag, "getRoomCode read restricted: ${error.message}")
+        trySend("")
+      }
+    }
+    ref.addValueEventListener(listener)
+    awaitClose { ref.removeEventListener(listener) }
+  }
+
   override suspend fun joinMatch(userId: String, matchId: String): Resource<JoinMatchResult> {
     val authUid = FirebaseManager.getAuth()?.currentUser?.uid?.ifBlank { null }
     val effectiveUid = if (!authUid.isNullOrBlank()) authUid else userId

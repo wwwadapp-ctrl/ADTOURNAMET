@@ -59,17 +59,25 @@ fun MatchDetailScreen(
   val match = uiState.match
   val isLudo = match?.gameType?.equals("LUDO", ignoreCase = true) == true
 
+  // Real room code from the protected node; falls back to the match field (never shows the hidden marker)
+  val secretRoomCode by viewModel.roomCode.collectAsState()
+  val displayRoomCode: String = if (secretRoomCode.isNotBlank()) {
+    secretRoomCode
+  } else {
+    (match?.gameCode ?: "").let { if (it == "__HIDDEN__") "" else it }
+  }
+
   var showProofDialog by remember { mutableStateOf(false) }
   var showJoinConfirmationDialog by remember { mutableStateOf(false) }
   var selectedImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
-  var roomCodeInput by remember { mutableStateOf(match?.gameCode ?: "") }
+  var roomCodeInput by remember { mutableStateOf(displayRoomCode) }
   var matchNumberInput by remember { mutableStateOf(match?.matchNumber ?: "") }
   var proofNotesInput by remember { mutableStateOf("") }
   var proofError by remember { mutableStateOf<String?>(null) }
 
-  LaunchedEffect(match?.gameCode, match?.matchNumber) {
+  LaunchedEffect(displayRoomCode, match?.matchNumber) {
     if (match != null) {
-      if (roomCodeInput.isBlank() && match.gameCode.isNotBlank()) roomCodeInput = match.gameCode
+      if (roomCodeInput.isBlank() && displayRoomCode.isNotBlank()) roomCodeInput = displayRoomCode
       if (matchNumberInput.isBlank() && match.matchNumber.isNotBlank()) matchNumberInput = match.matchNumber
     }
   }
@@ -441,7 +449,7 @@ fun MatchDetailScreen(
                   color = Gold400
                 )
                 Text(
-                  text = match.gameCode,
+                  text = displayRoomCode,
                   style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.Black,
                     letterSpacing = 4.sp,
@@ -460,14 +468,14 @@ fun MatchDetailScreen(
                 TournamentButton(
                   text = strings.copy,
                   onClick = {
-                    clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(match.gameCode))
+                    clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(displayRoomCode))
                     Toast.makeText(context, strings.roomCodeCopiedNotice, Toast.LENGTH_SHORT).show()
 
                     // Authoritative Anti-Cheat Audit Log (Fire-and-forget)
                     viewModel.logRoomCodeCopy(
                       matchId = match.matchId,
                       matchNumber = match.matchNumber.toString(),
-                      roomCode = match.gameCode,
+                      roomCode = displayRoomCode,
                       userUid = activeUid,
                       userName = currentUser?.effectiveName ?: "",
                       userPhone = currentUser?.effectiveMobile ?: ""

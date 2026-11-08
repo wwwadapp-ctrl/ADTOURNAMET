@@ -20,6 +20,7 @@ interface MatchRepository {
   fun getMatchPlayers(matchId: String): Flow<Resource<List<MatchPlayerEntity>>>
   suspend fun joinMatch(userId: String, matchId: String): Resource<JoinMatchResult>
   fun isUserJoinedMatch(userId: String, matchId: String): Flow<Boolean>
+  fun getRoomCode(matchId: String): Flow<String> = kotlinx.coroutines.flow.flowOf("")
 }
 
 interface WalletRepository {

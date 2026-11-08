@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.first
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -260,10 +261,23 @@ fun AppNavigation(
           if (res is Resource.Success) {
             val joinedMatches = res.data
             val joinedIds = joinedMatches.map { it.matchId }.toSet()
+            // Use the real room code from the protected node (falls back to the match field, never the hidden marker)
+            val joinedMatchesWithCodes = joinedMatches.map { m ->
+              if (m.gameCode.isBlank()) {
+                m
+              } else {
+                val secret = container.matchRepository.getRoomCode(m.matchId).first()
+                when {
+                  secret.isNotBlank() -> m.copy(gameCode = secret)
+                  m.gameCode == "__HIDDEN__" -> m.copy(gameCode = "")
+                  else -> m
+                }
+              }
+            }
             RoomCodeNotificationManager.processMatches(
               userId = activeUserId,
               joinedMatchIds = joinedIds,
-              matches = joinedMatches,
+              matches = joinedMatchesWithCodes,
               notificationRepository = container.notificationRepository,
               context = context,
               triggerAlert = true,

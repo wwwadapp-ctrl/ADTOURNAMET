@@ -84,3 +84,16 @@
 # Ktor & Google AI SDK rules
 -dontwarn io.ktor.**
 -dontwarn com.google.ai.client.generativeai.**
+# --- Added by DevOps: Firebase RTDB / models R8 safety ---
+-keepattributes Signature
+-keepattributes *Annotation*
+-keepattributes EnclosingMethod
+-keepattributes InnerClasses
+-keep class com.google.firebase.database.** { *; }
+-keepclassmembers class * { @com.google.firebase.database.PropertyName <fields>; }
+-keepclassmembers class * { @com.google.firebase.database.PropertyName <methods>; }
+-keep @com.google.firebase.database.IgnoreExtraProperties class * { *; }
+-keep @androidx.annotation.Keep class * { *; }
+-keepclassmembers class * { @androidx.annotation.Keep *; }
+-keep class kotlin.Metadata { *; }
+-dontwarn com.google.firebase.**

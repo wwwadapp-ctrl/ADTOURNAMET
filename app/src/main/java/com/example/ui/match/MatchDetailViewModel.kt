@@ -40,6 +40,11 @@ class MatchDetailViewModel(
   private val _uiState = MutableStateFlow(MatchDetailUiState(isAdmin = isAdminUser))
   val uiState: StateFlow<MatchDetailUiState> = _uiState.asStateFlow()
 
+  // Real room code, read from the protected node (empty if not allowed or not set yet)
+  private val _roomCode = MutableStateFlow("")
+  val roomCode: StateFlow<String> = _roomCode.asStateFlow()
+  private var roomCodeJob: kotlinx.coroutines.Job? = null
+
   init {
     loadMatchDetails()
   }
@@ -73,6 +78,10 @@ class MatchDetailViewModel(
           _uiState.value = _uiState.value.copy(submittedResult = res.data)
         }
       }
+    }
+    roomCodeJob?.cancel()
+    roomCodeJob = viewModelScope.launch {
+      matchRepository.getRoomCode(matchId).collect { _roomCode.value = it }
     }
   }
 
