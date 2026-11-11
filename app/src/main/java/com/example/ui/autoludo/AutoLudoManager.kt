@@ -117,17 +117,26 @@ object AutoLudoManager {
         })
     }
 
+    private val claimsInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
     /**
      * Credit prize to current user's OWN wallet atomically.
      */
     fun claimWinPrize(matchId: String, currentUid: String, onComplete: (Boolean) -> Unit = {}) {
+        if (matchId.isBlank() || currentUid.isBlank() || claimsInFlight.contains(matchId)) {
+            onComplete(false)
+            return
+        }
         val db = getDb() ?: run { onComplete(false); return }
+        claimsInFlight.add(matchId)
+
         val matchRef = db.getReference(NODE_MATCHES).child(matchId)
         matchRef.get().addOnSuccessListener { matchSnap ->
             val match = matchSnap.getValue(AutoLudoMatchEntity::class.java)
             val pot = (matchSnap.child("pot").value as? Number)?.toDouble() ?: 0.0
             // Only the real winner of a COMPLETED match, only once, only if the pot still holds the money
             if (match == null || match.status != "COMPLETED" || match.winnerUid != currentUid || match.prizeClaimed || pot <= 0.0) {
+                claimsInFlight.remove(matchId)
                 onComplete(false)
                 return@addOnSuccessListener
             }
@@ -141,9 +150,11 @@ object AutoLudoManager {
                 "miniGames/vault/adminProfit" to ServerValue.increment(adminCommission)
             )
             db.reference.updateChildren(updates).addOnCompleteListener { task ->
+                claimsInFlight.remove(matchId)
                 onComplete(task.isSuccessful)
             }
         }.addOnFailureListener {
+            claimsInFlight.remove(matchId)
             onComplete(false)
         }
     }
@@ -286,6 +297,7 @@ object AutoLudoManager {
         }
         if (currentUid.isNotBlank()) {
             autoRefundCancelledMatches(matches, currentUid)
+            autoClaimWonMatches(matches, currentUid)
         }
     }
 
@@ -302,6 +314,21 @@ object AutoLudoManager {
             !refundsInFlight.contains(match.matchId)
         }.forEach { match ->
             claimRefund(match.matchId, currentUid)
+        }
+    }
+
+    /**
+     * Scans and auto-claims all unclaimed won matches for the current user.
+     */
+    fun autoClaimWonMatches(matches: List<AutoLudoMatchEntity>, currentUid: String) {
+        if (currentUid.isBlank()) return
+        matches.filter { match ->
+            match.status == "COMPLETED" &&
+            match.winnerUid == currentUid &&
+            !match.prizeClaimed &&
+            !claimsInFlight.contains(match.matchId)
+        }.forEach { match ->
+            claimWinPrize(match.matchId, currentUid)
         }
     }
 

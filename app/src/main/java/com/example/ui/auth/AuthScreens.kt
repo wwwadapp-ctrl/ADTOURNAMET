@@ -39,6 +39,16 @@ import com.example.ui.components.TournamentCard
 import com.example.ui.components.TournamentTextField
 import com.example.ui.theme.*
 
+private fun convertBengaliDigitsToEnglish(input: String): String {
+  return input.map { ch ->
+    when (ch) {
+      '০' -> '0'; '১' -> '1'; '২' -> '2'; '৩' -> '3'; '৪' -> '4'
+      '৫' -> '5'; '৬' -> '6'; '৭' -> '7'; '৮' -> '8'; '৯' -> '9'
+      else -> ch
+    }
+  }.joinToString("")
+}
+
 @Composable
 fun LoginScreen(
   viewModel: AuthViewModel,
@@ -124,13 +134,18 @@ fun LoginScreen(
 
       val displayError = clientError ?: uiState.errorMessage?.let { rawError ->
         when {
+          rawError.contains("Invalid mobile number or password", ignoreCase = true) ||
+          rawError.contains("Invalid password", ignoreCase = true) ||
+          rawError.contains("No account registered", ignoreCase = true) ||
+          rawError.contains("User account not found", ignoreCase = true) ||
+          rawError.contains("User profile not found", ignoreCase = true) -> strings.invalidCredentialsError
           rawError.contains("Mobile number cannot be empty", ignoreCase = true) -> strings.phoneEmptyError
           rawError.contains("valid 11-digit", ignoreCase = true) || rawError.contains("Invalid mobile number", ignoreCase = true) -> strings.invalidPhoneError
           rawError.contains("Password cannot be empty", ignoreCase = true) -> strings.passwordEmptyError
           rawError.contains("at least 6 characters", ignoreCase = true) -> strings.passwordMinLengthError
-          rawError.contains("Invalid mobile number or password", ignoreCase = true) || rawError.contains("Invalid password", ignoreCase = true) -> strings.invalidCredentialsError
-          rawError.contains("No account registered", ignoreCase = true) -> strings.accountNotFoundError
-          rawError.contains("Network", ignoreCase = true) -> strings.offlineMode
+          rawError.contains("Too many failed attempts", ignoreCase = true) || rawError.contains("Too many attempts", ignoreCase = true) -> strings.tooManyAttemptsError
+          rawError.contains("banned", ignoreCase = true) || rawError.contains("suspended", ignoreCase = true) -> strings.accountSuspendedError
+          rawError.contains("Network", ignoreCase = true) || rawError.contains("timed out", ignoreCase = true) -> strings.offlineMode
           else -> rawError
         }
       }
@@ -155,8 +170,9 @@ fun LoginScreen(
       TournamentTextField(
         value = mobileNumber,
         onValueChange = {
-          if (it.length <= 11) {
-            mobileNumber = it
+          val cleaned = convertBengaliDigitsToEnglish(it)
+          if (cleaned.length <= 11) {
+            mobileNumber = cleaned
             clientError = null
             viewModel.clearMessages()
           }
@@ -266,6 +282,7 @@ fun RegisterScreen(
   onRegisterSuccess: () -> Unit,
   onNavigateToLogin: () -> Unit,
 ) {
+  val strings = LocalAppStrings.current
   val uiState by viewModel.uiState.collectAsState()
 
   var name by remember { mutableStateOf("") }
@@ -313,14 +330,16 @@ fun RegisterScreen(
     Spacer(modifier = Modifier.height(14.dp))
 
     Text(
-      text = "Create Player Account",
+      text = strings.authRegisterTitle,
       style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
       color = Color.White,
+      textAlign = TextAlign.Center,
     )
     Text(
-      text = "Join AD TOURNAMENT and compete in 1v1 battles",
+      text = strings.authRegisterSubtitle,
       style = MaterialTheme.typography.bodySmall,
       color = Slate400,
+      textAlign = TextAlign.Center,
     )
 
     Spacer(modifier = Modifier.height(24.dp))
@@ -355,8 +374,8 @@ fun RegisterScreen(
           clientError = null
           viewModel.clearMessages()
         },
-        label = "Full Name",
-        placeholder = "e.g. Shakib Al Hasan",
+        label = strings.authFullNameLabel,
+        placeholder = strings.authFullNamePlaceholder,
         leadingIcon = Icons.Default.Person,
         testTag = "register_name_input",
       )
@@ -366,15 +385,16 @@ fun RegisterScreen(
       TournamentTextField(
         value = mobileNumber,
         onValueChange = {
-          if (it.length <= 11) {
-            mobileNumber = it
+          val cleaned = convertBengaliDigitsToEnglish(it)
+          if (cleaned.length <= 11) {
+            mobileNumber = cleaned
             clientError = null
             viewModel.clearMessages()
           }
         },
-        label = "Bangladesh Mobile Number",
-        placeholder = "01XXXXXXXXX (11 digits)",
-        helperText = "Must start with 013, 014, 015, 016, 017, 018, or 019",
+        label = strings.authMobileNumberLabel,
+        placeholder = strings.authMobileNumberPlaceholder,
+        helperText = strings.authMobileNumberHelperText,
         leadingIcon = Icons.Default.Phone,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
         testTag = "register_mobile_input",
@@ -389,15 +409,15 @@ fun RegisterScreen(
           clientError = null
           viewModel.clearMessages()
         },
-        label = "Password",
-        placeholder = "Minimum 6 characters",
+        label = strings.password,
+        placeholder = strings.authPasswordPlaceholder,
         leadingIcon = Icons.Default.Lock,
         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
         trailingIcon = {
           IconButton(onClick = { passwordVisible = !passwordVisible }) {
             Icon(
               imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-              contentDescription = "Toggle password",
+              contentDescription = strings.togglePassword,
               tint = Slate400,
             )
           }
@@ -415,15 +435,15 @@ fun RegisterScreen(
           clientError = null
           viewModel.clearMessages()
         },
-        label = "Confirm Password",
-        placeholder = "Re-enter your password",
+        label = strings.authConfirmPasswordLabel,
+        placeholder = strings.authConfirmPasswordPlaceholder,
         leadingIcon = Icons.Default.LockReset,
         visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
         trailingIcon = {
           IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
             Icon(
               imageVector = if (confirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-              contentDescription = "Toggle confirm password",
+              contentDescription = strings.authToggleConfirmPassword,
               tint = Slate400,
             )
           }
@@ -443,7 +463,7 @@ fun RegisterScreen(
             viewModel.clearMessages()
           }
         },
-        label = "রেফার কোড (ঐচ্ছিক / Optional)",
+        label = strings.authReferralCodeLabel,
         placeholder = "e.g. ABC123",
         leadingIcon = Icons.Default.CardGiftcard,
         testTag = "register_referral_input",
@@ -465,7 +485,7 @@ fun RegisterScreen(
           ),
         )
         Text(
-          text = "I agree to fair-play rules & platform terms",
+          text = strings.authFairPlayTermsText,
           style = MaterialTheme.typography.bodySmall,
           color = Slate300,
         )
@@ -474,7 +494,7 @@ fun RegisterScreen(
       Spacer(modifier = Modifier.height(16.dp))
 
       TournamentButton(
-        text = "CREATE ACCOUNT",
+        text = strings.registerButton,
         onClick = {
           clientError = null
           val nameVal = AuthValidator.validateFullName(name)
@@ -493,11 +513,11 @@ fun RegisterScreen(
             return@TournamentButton
           }
           if (password != confirmPassword) {
-            clientError = "Passwords do not match. Please re-enter."
+            clientError = strings.authPasswordsMismatchError
             return@TournamentButton
           }
           if (!agreedToTerms) {
-            clientError = "Please agree to the tournament fair-play terms."
+            clientError = strings.authAgreeToTermsError
             return@TournamentButton
           }
           viewModel.register(
@@ -521,13 +541,13 @@ fun RegisterScreen(
       modifier = Modifier.fillMaxWidth(),
     ) {
       Text(
-        text = "Already have an account?",
+        text = strings.authAlreadyHaveAccountPrompt,
         style = MaterialTheme.typography.bodyMedium,
         color = Slate400,
       )
       TextButton(onClick = onNavigateToLogin) {
         Text(
-          text = "Sign In",
+          text = strings.authSignInAction,
           style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
           color = Gold400,
         )
@@ -561,7 +581,7 @@ fun ForgotPasswordScreen(
         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
       }
       Text(
-        text = "পাসওয়ার্ড রিসেট ও সহায়তা",
+        text = strings.authForgotPasswordHeader,
         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
         color = Color.White,
       )
@@ -575,12 +595,12 @@ fun ForgotPasswordScreen(
       borderColor = NavyCardBorder,
     ) {
       Text(
-        text = "অ্যাকাউন্ট রিকভারি সহায়তা",
+        text = strings.authForgotPasswordCardTitle,
         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
         color = Gold400,
       )
       Text(
-        text = "অ্যাকাউন্টের সুরক্ষার জন্য সরাসরি অফিসিয়াল সাপোর্টে যোগাযোগ করে আপনার নতুন পাসওয়ার্ড সেট করে নিন। আমাদের এডমিন প্যানেল আপনাকে দ্রুত সহায়তা করবে।",
+        text = strings.authForgotPasswordCardDesc,
         style = MaterialTheme.typography.bodySmall,
         color = Slate400,
         modifier = Modifier.padding(top = 6.dp, bottom = 20.dp),
@@ -589,8 +609,8 @@ fun ForgotPasswordScreen(
 
       // 1. WhatsApp Support Button
       SupportContactButton(
-        title = "WhatsApp-এ মেসেজ দিন",
-        subtitle = "অফিসিয়াল অ্যাডমিন সাপোর্ট",
+        title = strings.authWhatsappSupportTitle,
+        subtitle = strings.authWhatsappSupportSubtitle,
         icon = Icons.Default.Chat,
         gradientColors = listOf(Color(0xFF16A34A), Color(0xFF15803D)),
         onClick = {
@@ -607,8 +627,8 @@ fun ForgotPasswordScreen(
 
       // 2. Telegram Support Button
       SupportContactButton(
-        title = "Telegram-এ মেসেজ দিন",
-        subtitle = "অফিসিয়াল টেলিগ্রাম চ্যানেল বা চ্যাট",
+        title = strings.authTelegramSupportTitle,
+        subtitle = strings.authTelegramSupportSubtitle,
         icon = Icons.Default.Send,
         gradientColors = listOf(Color(0xFF0284C7), Color(0xFF0369A1)),
         onClick = {
@@ -626,7 +646,7 @@ fun ForgotPasswordScreen(
 
     TextButton(onClick = onNavigateBack) {
       Text(
-        text = "লগইন স্ক্রিনে ফিরে যান",
+        text = strings.authBackToLoginAction,
         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
         color = Gold400,
       )

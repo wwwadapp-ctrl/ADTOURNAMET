@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,6 +37,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -368,6 +372,7 @@ fun AutoLudoGameScreen(
 
             AutoLudoExitDialog(
                 opponentName = opponentName,
+                entryFee = currentMatch.entryFee,
                 onConfirm = {
                     showExitConfirmDialog = false
                     AutoLudoManager.forfeitMatch(currentMatch.matchId, currentUid) { _, _ -> onBackClick() }
@@ -410,7 +415,7 @@ fun AutoLudoResultDialog(
                     Text(text = strings.autoLudoResultWinTitle, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Gold400, textAlign = TextAlign.Center)
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    val reason = if (isOpponentForfeit) "Opponent surrendered." else if (isOpponentDisqualified) "Opponent disqualified." else strings.autoLudoResultWinReason
+                    val reason = if (isOpponentForfeit) strings.autoLudoResultReasonSurrendered else if (isOpponentDisqualified) strings.autoLudoResultReasonDisqualified else strings.autoLudoResultWinReason
                     Text(text = reason, color = Color.White, textAlign = TextAlign.Center)
                     
                     Spacer(modifier = Modifier.height(16.dp))
@@ -423,7 +428,8 @@ fun AutoLudoResultDialog(
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(text = strings.autoLudoResultLoseTitle, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text(text = strings.autoLudoResultLoseReason(winnerName), color = Color.White.copy(alpha = 0.7f), textAlign = TextAlign.Center)
+                    val loseReason = if (isOpponentDisqualified) strings.autoLudoResultLoseDisqualified(winnerName) else strings.autoLudoResultLoseReason(winnerName)
+                    Text(text = loseReason, color = Color.White.copy(alpha = 0.7f), textAlign = TextAlign.Center)
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -438,16 +444,38 @@ fun AutoLudoResultDialog(
 @Composable
 fun AutoLudoExitDialog(
     opponentName: String,
+    entryFee: Double = 0.0,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val strings = LocalAppStrings.current
+    val infiniteTransition = rememberInfiniteTransition(label = "ExitDialogPulse")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "ExitPulseScale"
+    )
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 0.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "ExitGlowAlpha"
+    )
+
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
-            modifier = Modifier.fillMaxWidth(0.9f),
+            modifier = Modifier.fillMaxWidth(0.88f),
             shape = RoundedCornerShape(24.dp),
             color = Color.Transparent,
-            border = BorderStroke(1.5.dp, Brush.verticalGradient(listOf(Color(0xFFFFD54F), Color(0xFFFF9800))))
+            border = BorderStroke(1.5.dp, Brush.verticalGradient(listOf(Color(0xFFFFD54F), Color(0xFFFF9800)))),
+            shadowElevation = 16.dp
         ) {
             Column(
                 modifier = Modifier
@@ -455,18 +483,147 @@ fun AutoLudoExitDialog(
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(text = strings.autoLudoExitTitle, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center)
+                // Top Warning Icon with Pulse Animation
+                Box(
+                    modifier = Modifier.size(64.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Outer radial glow
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        Color(0xFFFF7043).copy(alpha = glowAlpha),
+                                        Color(0xFFE53935).copy(alpha = glowAlpha * 0.5f),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                    )
+                    // Inner Circle Icon
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color(0xFFD32F2F), Color(0xFFC62828))
+                                )
+                            )
+                            .border(1.dp, Color(0xFFFF8A80), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = "Warning",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = strings.autoLudoExitMessage(opponentName), color = Color.White.copy(alpha = 0.7f), textAlign = TextAlign.Center)
-                
+
+                // Title
+                Text(
+                    text = strings.autoLudoExitTitle,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Message with opponent name in gold (#FFD54F, bold) using AnnotatedString
+                val formattedMessage = remember(opponentName, strings) {
+                    buildAnnotatedString {
+                        append(strings.autoLudoExitMessagePrefix)
+                        withStyle(style = SpanStyle(color = Color(0xFFFFD54F), fontWeight = FontWeight.Bold)) {
+                            append(opponentName)
+                        }
+                        append(strings.autoLudoExitMessageSuffix)
+                    }
+                }
+
+                Text(
+                    text = formattedMessage,
+                    fontSize = 14.sp,
+                    color = Color.White.copy(alpha = 0.85f),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Warning chip
+                val formattedFee = strings.taka(entryFee)
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(Color(0xFFEF4444).copy(alpha = 0.15f))
+                        .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.5f), CircleShape)
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = strings.autoLudoExitWarningFee(formattedFee),
+                        color = Color(0xFFFF8A80),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
-                    OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
-                        Text(text = strings.autoLudoExitNo, color = Color.White)
+
+                // Buttons (Stacked)
+                // Primary (Safe): "না, খেলা চালিয়ে যাই"
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .shadow(8.dp, RoundedCornerShape(14.dp), ambientColor = Color(0xFFFFD54F), spotColor = Color(0xFFFF9800)),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Brush.verticalGradient(listOf(Color(0xFFFFD54F), Color(0xFFFFA000))))
+                            .padding(horizontal = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = strings.autoLudoExitKeepPlaying,
+                            color = Color(0xFF1F1200),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
-                    Button(onClick = onConfirm, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) {
-                        Text(text = strings.autoLudoExitYes, color = Color.White)
-                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Secondary (Destructive): "হ্যাঁ, বের হব"
+                OutlinedButton(
+                    onClick = onConfirm,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444))
+                ) {
+                    Text(
+                        text = strings.autoLudoExitConfirm,
+                        color = Color(0xFFEF4444),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }
@@ -736,14 +893,24 @@ fun AutoLudoBoardScreen(
         strikes = gameState.player2Strikes
     )
 
+    val adMe = if (isPlayer2) player2 else player1
+    val adOpp = if (isPlayer2) player1 else player2
+    val adCanRoll = (isPlayer1Turn && canControlPlayer1) || (isPlayer2Turn && canControlPlayer2)
+    val adDice = rememberAdDiceContent()
+    val adDiceArgs = AdDiceArgs(
+        value = effectiveDiceValue,
+        enabled = adCanRoll && !isRolled,
+        isPlayer1Turn = adMe.isCurrentTurn,
+        color = Color(if (adOpp.isCurrentTurn) adOpp.pawnColor else adMe.pawnColor),
+        onRoll = { onDiceRoll(it, false) },
+        soundPool = soundPool,
+        diceSoundId = diceSoundId,
+        toneGenerator = toneGenerator
+    )
+
     Box(modifier = Modifier.fillMaxSize()) {
         // Background
-        Image(
-            painter = painterResource(id = R.drawable.game_bg),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
+        Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFF2A4BB0), Color(0xFF13205A), Color(0xFF0B1640)))))
 
         Column(
             modifier = Modifier
@@ -771,6 +938,14 @@ fun AutoLudoBoardScreen(
                 Spacer(modifier = Modifier.height(30.dp)) // Placeholder to avoid jump
             }
             
+            AdPlayerBattleCard(
+                player = adOpp,
+                isMe = false,
+                timerProgress = if (adOpp.isCurrentTurn) timerProgress else 0f,
+                dice = if (adOpp.isCurrentTurn) { { adDice(adDiceArgs) } } else null,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+            )
+
             // 2. Centered Ludo Board Container (Flex-weighted to guarantee fit)
             Box(
                 modifier = Modifier
@@ -783,8 +958,8 @@ fun AutoLudoBoardScreen(
                     modifier = Modifier
                         .fillMaxWidth(0.94f)
                         .aspectRatio(1f)
-                        .shadow(elevation = 12.dp, shape = RoundedCornerShape(8.dp), clip = false)
-                        .border(2.dp, Color(0xFFBF953F), RoundedCornerShape(8.dp))
+                        .shadow(elevation = 22.dp, shape = RoundedCornerShape(8.dp), ambientColor = Color(0xFFFFC107), spotColor = Color(0xFFFFA000), clip = false)
+                        .border(3.dp, Brush.linearGradient(listOf(Color(0xFFFFF3B0), Color(0xFFFFC107), Color(0xFFB07A00))), RoundedCornerShape(8.dp))
                         .background(Color.White)
                         .graphicsLayer {
                             rotationZ = boardRotation
@@ -793,23 +968,18 @@ fun AutoLudoBoardScreen(
                     val boardSizePx = constraints.maxWidth.toFloat()
                     val unit = boardSizePx / 15f
 
-                    Image(
-                        painter = painterResource(id = R.drawable.ludo_board),
-                        contentDescription = "Ludo Board",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit
-                    )
+                    AdLudoBoard(boardRotation = boardRotation, modifier = Modifier.fillMaxSize())
 
                     // Render pawns as individual composables for better scaling, performance and ANIMATION
                     val density = LocalDensity.current
 
                     // Red Pawn Colors (Deep Royal Ruby - Saturated)
-                    val redPrimary = Color(0xFF9B0000)
+                    val redPrimary = Color(0xFFE53935)
                     val redDeep = Color(0xFF4A0000)
                     val redOutline = Color(0xFF2E0000)
 
                     // Yellow Pawn Colors (Rich Golden Amber - Saturated)
-                    val yellowPrimary = Color(0xFFFF9100)
+                    val yellowPrimary = Color(0xFFFBC02D)
                     val yellowDeep = Color(0xFF9E5B00)
                     val yellowOutline = Color(0xFF4E2D00)
 
@@ -907,21 +1077,12 @@ fun AutoLudoBoardScreen(
 
             // 3. Bottom Battle Dock (Always visible)
             val canActivePlayerRoll = (isPlayer1Turn && canControlPlayer1) || (isPlayer2Turn && canControlPlayer2)
-            LudoBottomBattleDock(
-                player1 = if (isPlayer2) player2 else player1,
-                player2 = if (isPlayer2) player1 else player2,
-                currentDiceValue = effectiveDiceValue,
-                isDiceRolled = isRolled,
-                canRoll = canActivePlayerRoll,
-                timerProgress = timerProgress,
-                onDiceRoll = { onDiceRoll(it, false) },
-                soundPool = soundPool,
-                diceSoundId = diceSoundId,
-                toneGenerator = toneGenerator,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .zIndex(20f)
+            AdPlayerBattleCard(
+                player = adMe,
+                isMe = true,
+                timerProgress = if (adMe.isCurrentTurn) timerProgress else 0f,
+                dice = if (!adOpp.isCurrentTurn) { { adDice(adDiceArgs) } } else null,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).zIndex(20f)
             )
         }
     }
@@ -1250,7 +1411,7 @@ fun LudoPawnView(
                 onClick()
             }
     ) {
-        LudoKingPawnToken(
+        AdLudoPawnToken(
             pawnColor = pawnColor,
             isEligible = isEligibleToMove,
             modifier = Modifier.fillMaxSize()

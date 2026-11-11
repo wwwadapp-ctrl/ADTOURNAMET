@@ -68,12 +68,42 @@ interface AppStrings {
   val passwordEmptyError: String
   val invalidCredentialsError: String
   val accountNotFoundError: String
+  val tooManyAttemptsError: String
+  val accountSuspendedError: String
 
   // Auth - Register
   val registerTitle: String
   val registerSubtitle: String
   val registerButton: String
   val alreadyHaveAccountLogin: String
+  val authRegisterTitle: String
+  val authRegisterSubtitle: String
+  val authFullNameLabel: String
+  val authFullNamePlaceholder: String
+  val authMobileNumberLabel: String
+  val authMobileNumberPlaceholder: String
+  val authMobileNumberHelperText: String
+  val authPasswordPlaceholder: String
+  val authConfirmPasswordLabel: String
+  val authConfirmPasswordPlaceholder: String
+  val authToggleConfirmPassword: String
+  val authReferralCodeLabel: String
+  val authFairPlayTermsText: String
+  val authAlreadyHaveAccountPrompt: String
+  val authSignInAction: String
+  val authPasswordsMismatchError: String
+  val authAgreeToTermsError: String
+  val authAccountCreatedSuccess: String
+
+  // Auth - Forgot Password & Support
+  val authForgotPasswordHeader: String
+  val authForgotPasswordCardTitle: String
+  val authForgotPasswordCardDesc: String
+  val authWhatsappSupportTitle: String
+  val authWhatsappSupportSubtitle: String
+  val authTelegramSupportTitle: String
+  val authTelegramSupportSubtitle: String
+  val authBackToLoginAction: String
 
   // Auth - Forgot Password & OTP
   val forgotPasswordTitle: String
@@ -794,14 +824,21 @@ interface AppStrings {
   // AutoLudo Result Dialog
   val autoLudoResultWinTitle: String
   val autoLudoResultWinReason: String
+  val autoLudoResultReasonSurrendered: String
+  val autoLudoResultReasonDisqualified: String
   fun autoLudoResultWinPrize(prize: String): String
   val autoLudoResultLoseTitle: String
   fun autoLudoResultLoseReason(winnerName: String): String
+  fun autoLudoResultLoseDisqualified(winnerName: String): String
   val autoLudoResultOk: String
   
   // AutoLudo Exit Dialog
   val autoLudoExitTitle: String
   fun autoLudoExitMessage(opponent: String): String
+  val autoLudoExitMessagePrefix: String
+  val autoLudoExitMessageSuffix: String
+  fun autoLudoExitWarningFee(fee: String): String
+  val autoLudoExitKeepPlaying: String
   val autoLudoExitConfirm: String
   val autoLudoExitCancel: String
   val autoLudoExitYes: String
@@ -860,14 +897,44 @@ object BengaliStrings : AppStrings {
   override val togglePassword = "পাসওয়ার্ড দেখুন বা লুকান"
   override val phoneEmptyError = "মোবাইল নম্বর খালি রাখা যাবে না"
   override val passwordEmptyError = "পাসওয়ার্ড খালি রাখা যাবে না"
-  override val invalidCredentialsError = "ভুল মোবাইল নম্বর বা পাসওয়ার্ড"
+  override val invalidCredentialsError = "মোবাইল নম্বর বা পাসওয়ার্ড সঠিক নয়। আবার দেখে নিন।"
   override val accountNotFoundError = "এই নম্বরে কোনো অ্যাকাউন্ট নিবন্ধিত নেই"
+  override val tooManyAttemptsError = "অনেকবার ভুল চেষ্টা হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন।"
+  override val accountSuspendedError = "এই একাউন্টটি স্থগিত আছে। সাহায্যের জন্য সাপোর্টে যোগাযোগ করুন।"
 
   // Auth - Register
-  override val registerTitle = "অ্যাকাউন্ট তৈরি করুন"
-  override val registerSubtitle = "হাজারো প্লেয়ারের সাথে ১v১ এস্পোর্টসে যোগ দিন"
+  override val registerTitle = "প্লেয়ার অ্যাকাউন্ট তৈরি করুন"
+  override val registerSubtitle = "AD TOURNAMENT-এ যোগ দিন এবং ১v১ ব্যাটেলে লড়াই করুন"
   override val registerButton = "রেজিস্ট্রেশন করুন"
   override val alreadyHaveAccountLogin = "ইতিমধ্যে অ্যাকাউন্ট আছে? লগইন করুন"
+  override val authRegisterTitle = "প্লেয়ার অ্যাকাউন্ট তৈরি করুন"
+  override val authRegisterSubtitle = "AD TOURNAMENT-এ যোগ দিন এবং ১v১ ব্যাটেলে লড়াই করুন"
+  override val authFullNameLabel = "সম্পূর্ণ নাম"
+  override val authFullNamePlaceholder = "যেমন: সাকিব আল হাসান"
+  override val authMobileNumberLabel = "বাংলাদেশি মোবাইল নম্বর"
+  override val authMobileNumberPlaceholder = "01XXXXXXXXX (১১ ডিজিট)"
+  override val authMobileNumberHelperText = "অবশ্যই ০১৩, ০১৪, ০১৫, ০১৬, ০১৭, ০১৮, অথবা ০১৯ দিয়ে শুরু হতে হবে"
+  override val authPasswordPlaceholder = "সর্বনিম্ন ৬ অক্ষর"
+  override val authConfirmPasswordLabel = "কনফার্ম পাসওয়ার্ড"
+  override val authConfirmPasswordPlaceholder = "পাসওয়ার্ড পুনরায় লিখুন"
+  override val authToggleConfirmPassword = "কনফার্ম পাসওয়ার্ড দেখুন বা লুকান"
+  override val authReferralCodeLabel = "রেফার কোড (ঐচ্ছিক)"
+  override val authFairPlayTermsText = "আমি টুর্নামেন্টের ফেয়ার-প্লে শর্তাবলীতে সম্মত"
+  override val authAlreadyHaveAccountPrompt = "ইতিমধ্যে অ্যাকাউন্ট আছে?"
+  override val authSignInAction = "সাইন ইন"
+  override val authPasswordsMismatchError = "পাসওয়ার্ড দুটি মিলছে না। পুনরায় টাইপ করুন।"
+  override val authAgreeToTermsError = "অনুগ্রহ করে টুর্নামেন্টের ফেয়ার-প্লে শর্তাবলীতে সম্মতি দিন।"
+  override val authAccountCreatedSuccess = "সফলভাবে অ্যাকাউন্ট তৈরি হয়েছে! AD Tournament-এ স্বাগতম।"
+
+  // Auth - Forgot Password & Support
+  override val authForgotPasswordHeader = "পাসওয়ার্ড রিসেট ও সহায়তা"
+  override val authForgotPasswordCardTitle = "অ্যাকাউন্ট রিকভারি সহায়তা"
+  override val authForgotPasswordCardDesc = "অ্যাকাউন্টের সুরক্ষার জন্য সরাসরি অফিসিয়াল সাপোর্টে যোগাযোগ করে আপনার নতুন পাসওয়ার্ড সেট করে নিন। আমাদের এডমিন প্যানেল আপনাকে দ্রুত সহায়তা করবে।"
+  override val authWhatsappSupportTitle = "WhatsApp-এ মেসেজ দিন"
+  override val authWhatsappSupportSubtitle = "অফিসিয়াল অ্যাডমিন সাপোর্ট"
+  override val authTelegramSupportTitle = "Telegram-এ মেসেজ দিন"
+  override val authTelegramSupportSubtitle = "অফিসিয়াল টেলিগ্রাম চ্যানেল বা চ্যাট"
+  override val authBackToLoginAction = "লগইন স্ক্রিনে ফিরে যান"
 
   // Auth - Forgot Password & OTP
   override val forgotPasswordTitle = "পাসওয়ার্ড রিসেট"
@@ -1614,14 +1681,21 @@ object BengaliStrings : AppStrings {
   // AutoLudo Result Dialog
   override val autoLudoResultWinTitle = "অভিনন্দন! আপনি বিজয়ী! 🏆"
   override val autoLudoResultWinReason = "অভিনন্দন! আপনি বিজয়ী হয়েছেন!"
+  override val autoLudoResultReasonSurrendered = "প্রতিপক্ষ খেলা ছেড়ে দিয়েছেন।"
+  override val autoLudoResultReasonDisqualified = "প্রতিপক্ষ ৩ বার চাল মিস করায় বাদ পড়েছেন।"
   override fun autoLudoResultWinPrize(prize: String) = "+$prize গেম ওয়ালেটে যোগ হয়েছে"
   override val autoLudoResultLoseTitle = "এবার জেতা হয়নি"
   override fun autoLudoResultLoseReason(winnerName: String) = "$winnerName গেমটি জিতেছেন। ভালো খেলার জন্য ধন্যবাদ।"
+  override fun autoLudoResultLoseDisqualified(winnerName: String) = "আপনি ৩ বার চাল মিস করায় বাদ পড়েছেন। $winnerName গেমটি জিতেছেন।"
   override val autoLudoResultOk = "ঠিক আছে"
   
   // AutoLudo Exit Dialog
   override val autoLudoExitTitle = "আপনি কি ম্যাচ থেকে বের হতে চান?"
-  override fun autoLudoExitMessage(opponent: String) = "আপনি বের হয়ে গেলে $opponent-কে বিজয়ী ঘোষণা করা হবে।"
+  override fun autoLudoExitMessage(opponent: String) = "আপনি বের হলে $opponent বিজয়ী হবেন।"
+  override val autoLudoExitMessagePrefix = "আপনি বের হলে "
+  override val autoLudoExitMessageSuffix = " বিজয়ী হবেন।"
+  override fun autoLudoExitWarningFee(fee: String) = "⚠️ বের হলে আপনার $fee এন্ট্রি ফি ফেরত পাবেন না"
+  override val autoLudoExitKeepPlaying = "না, খেলা চালিয়ে যাই"
   override val autoLudoExitConfirm = "হ্যাঁ, বের হব"
   override val autoLudoExitCancel = "না"
   override val autoLudoExitYes = "হ্যাঁ"
@@ -1680,14 +1754,44 @@ object EnglishStrings : AppStrings {
   override val togglePassword = "Toggle password"
   override val phoneEmptyError = "Mobile number cannot be empty"
   override val passwordEmptyError = "Password cannot be empty"
-  override val invalidCredentialsError = "Invalid mobile number or password"
+  override val invalidCredentialsError = "Mobile number or password is incorrect. Please check and try again."
   override val accountNotFoundError = "No account registered with this mobile number"
+  override val tooManyAttemptsError = "Too many attempts. Please try again later."
+  override val accountSuspendedError = "This account is suspended. Please contact support."
 
   // Auth - Register
-  override val registerTitle = "Create Account"
-  override val registerSubtitle = "Join thousands of players in 1v1 esports"
+  override val registerTitle = "Create Player Account"
+  override val registerSubtitle = "Join AD TOURNAMENT and compete in 1v1 battles"
   override val registerButton = "REGISTER"
   override val alreadyHaveAccountLogin = "Already have an account? Login"
+  override val authRegisterTitle = "Create Player Account"
+  override val authRegisterSubtitle = "Join AD TOURNAMENT and compete in 1v1 battles"
+  override val authFullNameLabel = "Full Name"
+  override val authFullNamePlaceholder = "e.g. Shakib Al Hasan"
+  override val authMobileNumberLabel = "Bangladesh Mobile Number"
+  override val authMobileNumberPlaceholder = "01XXXXXXXXX (11 digits)"
+  override val authMobileNumberHelperText = "Must start with 013, 014, 015, 016, 017, 018, or 019"
+  override val authPasswordPlaceholder = "Minimum 6 characters"
+  override val authConfirmPasswordLabel = "Confirm Password"
+  override val authConfirmPasswordPlaceholder = "Re-enter your password"
+  override val authToggleConfirmPassword = "Toggle confirm password"
+  override val authReferralCodeLabel = "Referral Code (Optional)"
+  override val authFairPlayTermsText = "I agree to the tournament fair-play terms"
+  override val authAlreadyHaveAccountPrompt = "Already have an account?"
+  override val authSignInAction = "Sign In"
+  override val authPasswordsMismatchError = "Passwords do not match. Please re-enter."
+  override val authAgreeToTermsError = "Please agree to the tournament fair-play terms."
+  override val authAccountCreatedSuccess = "Account created successfully! Welcome to AD Tournament."
+
+  // Auth - Forgot Password & Support
+  override val authForgotPasswordHeader = "Password Reset & Support"
+  override val authForgotPasswordCardTitle = "Account Recovery Support"
+  override val authForgotPasswordCardDesc = "For account security, please contact official support directly to reset your password. Our admin panel will assist you quickly."
+  override val authWhatsappSupportTitle = "Message on WhatsApp"
+  override val authWhatsappSupportSubtitle = "Official Admin Support"
+  override val authTelegramSupportTitle = "Message on Telegram"
+  override val authTelegramSupportSubtitle = "Official Telegram Channel or Chat"
+  override val authBackToLoginAction = "Back to Login"
 
   // Auth - Forgot Password & OTP
   override val forgotPasswordTitle = "Reset Password"
@@ -2088,7 +2192,7 @@ object EnglishStrings : AppStrings {
   override val miniGamesScratchAction = "Scratch & Win"
   
   // History
-  override val historyResultWon = "WINNER ������"
+  override val historyResultWon = "WINNER 🏆"
   override val historyResultLost = "LOST"
   override val historyResultPending = "PENDING"
   override val historyResultCancelled = "CANCELLED"
@@ -2417,15 +2521,22 @@ object EnglishStrings : AppStrings {
   // AutoLudo Result Dialog
   override val autoLudoResultWinTitle = "Congratulations! You won! 🏆"
   override val autoLudoResultWinReason = "Congratulations! You won!"
+  override val autoLudoResultReasonSurrendered = "Your opponent surrendered."
+  override val autoLudoResultReasonDisqualified = "Your opponent missed 3 turns and was disqualified."
   override fun autoLudoResultWinPrize(prize: String) = "+$prize added to your game wallet"
   override val autoLudoResultLoseTitle = "Not this time"
   override fun autoLudoResultLoseReason(winnerName: String) = "$winnerName won the game. Thanks for playing!"
+  override fun autoLudoResultLoseDisqualified(winnerName: String) = "You missed 3 turns and were disqualified. $winnerName won the game."
   override val autoLudoResultOk = "OK"
   
   // AutoLudo Exit Dialog
-  override val autoLudoExitTitle = "Are you sure you want to exit?"
-  override fun autoLudoExitMessage(opponent: String) = "If you exit, $opponent will be declared the winner."
-  override val autoLudoExitConfirm = "Yes, exit"
+  override val autoLudoExitTitle = "Do you want to leave the match?"
+  override fun autoLudoExitMessage(opponent: String) = "If you leave, $opponent will win."
+  override val autoLudoExitMessagePrefix = "If you leave, "
+  override val autoLudoExitMessageSuffix = " will win."
+  override fun autoLudoExitWarningFee(fee: String) = "⚠️ You will not get your $fee entry fee back"
+  override val autoLudoExitKeepPlaying = "No, keep playing"
+  override val autoLudoExitConfirm = "Yes, leave"
   override val autoLudoExitCancel = "No"
   override val autoLudoExitYes = "Yes"
   override val autoLudoExitNo = "No"
