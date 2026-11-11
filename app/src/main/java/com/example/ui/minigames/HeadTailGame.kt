@@ -33,6 +33,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.core.firebase.FirebaseManager
 import com.example.ui.components.TournamentButton
+import com.example.core.i18n.LocalAppStrings
+import com.example.core.i18n.digits
+import com.example.core.i18n.taka
 import com.example.ui.theme.*
 import com.example.ui.wallet.WalletViewModel
 import com.google.firebase.database.DataSnapshot
@@ -75,6 +78,11 @@ fun HeadTailGameScreen(
     var currentReservePool by remember { mutableStateOf(0.0) }
     var isTransferModalVisible by remember { mutableStateOf(false) }
 
+    // Global Config states
+    var isMiniGamesEnabled by remember { mutableStateOf(true) }
+    var isHeadTailGameActive by remember { mutableStateOf(true) }
+    val isGameActive = isMiniGamesEnabled && isHeadTailGameActive
+
     // Observers
     DisposableEffect(uid) {
         if (uid.isBlank()) return@DisposableEffect onDispose {}
@@ -97,6 +105,16 @@ fun HeadTailGameScreen(
             override fun onCancelled(error: DatabaseError) {}
         }
         poolRef.addValueEventListener(poolListener)
+
+        val configRef = database.getReference("miniGames/globalConfig")
+        val configListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                isMiniGamesEnabled = snapshot.child("miniGamesEnabled").value?.toString()?.toBoolean() ?: true
+                isHeadTailGameActive = snapshot.child("headTailGameActive").value?.toString()?.toBoolean() ?: true
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        configRef.addValueEventListener(configListener)
 
         val userRef = database.getReference("users").child(uid)
         val profileValueListener = object : ValueEventListener {
@@ -125,6 +143,7 @@ fun HeadTailGameScreen(
         onDispose {
             balanceRef.removeEventListener(balanceListener)
             poolRef.removeEventListener(poolListener)
+            configRef.removeEventListener(configListener)
             userRef.removeEventListener(profileValueListener)
         }
     }
@@ -146,7 +165,10 @@ fun HeadTailGameScreen(
     var selectedSide by remember { mutableStateOf(CoinSide.HEAD) }
     var selectedBetAmount by remember { mutableStateOf(1L) }
     var currentCoinSide by remember { mutableStateOf(CoinSide.HEAD) }
-    var resultText by remember { mutableStateOf<String?>(null) }
+    
+    val strings = LocalAppStrings.current
+    
+    var resultText by remember(strings) { mutableStateOf<String?>(null) }
     var showWinDialog by remember { mutableStateOf(false) }
     var lastWinAmount by remember { mutableStateOf(0.0) }
     var isLastWin by remember { mutableStateOf(false) }
@@ -172,9 +194,9 @@ fun HeadTailGameScreen(
     )
 
     fun performFlip() {
-        if (isRolling) return
+        if (isRolling || !isGameActive) return
         if (gameBalance < selectedBetAmount) {
-            Toast.makeText(context, "গেম ব্যালেন্স অপর্যাপ্ত", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, strings.headTailToastNoBalance, Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -214,7 +236,8 @@ fun HeadTailGameScreen(
                 launch { coinRotationX.animateTo(if (finalSide == CoinSide.HEAD) 0f else 180f, spring()) }
                 
                 isRolling = false
-                resultText = "ফলফল: ${if (finalSide == CoinSide.HEAD) "হেড" else "টেল"}"
+                val sideStr = if (finalSide == CoinSide.HEAD) strings.headTailChoiceHead else strings.headTailChoiceTail
+                resultText = strings.headTailResult(sideStr)
 
                 // 4. Visual Resolution (Financials already committed by Engine)
                 lastWinAmount = gameResult.winAmount
@@ -225,7 +248,7 @@ fun HeadTailGameScreen(
                 isRolling = false
                 Toast.makeText(
                     context, 
-                    error.message ?: "ট্রানজেকশন ব্যর্থ হয়েছে", 
+                    error.message ?: strings.headTailToastFailed, 
                     Toast.LENGTH_SHORT
                 ).show()
             }
@@ -281,22 +304,41 @@ fun HeadTailGameScreen(
                     ) {
                         Spacer(modifier = Modifier.height(10.dp))
 
+                        if (!isGameActive) {
+                            Surface(
+                                modifier = Modifier.padding(bottom = 12.dp).fillMaxWidth().padding(horizontal = 20.dp),
+                                color = Color.Red.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    strings.headTailClosedBanner,
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp),
+                                    color = Color.Red,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+
                         // Title
                         Text(
-                            "HEAD & TAIL",
+                            strings.headTailTitle,
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Black,
                                 fontSize = 32.sp,
-                                letterSpacing = 2.sp,
+                                letterSpacing = if (strings == com.example.core.i18n.BengaliStrings) 0.sp else 2.sp,
                                 brush = Brush.verticalGradient(listOf(HTGoldLight, HTGold, HTAmber))
                             )
                         )
                         Text(
-                            "হেড-টেল",
+                            strings.headTailSubtitle,
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.ExtraBold,
                                 color = HTGold.copy(alpha = 0.8f),
-                                letterSpacing = 4.sp
+                                letterSpacing = if (strings == com.example.core.i18n.BengaliStrings) 0.sp else 4.sp,
+                                fontSize = 18.sp
                             )
                         )
 
@@ -326,10 +368,11 @@ fun HeadTailGameScreen(
 
                         if (isRolling) {
                             Text(
-                                "কয়েন ঘুরছে...",
+                                strings.headTailTossing,
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,
-                                    color = HTGold
+                                    color = HTGold,
+                                    letterSpacing = if (com.example.core.i18n.LocalAppStrings.current == com.example.core.i18n.BengaliStrings) 0.sp else 0.5.sp
                                 ),
                                 modifier = Modifier
                                     .padding(vertical = 6.dp)
@@ -344,7 +387,13 @@ fun HeadTailGameScreen(
                                 modifier = Modifier.padding(vertical = 6.dp)
                             )
                         } else {
-                            Spacer(modifier = Modifier.height(30.dp))
+                            Text(
+                                strings.headTailInstruction,
+                                color = Color.White.copy(alpha = 0.6f),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(vertical = 6.dp)
+                            )
                         }
 
                         Spacer(modifier = Modifier.weight(1f))
@@ -359,13 +408,13 @@ fun HeadTailGameScreen(
                             ChoiceCard(
                                 side = CoinSide.HEAD,
                                 isSelected = selectedSide == CoinSide.HEAD,
-                                onClick = { if (!isRolling) selectedSide = it },
+                                onClick = { if (!isRolling && isGameActive) selectedSide = it },
                                 modifier = Modifier.weight(1f)
                             )
                             ChoiceCard(
                                 side = CoinSide.TAIL,
                                 isSelected = selectedSide == CoinSide.TAIL,
-                                onClick = { if (!isRolling) selectedSide = it },
+                                onClick = { if (!isRolling && isGameActive) selectedSide = it },
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -376,8 +425,12 @@ fun HeadTailGameScreen(
                         CasinoBettingConsole(
                             selectedBet = selectedBetAmount.toInt(),
                             onBetSelected = { selectedBetAmount = it.toLong() },
-                            actionButtonText = if (gameBalance < selectedBetAmount) "ব্যালেন্স নেই" else "টস করুন",
-                            isActionEnabled = !isRolling && gameBalance >= selectedBetAmount,
+                            actionButtonText = when {
+                                !isGameActive -> strings.headTailClosedBanner
+                                gameBalance < selectedBetAmount -> strings.headTailToastNoBalance
+                                else -> strings.headTailTossButton
+                            },
+                            isActionEnabled = !isRolling && gameBalance >= selectedBetAmount && isGameActive,
                             onActionClick = { performFlip() }
                         )
 
@@ -463,11 +516,12 @@ private fun TopBalanceHUD(
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            val strings = LocalAppStrings.current
             // Main Balance
-            BalancePill(label = "Main Balance", amount = mainBalance, icon = Icons.Default.AccountBalanceWallet)
+            BalancePill(label = strings.diceMainBalanceLabel, amount = mainBalance, icon = Icons.Default.AccountBalanceWallet)
             // Game Wallet
             BalancePill(
-                label = "Game Wallet",
+                label = strings.diceGameWalletLabel,
                 amount = gameWallet,
                 icon = Icons.Default.AccountBalanceWallet,
                 isInteractive = true,
@@ -504,7 +558,8 @@ private fun BalancePill(
             Spacer(modifier = Modifier.width(8.dp))
             Column {
                 Text(label, fontSize = 9.sp, color = if (isInteractive) HTGold else Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
-                Text("৳${"%.2f".format(amount)}", fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
+                val strings = LocalAppStrings.current
+                Text(strings.taka(amount), fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
             }
             if (isInteractive) {
                 Spacer(modifier = Modifier.width(6.dp))
@@ -632,11 +687,12 @@ private fun ChoiceCard(
                 shape = RoundedCornerShape(6.dp),
                 color = if (isSelected) HTGold else Color.White.copy(alpha = 0.2f)
             ) {
+                val strings = LocalAppStrings.current
                 Text(
-                    "1.9x",
+                    strings.digits("1.9") + "x",
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     fontSize = 9.sp,
-                    fontWeight = FontWeight.Black,
+                    fontWeight = if (strings == com.example.core.i18n.BengaliStrings) FontWeight.Bold else FontWeight.Black,
                     color = if (isSelected) Color.Black else Color.White
                 )
             }
@@ -648,6 +704,7 @@ private fun ChoiceCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                val strings = LocalAppStrings.current
                 Icon(
                     imageVector = if (side == CoinSide.HEAD) Icons.Default.Face else Icons.Default.Star,
                     contentDescription = null,
@@ -656,14 +713,14 @@ private fun ChoiceCard(
                 )
                 Column(verticalArrangement = Arrangement.Center) {
                     Text(
-                        if (side == CoinSide.HEAD) "HEAD" else "TAIL",
+                        if (side == CoinSide.HEAD) strings.headTailChoiceHead else strings.headTailChoiceTail,
                         color = Color.White,
-                        fontWeight = FontWeight.Black,
+                        fontWeight = if (strings == com.example.core.i18n.BengaliStrings) FontWeight.Bold else FontWeight.Black,
                         fontSize = 15.sp,
-                        letterSpacing = 1.sp
+                        letterSpacing = if (strings == com.example.core.i18n.BengaliStrings) 0.sp else 1.sp
                     )
                     Text(
-                        if (side == CoinSide.HEAD) "হেড" else "টেল",
+                        strings.headTailPayout,
                         color = if (isSelected) HTGold else Color.White.copy(alpha = 0.65f),
                         fontWeight = FontWeight.Bold,
                         fontSize = 11.sp

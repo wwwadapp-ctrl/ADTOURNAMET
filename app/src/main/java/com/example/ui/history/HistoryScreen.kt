@@ -31,7 +31,7 @@ import com.example.domain.model.MatchEntity
 import com.example.domain.model.MatchStatus
 import com.example.domain.model.UserEntity
 import com.example.domain.model.WalletEntity
-import com.example.core.i18n.LocalAppStrings
+import com.example.core.i18n.*
 import com.example.ui.components.PremiumNotificationBellButton
 import com.example.ui.components.UnifiedEsportsTopBar
 import com.example.ui.theme.*
@@ -237,7 +237,7 @@ private fun HistorySummaryCard(
     ) {
       SummaryStatColumn(
         label = strings.totalPlayed,
-        value = totalPlayed.toString(),
+        value = strings.number(totalPlayed),
         valueColor = Color.White,
       )
       VerticalDivider(
@@ -246,7 +246,7 @@ private fun HistorySummaryCard(
       )
       SummaryStatColumn(
         label = strings.totalWon,
-        value = wonCount.toString(),
+        value = strings.number(wonCount),
         valueColor = Emerald400,
       )
       VerticalDivider(
@@ -255,7 +255,7 @@ private fun HistorySummaryCard(
       )
       SummaryStatColumn(
         label = strings.statLosses,
-        value = lostCount.toString(),
+        value = strings.number(lostCount),
         valueColor = Rose400,
       )
       VerticalDivider(
@@ -264,7 +264,7 @@ private fun HistorySummaryCard(
       )
       SummaryStatColumn(
         label = strings.winRateLabel,
-        value = "$winRate%",
+        value = strings.digits("$winRate%"),
         valueColor = Gold400,
       )
     }
@@ -372,10 +372,10 @@ private fun HistoryMatchCard(
   val isRejected = status == "REJECTED"
 
   val (resultText, resultColor, resultBg) = when (matchResult) {
-    HistoryMatchResult.WON -> Triple("বিজয়ী 🏆", Emerald400, Emerald600.copy(alpha = 0.2f))
-    HistoryMatchResult.LOST -> Triple("পরাজিত", Rose400, Rose600.copy(alpha = 0.2f))
-    HistoryMatchResult.PENDING -> Triple("পর্যালোচনাধীন", Gold400, Gold500.copy(alpha = 0.2f))
-    HistoryMatchResult.CANCELLED -> Triple("বাতিল", Slate400, Slate600.copy(alpha = 0.2f))
+    HistoryMatchResult.WON -> Triple(strings.historyResultWon, Emerald400, Emerald600.copy(alpha = 0.2f))
+    HistoryMatchResult.LOST -> Triple(strings.historyResultLost, Rose400, Rose600.copy(alpha = 0.2f))
+    HistoryMatchResult.PENDING -> Triple(strings.historyResultPending, Gold400, Gold500.copy(alpha = 0.2f))
+    HistoryMatchResult.CANCELLED -> Triple(strings.historyResultCancelled, Slate400, Slate600.copy(alpha = 0.2f))
   }
 
   val isWinner = matchResult == HistoryMatchResult.WON
@@ -390,18 +390,50 @@ private fun HistoryMatchCard(
     match.createdAt > 0L -> match.createdAt
     else -> 0L
   }
-  val formattedDate = remember(rawTimestamp) {
+  val formattedDate = remember(rawTimestamp, strings) {
     if (rawTimestamp > 0L) {
-      SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date(rawTimestamp))
+      if (strings === BengaliStrings) {
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = rawTimestamp }
+        val day = strings.digits(String.format(Locale.US, "%02d", cal.get(java.util.Calendar.DAY_OF_MONTH)))
+        val monthIdx = cal.get(java.util.Calendar.MONTH).coerceIn(0, 11)
+        val month = listOf(
+          "জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন",
+          "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর"
+        )[monthIdx]
+        val year = strings.digits(cal.get(java.util.Calendar.YEAR).toString())
+        val time = strings.digits(SimpleDateFormat("hh:mm", Locale.US).format(Date(rawTimestamp)))
+        val amPm = SimpleDateFormat("a", Locale.US).format(Date(rawTimestamp))
+        "$day $month $year, $time $amPm"
+      } else {
+        SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date(rawTimestamp))
+      }
     } else {
-      "Completed"
+      strings.historyDateCompleted
     }
   }
 
+  val displayGameName = if (match.gameType.equals("LUDO", ignoreCase = true)) strings.filterLudo else strings.filterCarrom
+  val matchIdShort = if (match.matchId.isNotBlank()) match.matchId.takeLast(6).uppercase() else ""
+  
   val displayTitle = match.title.ifBlank {
-    "${match.gameType} 1v1 Battle"
+    strings.historyMatchTitle(displayGameName, matchIdShort)
   }
-  val matchIdShort = if (match.matchId.isNotBlank()) "#${match.matchId.takeLast(6).uppercase()}" else ""
+  
+  // Rebuild title if it matches: <Ludo|Carrom> 1v1 #<number>
+  val titleRegex = Regex("(?i)^(ludo|carrom)\\s*1v1\\s*#(\\S+)$")
+  val finalDisplayTitle = match.title.takeIf { it.isNotBlank() }?.let { title ->
+      val matchResult = titleRegex.find(title)
+      if (matchResult != null) {
+          val game = matchResult.groupValues[1]
+          val id = matchResult.groupValues[2]
+          val localizedGame = if (game.equals("ludo", ignoreCase = true)) strings.filterLudo else strings.filterCarrom
+          strings.historyMatchTitle(localizedGame, strings.digits(id))
+      } else {
+          title
+      }
+  } ?: strings.historyMatchTitle(displayGameName, strings.digits(matchIdShort))
+
+  val matchIdDisplay = if (matchIdShort.isNotBlank()) "#$matchIdShort" else ""
 
   Surface(
     shape = RoundedCornerShape(12.dp),
@@ -464,7 +496,7 @@ private fun HistoryMatchCard(
           Spacer(modifier = Modifier.width(10.dp))
           Column(modifier = Modifier.weight(1f)) {
             Text(
-              text = displayTitle,
+              text = finalDisplayTitle,
               style = MaterialTheme.typography.titleSmall.copy(
                 fontWeight = FontWeight.Bold,
               ),
@@ -476,9 +508,9 @@ private fun HistoryMatchCard(
             Text(
               text = buildString {
                 append(formattedDate)
-                if (matchIdShort.isNotBlank()) {
+                if (matchIdDisplay.isNotBlank()) {
                   append(" • ")
-                  append(matchIdShort)
+                  append(matchIdDisplay)
                 }
               },
               style = MaterialTheme.typography.labelSmall,
@@ -527,7 +559,7 @@ private fun HistoryMatchCard(
           // Game
           Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-              text = "${strings.labelGame} ",
+              text = "${strings.historyGameLabel} ",
               style = MaterialTheme.typography.labelSmall,
               color = Slate400,
             )
@@ -543,28 +575,36 @@ private fun HistoryMatchCard(
           // Entry Fee
           Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-              text = "${strings.labelEntry} ",
+              text = "${strings.historyEntryLabel} ",
               style = MaterialTheme.typography.labelSmall,
               color = Slate400,
             )
             Text(
-              text = "৳${match.effectiveEntryFeeMinorUnits / 100}",
-              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+              text = strings.takaFromMinor(match.effectiveEntryFeeMinorUnits),
+              style = MaterialTheme.typography.labelSmall.copy(
+                  fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
+                  letterSpacing = 0.sp
+              ),
               color = Color.White,
+              modifier = Modifier.padding(end = 2.dp)
             )
           }
 
           // Prize
           Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-              text = "${strings.labelPrize} ",
+              text = "${strings.historyPrizeLabel} ",
               style = MaterialTheme.typography.labelSmall,
               color = Slate400,
             )
             Text(
-              text = if (isCancelled) "—" else if (isDefeat) "৳ 0.00" else "৳ ${"%.2f".format(match.displayPrizePool)}",
-              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+              text = if (isCancelled) "—" else if (isDefeat) strings.taka(0.0) else strings.taka(match.displayPrizePool),
+              style = MaterialTheme.typography.labelSmall.copy(
+                  fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
+                  letterSpacing = 0.sp
+              ),
               color = if (isCancelled || isDefeat) Slate400 else Gold400,
+              modifier = Modifier.padding(end = 2.dp)
             )
           }
         }

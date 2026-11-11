@@ -77,11 +77,17 @@ class NotificationCenterTest {
   @Test
   fun notificationsScreen_showsEmptyState_whenNoNotifications() {
     composeTestRule.setContent {
-      NotificationsScreen(
-        userId = "user_with_no_notifs",
-        onNavigateBack = {},
-        notificationRepository = notificationRepository,
-      )
+        NotificationsScreen(
+          userId = "user_with_no_notifs",
+          currentUser = null,
+          wallet = null,
+          unreadNotificationsCount = 0,
+          onWalletClick = {},
+          onNotificationClick = {},
+          onProfileClick = {},
+          onNavigateBack = {},
+          notificationRepository = notificationRepository,
+        )
     }
 
     composeTestRule.waitForIdle()
@@ -109,6 +115,12 @@ class NotificationCenterTest {
     composeTestRule.setContent {
       NotificationsScreen(
         userId = "user_A",
+        currentUser = null,
+        wallet = null,
+        unreadNotificationsCount = 0,
+        onWalletClick = {},
+        onNotificationClick = {},
+        onProfileClick = {},
         onNavigateBack = {},
         notificationRepository = notificationRepository,
       )
@@ -139,6 +151,12 @@ class NotificationCenterTest {
     composeTestRule.setContent {
       NotificationsScreen(
         userId = targetUser,
+        currentUser = null,
+        wallet = null,
+        unreadNotificationsCount = 0,
+        onWalletClick = {},
+        onNotificationClick = {},
+        onProfileClick = {},
         onNavigateBack = {},
         notificationRepository = notificationRepository,
       )

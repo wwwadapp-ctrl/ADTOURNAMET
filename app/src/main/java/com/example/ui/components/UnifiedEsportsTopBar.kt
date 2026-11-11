@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
-import com.example.core.i18n.LocalAppStrings
+import com.example.core.i18n.*
 import com.example.domain.model.UserEntity
 import com.example.domain.model.WalletEntity
 import com.example.ui.theme.*
@@ -68,11 +68,11 @@ fun UnifiedEsportsTopBar(
         if (w.bonusAmount > 0.0) w.bonusAmount else w.bonusBalance / 100.0
     } ?: 0.0
 
-    val formattedBalance = remember(liveBalance) {
-        "৳ ${"%.2f".format(liveBalance)}"
+    val formattedBalance = remember(liveBalance, strings) {
+        strings.taka(liveBalance)
     }
-    val formattedBonus = remember(bonusBalance) {
-        "🎁 ৳ ${"%.2f".format(bonusBalance)}"
+    val formattedBonus = remember(bonusBalance, strings) {
+        "🎁 " + strings.taka(bonusBalance)
     }
 
     Surface(
@@ -102,9 +102,9 @@ fun UnifiedEsportsTopBar(
 
                 // Centered Subtitle
                 Text(
-                    text = "১v১ এস্পোর্টস ব্যাটল",
+                    text = strings.topBarSubtitle,
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
+                    fontWeight = FontWeight.Bold,
                     color = Gold400,
                     letterSpacing = 0.5.sp,
                     modifier = Modifier.padding(horizontal = 8.dp)
@@ -203,9 +203,12 @@ fun UnifiedEsportsTopBar(
                                         style = MaterialTheme.typography.labelMedium.copy(
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 11.sp,
+                                            letterSpacing = 0.sp,
                                         ),
                                         color = Gold400,
                                         maxLines = 1,
+                                        softWrap = false,
+                                        modifier = Modifier.padding(end = 2.dp)
                                     )
                                     if (bonusBalance > 0.0) {
                                         Text(
@@ -362,12 +365,13 @@ private fun LogoWithNeonRing(size: Dp = 40.dp) {
 
 @Composable
 fun HeaderLuxuryDigitalClock(modifier: Modifier = Modifier) {
+    val strings = LocalAppStrings.current
     var timeText by remember { mutableStateOf("") }
     val timeFormat = remember { SimpleDateFormat("hh:mm:ss a", Locale.getDefault()) }
 
     LaunchedEffect(Unit) {
         while (true) {
-            timeText = timeFormat.format(Date())
+            timeText = strings.digits(timeFormat.format(Date()))
             delay(1000L)
         }
     }
@@ -411,11 +415,13 @@ fun HeaderLuxuryDigitalClock(modifier: Modifier = Modifier) {
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    letterSpacing = 0.sp
                 ),
                 color = Gold400,
                 maxLines = 1,
-                softWrap = false
+                softWrap = false,
+                modifier = Modifier.padding(end = 2.dp)
             )
         }
     }

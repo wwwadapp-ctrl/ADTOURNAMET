@@ -31,6 +31,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.core.firebase.FirebaseManager
+import com.example.core.i18n.BengaliStrings
+import com.example.core.i18n.LocalAppStrings
+import com.example.core.i18n.digits
+import com.example.core.i18n.taka
+import androidx.compose.ui.unit.TextUnit
 import com.example.ui.components.TournamentButton
 import com.example.ui.wallet.WalletViewModel
 import com.google.firebase.database.DataSnapshot
@@ -39,9 +44,7 @@ import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import java.security.SecureRandom
-import kotlin.coroutines.resume
 
 // --- Luxury Palette ---
 private val ScratchNavy = Color(0xFF0B0D21)
@@ -57,6 +60,7 @@ fun ScratchCardGameScreen(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val strings = LocalAppStrings.current
     val walletState by walletViewModel.uiState.collectAsState()
     val mainBalance = walletState.mainBalance
 
@@ -67,6 +71,11 @@ fun ScratchCardGameScreen(
     var userName by remember(walletState.user) { mutableStateOf(walletState.user?.effectiveName ?: authUser?.displayName?.ifBlank { null } ?: "User") }
     var userPhone by remember(walletState.user) { mutableStateOf(walletState.user?.effectiveMobile ?: authUser?.phoneNumber ?: "") }
     var showTransferModal by remember { mutableStateOf(false) }
+
+    // Global Config states
+    var isMiniGamesEnabled by remember { mutableStateOf(true) }
+    var isScratchCardGameActive by remember { mutableStateOf(true) }
+    val isGameActive = isMiniGamesEnabled && isScratchCardGameActive
 
     // Observers (Synchronized with Dice and Wheel mini-games)
     DisposableEffect(uid) {
@@ -90,6 +99,16 @@ fun ScratchCardGameScreen(
             override fun onCancelled(error: DatabaseError) {}
         }
         poolRef.addValueEventListener(poolListener)
+
+        val configRef = database.getReference("miniGames/globalConfig")
+        val configListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                isMiniGamesEnabled = snapshot.child("miniGamesEnabled").value?.toString()?.toBoolean() ?: true
+                isScratchCardGameActive = snapshot.child("scratchCardGameActive").value?.toString()?.toBoolean() ?: true
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        configRef.addValueEventListener(configListener)
 
         val userRef = database.getReference("users").child(uid)
         val profileValueListener = object : ValueEventListener {
@@ -118,6 +137,7 @@ fun ScratchCardGameScreen(
         onDispose {
             balanceRef.removeEventListener(balanceListener)
             poolRef.removeEventListener(poolListener)
+            configRef.removeEventListener(configListener)
             userRef.removeEventListener(profileValueListener)
         }
     }
@@ -175,9 +195,9 @@ fun ScratchCardGameScreen(
 
     // Buy New Ticket (Authoritative execution via MiniGameCoreEngine)
     fun buyTicket() {
-        if (isTicketPurchased && !isRevealed) return
+        if ((isTicketPurchased && !isRevealed) || !isGameActive) return
         if (gameWalletBalance < selectedBetAmount) {
-            Toast.makeText(context, "গেম ব্যালেন্স অপর্যাপ্ত", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, strings.scratchNoBalance, Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -204,7 +224,7 @@ fun ScratchCardGameScreen(
                 isRevealed = false
                 isTicketPurchased = true
             }.onFailure { error ->
-                Toast.makeText(context, error.message ?: "ট্রানজেকশন ব্যর্থ হয়েছে", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, error.message ?: strings.scratchToastFailed, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -214,7 +234,7 @@ fun ScratchCardGameScreen(
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(Color(0xFF0B0D21), Color(0xFF151838), Color(0xFF1E1538))))
     ) {
-        // --- TOP HUD (Identical to Dice & Spin Wheel with Glowing Add Button) ---
+        // --- TOP HUD ---
         TopBalanceHUD(
             mainBalance = mainBalance,
             gameWallet = gameWalletBalance,
@@ -226,35 +246,57 @@ fun ScratchCardGameScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 150.dp),
+                .padding(top = 110.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Closed Banner
+            if (!isGameActive) {
+                Surface(
+                    modifier = Modifier.padding(bottom = 12.dp).fillMaxWidth().padding(horizontal = 20.dp),
+                    color = Color.Red.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.4f))
+                ) {
+                    Text(
+                        strings.scratchClosedBanner,
+                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp),
+                        color = Color.Red,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
             // Grand Casino Title
             Text(
-                "SCRATCH CARD",
+                strings.scratchTitle,
                 style = MaterialTheme.typography.headlineLarge.copy(
                     fontWeight = FontWeight.Black,
-                    letterSpacing = 2.sp,
+                    fontSize = 24.sp,
+                    letterSpacing = if (strings == BengaliStrings) 0.sp else 2.sp,
                     brush = Brush.verticalGradient(listOf(Color(0xFFFFF7C2), Color(0xFFFFD700), Color(0xFFD97706)))
                 ),
                 modifier = Modifier.shadow(8.dp, spotColor = AmberGlow)
             )
             Text(
-                "ঘষে জিতুন",
+                strings.scratchSubtitle,
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.ExtraBold,
+                    fontSize = 16.sp,
                     color = Color(0xFFFFD700).copy(alpha = 0.85f),
-                    letterSpacing = 4.sp
+                    letterSpacing = if (strings == BengaliStrings) 0.sp else 4.sp
                 )
             )
 
-            Spacer(modifier = Modifier.weight(0.15f))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // --- 3D Scratch Ticket ---
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(270.dp)
+                    .height(250.dp)
                     .padding(horizontal = 24.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -263,7 +305,7 @@ fun ScratchCardGameScreen(
                     isRevealed = isRevealed,
                     isTicketPurchased = isTicketPurchased,
                     icons = icons,
-                    winText = if (resultMultiplier > 0) "${resultMultiplier}X WIN" else "TRY AGAIN",
+                    winText = if (resultMultiplier > 0) strings.scratchWinX(strings.digits(resultMultiplier.toString())) else strings.scratchTryAgain,
                     onScratchPoint = { offset, canvasSize ->
                         if (!isTicketPurchased || isRevealed) return@TicketFrame
                         scratchPath.value = Path().apply {
@@ -305,7 +347,7 @@ fun ScratchCardGameScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Instruction Badge
             Surface(
@@ -315,9 +357,9 @@ fun ScratchCardGameScreen(
             ) {
                 Text(
                     text = when {
-                        !isTicketPurchased -> "প্রথমে নিচের বাটনে চাপ দিয়ে নতুন কার্ড নিন"
-                        isRevealed -> "কার্ড খোলা হয়েছে (Card Revealed)"
-                        else -> "আঙুল দিয়ে কার্ডটি ঘষুন (Scratch to Reveal)"
+                        !isTicketPurchased -> strings.scratchInstructionNew
+                        isRevealed -> strings.scratchInstructionRevealed
+                        else -> strings.scratchInstructionScratching
                     },
                     color = Color.White.copy(alpha = 0.85f),
                     fontSize = 12.sp,
@@ -325,31 +367,32 @@ fun ScratchCardGameScreen(
                 )
             }
 
-            // Failsafe "পুরোটা খুলুন (Reveal All)" Button
+            // Failsafe "Reveal All" Button
             if (isTicketPurchased && !isRevealed) {
                 TextButton(
                     onClick = { revealCard() },
                     modifier = Modifier.padding(top = 2.dp)
                 ) {
                     Text(
-                        "পুরোটা খুলুন (Reveal All)",
+                        strings.scratchRevealAll,
                         color = GoldMetallic,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             } else {
-                Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(24.dp))
             }
 
-            Spacer(modifier = Modifier.weight(0.45f))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Betting Console
-            val isActionEnabled = (!isTicketPurchased || isRevealed) && gameWalletBalance >= selectedBetAmount
+            val isActionEnabled = (!isTicketPurchased || isRevealed) && gameWalletBalance >= selectedBetAmount && isGameActive
             val buttonText = when {
-                gameWalletBalance < selectedBetAmount -> "অপর্যাপ্ত ব্যালেন্স"
-                isTicketPurchased && !isRevealed -> "কার্ডটি ঘষুন..."
-                else -> "নতুন কার্ড নিন (NEW TICKET)"
+                !isGameActive -> strings.scratchClosedBanner
+                gameWalletBalance < selectedBetAmount -> strings.scratchNoBalance
+                isTicketPurchased && !isRevealed -> strings.scratchCardScratching
+                else -> strings.scratchNewTicketButton
             }
 
             CasinoBettingConsole(
@@ -368,7 +411,7 @@ fun ScratchCardGameScreen(
         }
     }
 
-    // Modal Overlays (Centralized TransferModal from MiniGameUtils.kt)
+    // Modal Overlays
     if (showTransferModal) {
         TransferModal(
             uid = uid,
@@ -397,7 +440,7 @@ fun ScratchCardGameScreen(
                     )
                     requestRef.setValue(requestData).addOnCompleteListener { task ->
                         if (task.isSuccessful) {
-                            Toast.makeText(context, "অনুরোধটি সফলভাবে অ্যাডমিনের কাছে পাঠানো হয়েছে", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, strings.scratchTransferToast, Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -530,15 +573,15 @@ fun TicketFrame(
 
                     drawContext.canvas.saveLayer(Rect(Offset.Zero, size), offscreen)
 
-                    // Holographic Foil Gradient (Silver-Gold shimmering)
+                    // Holographic Foil Gradient
                     drawRect(
                         brush = Brush.linearGradient(
                             listOf(
-                                Color(0xFFC0C0C0), // Silver
-                                Color(0xFFE5B14B), // Gold
-                                Color(0xFFE5E4E2), // Platinum
-                                Color(0xFFFFD700), // Gold
-                                Color(0xFFC0C0C0)  // Silver
+                                Color(0xFFC0C0C0),
+                                Color(0xFFE5B14B),
+                                Color(0xFFE5E4E2),
+                                Color(0xFFFFD700),
+                                Color(0xFFC0C0C0)
                             ),
                             start = Offset(0f, 0f),
                             end = Offset(size.width, size.height)
@@ -556,7 +599,7 @@ fun TicketFrame(
                         )
                     }
 
-                    // Scratched transparent path (revealing content underneath)
+                    // Scratched transparent path
                     drawPath(
                         path = scratchedPath,
                         color = Color.Transparent,
@@ -591,12 +634,6 @@ fun TicketFrame(
     }
 }
 
-/**
- * Top HUD identical to DiceRollGame and SpinWheelGame with:
- * - Frosted circular back button
- * - Main Balance Pill
- * - Interactive Game Wallet Button with glowing '+' badge
- */
 @Composable
 private fun TopBalanceHUD(
     mainBalance: Double,
@@ -605,6 +642,7 @@ private fun TopBalanceHUD(
     onWalletClick: () -> Unit,
     isScratching: Boolean
 ) {
+    val strings = LocalAppStrings.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -634,99 +672,68 @@ private fun TopBalanceHUD(
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // 1. Main Balance Pill (Frosted dark glass with gold accent, min 46dp height)
+            // 1. Main Balance Chip (Compact with short label, maxLines = 1, softWrap = false, 13.sp)
             Surface(
-                modifier = Modifier
-                    .defaultMinSize(minHeight = 46.dp)
-                    .wrapContentHeight(),
-                shape = RoundedCornerShape(22.dp),
-                color = Color(0xFF0F172A).copy(alpha = 0.75f),
-                border = BorderStroke(1.dp, GoldMetallic.copy(alpha = 0.35f))
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xFF1E1538),
+                border = BorderStroke(1.dp, Color(0x33FFD700))
             ) {
-                Row(
+                Text(
+                    text = "${strings.spinChipMain}: ${strings.taka(mainBalance)}",
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.AccountBalanceWallet,
-                        contentDescription = null,
-                        tint = GoldMetallic,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column(verticalArrangement = Arrangement.Center) {
-                        Text(
-                            "Main Balance",
-                            fontSize = 10.sp,
-                            color = Color.White.copy(alpha = 0.7f),
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1
-                        )
-                        Text(
-                            "৳${"%.2f".format(mainBalance)}",
-                            fontSize = 13.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1
-                        )
-                    }
-                }
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        letterSpacing = if (strings == BengaliStrings) 0.sp else TextUnit.Unspecified
+                    ),
+                    maxLines = 1,
+                    softWrap = false,
+                    color = Color.White
+                )
             }
 
-            // 2. Game Wallet Interactive Button (Gold border, coin icon, gold text, '+' badge)
+            // 2. Game Wallet Chip as Interactive Button
             Surface(
                 modifier = Modifier
-                    .defaultMinSize(minHeight = 46.dp)
-                    .wrapContentHeight()
-                    .clip(RoundedCornerShape(22.dp))
+                    .clip(RoundedCornerShape(20.dp))
                     .clickable(enabled = !isScratching) { onWalletClick() },
-                shape = RoundedCornerShape(22.dp),
-                color = Color(0xFF1E1538).copy(alpha = 0.85f),
-                border = BorderStroke(1.5.dp, GoldMetallic)
+                shape = RoundedCornerShape(20.dp),
+                color = Color.Black.copy(alpha = 0.8f),
+                border = BorderStroke(1.5.dp, Color(0xFFFFD700))
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier
+                        .height(38.dp)
+                        .padding(start = 12.dp, end = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Default.AccountBalanceWallet,
-                        contentDescription = null,
-                        tint = GoldMetallic,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column(verticalArrangement = Arrangement.Center) {
-                        Text(
-                            "Game Wallet",
-                            fontSize = 10.sp,
-                            color = GoldMetallic.copy(alpha = 0.85f),
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1
-                        )
-                        Text(
-                            "৳${"%.2f".format(gameWallet)}",
+                    Text(
+                        text = "${strings.spinChipGame}: ${strings.taka(gameWallet)}",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = if (strings == BengaliStrings) FontWeight.Bold else FontWeight.Black,
                             fontSize = 13.sp,
-                            color = GoldMetallic,
-                            fontWeight = FontWeight.Black,
-                            maxLines = 1
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Surface(
-                        shape = CircleShape,
-                        color = GoldMetallic,
-                        modifier = Modifier.size(18.dp)
+                            letterSpacing = if (strings == BengaliStrings) 0.sp else TextUnit.Unspecified
+                        ),
+                        maxLines = 1,
+                        softWrap = false,
+                        color = GoldMetallic
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(GoldMetallic),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = "Add Funds",
-                                tint = Color.Black,
-                                modifier = Modifier.size(12.dp)
-                            )
-                        }
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Add",
+                            tint = Color.Black,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
             }
@@ -741,6 +748,7 @@ fun WinResultDialog(
     winAmount: Double,
     onDismiss: () -> Unit
 ) {
+    val strings = LocalAppStrings.current
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
@@ -773,7 +781,7 @@ fun WinResultDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = if (isWin) "অভিনন্দন!" else "দুঃখিত!",
+                    text = if (isWin) strings.mgWinTitle else strings.mgLossTitle,
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Black,
                         fontSize = 22.sp
@@ -790,7 +798,7 @@ fun WinResultDialog(
                         border = BorderStroke(1.dp, Color(0xFFFFD700).copy(alpha = 0.4f))
                     ) {
                         Text(
-                            text = "${multiplier}X WIN",
+                            text = strings.scratchWinX(strings.digits(multiplier.toString())),
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Black,
@@ -800,14 +808,14 @@ fun WinResultDialog(
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "আপনি ৳${"%.2f".format(winAmount)} জিতেছেন!\nটাকা আপনার গেম ওয়ালেটে যুক্ত হয়েছে।",
+                        text = strings.scratchWinMessage(strings.taka(winAmount)),
                         textAlign = TextAlign.Center,
                         color = Color.White.copy(alpha = 0.9f),
                         fontSize = 14.sp
                     )
                 } else {
                     Text(
-                        text = "এবার কোনো মিল পাওয়া যায়নি। আবার চেষ্টা করুন!",
+                        text = strings.scratchLossMessage,
                         textAlign = TextAlign.Center,
                         color = Color.White.copy(alpha = 0.8f),
                         fontSize = 14.sp
@@ -817,7 +825,7 @@ fun WinResultDialog(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 TournamentButton(
-                    text = "বন্ধ করুন",
+                    text = strings.mgCloseButton,
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth()
                 )

@@ -2760,13 +2760,17 @@ class FirebaseNotificationRepository : NotificationRepository {
             }
 
             val targetScreen = child.child("targetScreen").getValue(String::class.java) ?: ""
+            val titleEn = child.child("titleEn").getValue(String::class.java) ?: ""
+            val messageEn = child.child("messageEn").getValue(String::class.java) ?: ""
 
             NotificationEntity(
               id = id,
               notificationId = id,
               userId = userId,
               title = title,
+              titleEn = titleEn,
               message = message,
+              messageEn = messageEn,
               body = message,
               type = type,
               timestamp = timestamp,
@@ -4414,7 +4418,9 @@ class FirebaseAdminRepository(
             val matchNum = currentMatch.matchNumber.ifBlank { matchId.takeLast(4) }
             val prizeAmountFormatted = "%.0f".format(prizeMinorUnits / 100.0)
             val winningNotifTitle = "🏆 ম্যাচ জিতেছেন!"
+            val winningNotifTitleEn = "🏆 Match Won!"
             val winningNotifBody = "ম্যাচ #${matchNum}-এর পুরস্কার ৳${prizeAmountFormatted} আপনার অ্যাকাউন্টে যোগ হয়েছে।"
+            val winningNotifBodyEn = "Prize of ৳${prizeAmountFormatted} for Match #${matchNum} has been added to your account."
             val winningNotifId = "notif_win_${matchId}_${winnerId}"
 
             val winCanonicalDto = CanonicalNotificationDto(
@@ -4440,7 +4446,9 @@ class FirebaseAdminRepository(
                 notificationId = winningNotifId,
                 userId = winnerId,
                 title = winningNotifTitle,
+                titleEn = winningNotifTitleEn,
                 body = winningNotifBody,
+                messageEn = winningNotifBodyEn,
                 targetScreen = "WALLET",
                 createdAt = now,
               ),
@@ -4548,14 +4556,18 @@ class FirebaseAdminRepository(
         val matchNum = currentMatch.matchNumber.ifBlank { matchId.takeLast(4) }
         val prizeAmountFormatted = "%.0f".format(prizeMinorUnits / 100.0)
         val winningNotifTitle = "🏆 ম্যাচ জিতেছেন!"
+        val winningNotifTitleEn = "🏆 Match Won!"
         val winningNotifBody = "ম্যাচ #${matchNum}-এর পুরস্কার ৳${prizeAmountFormatted} আপনার অ্যাকাউন্টে যোগ হয়েছে।"
+        val winningNotifBodyEn = "Prize of ৳${prizeAmountFormatted} for Match #${matchNum} has been added to your account."
         val winningNotifId = "notif_win_${matchId}_${winnerId}"
 
         val winnerNotif = NotificationEntity(
           notificationId = winningNotifId,
           userId = winnerId,
           title = winningNotifTitle,
+          titleEn = winningNotifTitleEn,
           body = winningNotifBody,
+          messageEn = winningNotifBodyEn,
           targetScreen = "WALLET",
           createdAt = now,
         )
@@ -4611,8 +4623,10 @@ class FirebaseAdminRepository(
           updates["${FirebaseConfig.NODE_USER_NOTIFICATIONS}/$submitterUid/NOTIF_${now}"] = NotificationEntity(
             notificationId = "NOTIF_${now}",
             userId = submitterUid,
-            title = "Victory Proof Rejected",
-            body = "Your victory proof for match #${matchId.takeLast(6)} was rejected: $reason",
+            title = "প্রমাণ প্রত্যাখ্যাত",
+            titleEn = "Victory Proof Rejected",
+            body = "ম্যাচ #${matchId.takeLast(6)}-এর জন্য আপনার জয়ের প্রমাণ প্রত্যাখ্যাত হয়েছে: $reason",
+            messageEn = "Your victory proof for match #${matchId.takeLast(6)} was rejected: $reason",
             targetScreen = "HISTORY",
             createdAt = now,
           )
@@ -4640,8 +4654,10 @@ class FirebaseAdminRepository(
           val notif = NotificationEntity(
             notificationId = "NOTIF_${now}",
             userId = submitterUid,
-            title = "Victory Proof Rejected",
-            body = "Your victory proof for match #${matchId.takeLast(6)} was rejected: $reason",
+            title = "প্রমাণ প্রত্যাখ্যাত",
+            titleEn = "Victory Proof Rejected",
+            body = "ম্যাচ #${matchId.takeLast(6)}-এর জন্য আপনার জয়ের প্রমাণ প্রত্যাখ্যাত হয়েছে: $reason",
+            messageEn = "Your victory proof for match #${matchId.takeLast(6)} was rejected: $reason",
             targetScreen = "HISTORY",
             createdAt = now,
           )
@@ -4669,8 +4685,10 @@ class FirebaseAdminRepository(
         val notif = NotificationEntity(
           notificationId = "NOTIF_${now}",
           userId = submitterUid,
-          title = "Victory Proof Rejected",
-          body = "Your victory proof for match #${matchId.takeLast(6)} was rejected: $reason",
+          title = "প্রমাণ প্রত্যাখ্যাত",
+          titleEn = "Victory Proof Rejected",
+          body = "ম্যাচ #${matchId.takeLast(6)}-এর জন্য আপনার জয়ের প্রমাণ প্রত্যাখ্যাত হয়েছে: $reason",
+          messageEn = "Your victory proof for match #${matchId.takeLast(6)} was rejected: $reason",
           targetScreen = "HISTORY",
           createdAt = now,
         )

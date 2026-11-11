@@ -29,9 +29,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.core.i18n.LocalAppStrings
+import com.example.core.i18n.*
 import com.example.domain.model.MatchEntity
 import com.example.domain.model.MatchStatus
 import com.example.ui.theme.*
@@ -51,6 +52,7 @@ fun MatchCard(
   isJoined: Boolean = false,
   currentUserId: String = "",
 ) {
+  val strings = LocalAppStrings.current
   val isLudo = match.gameType.equals("LUDO", ignoreCase = true)
   val isUpcoming = match.status.equals(MatchStatus.UPCOMING.name, ignoreCase = true)
   val isRunning = match.status.equals(MatchStatus.RUNNING.name, ignoreCase = true)
@@ -151,21 +153,32 @@ fun MatchCard(
             }
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-              text = if (isLudo) "LUDO 1v1" else "CARROM 1v1",
+              text = if (isLudo) strings.matchCardLudoChip else strings.matchCardCarromChip,
               style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.5.sp,
+                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
+                letterSpacing = if (strings === BengaliStrings) 0.sp else 0.5.sp,
+                fontSize = 12.sp,
               ),
               color = Color.White,
+              maxLines = 1,
+              softWrap = false,
             )
           }
         }
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-          text = match.matchNumber,
-          style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-          color = Slate300,
-        )
+        if (match.matchNumber.isNotBlank()) {
+          Spacer(modifier = Modifier.width(8.dp))
+          Text(
+            text = strings.digits(match.matchNumber),
+            style = MaterialTheme.typography.labelMedium.copy(
+              fontWeight = FontWeight.Bold,
+              fontSize = 13.sp,
+            ),
+            color = Slate300,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(end = 2.dp),
+          )
+        }
       }
 
       MatchStatusBadge(
@@ -175,11 +188,34 @@ fun MatchCard(
         isJoined = isJoined,
         isWinner = isUserWinner,
         isLoser = isUserLoser,
-        modifier = Modifier.padding(end = 116.dp)
+        modifier = Modifier.padding(end = 96.dp)
       )
     }
 
     Spacer(modifier = Modifier.height(10.dp))
+
+    val titleRegex = remember { Regex("(?i)^(ludo|carrom)\\s*1v1\\s*#(\\S+)$") }
+    val displayGameName = if (isLudo) strings.filterLudo else strings.filterCarrom
+    val finalTitle = remember(match.title, match.matchNumber, strings) {
+      match.title.takeIf { it.isNotBlank() }?.let { title ->
+        val matchResult = titleRegex.find(title)
+        if (matchResult != null) {
+          val game = matchResult.groupValues[1]
+          val id = matchResult.groupValues[2]
+          val localizedGame = if (game.equals("ludo", ignoreCase = true)) strings.filterLudo else strings.filterCarrom
+          strings.historyMatchTitle(localizedGame, strings.digits(id))
+        } else {
+          title
+        }
+      } ?: run {
+        val numStr = match.matchNumber.removePrefix("#").trim()
+        if (numStr.isNotBlank()) {
+          strings.historyMatchTitle(displayGameName, strings.digits(numStr))
+        } else {
+          "${displayGameName} ${strings.label1v1Battle}"
+        }
+      }
+    }
 
     Row(
       modifier = Modifier.fillMaxWidth(),
@@ -187,15 +223,20 @@ fun MatchCard(
       verticalAlignment = Alignment.CenterVertically,
     ) {
       Text(
-        text = match.title.ifBlank { "${if (isLudo) "Ludo" else "Carrom"} 1v1 Battle" },
-        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+        text = finalTitle,
+        style = MaterialTheme.typography.titleSmall.copy(
+          fontWeight = FontWeight.Bold,
+          fontSize = 15.sp,
+        ),
         color = Color.White,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = Modifier.weight(1f),
       )
       if (onCardClick != null) {
         Icon(
           imageVector = Icons.Default.ChevronRight,
-          contentDescription = "View Details",
+          contentDescription = strings.labelViewResult,
           tint = Slate400,
           modifier = Modifier.size(20.dp),
         )
@@ -214,29 +255,62 @@ fun MatchCard(
       horizontalArrangement = Arrangement.SpaceBetween,
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      val strings = LocalAppStrings.current
       Column {
-        Text(text = strings.entryFeeLabel, style = MaterialTheme.typography.labelSmall, color = Slate400)
         Text(
-          text = "৳ ${"%.2f".format(match.displayEntryFee)}",
-          style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+          text = strings.entryFeeLabel,
+          style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+          color = Slate400,
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+          text = strings.taka(match.displayEntryFee),
+          style = MaterialTheme.typography.titleMedium.copy(
+            fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Bold,
+            fontSize = 15.sp,
+            letterSpacing = 0.sp,
+          ),
           color = Color.White,
+          maxLines = 1,
+          softWrap = false,
+          modifier = Modifier.padding(end = 2.dp),
         )
       }
       Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = strings.labelFormat, style = MaterialTheme.typography.labelSmall, color = Slate400)
+        Text(
+          text = strings.labelFormat,
+          style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+          color = Slate400,
+        )
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
           text = strings.label1v1Battle,
-          style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+          style = MaterialTheme.typography.titleSmall.copy(
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp,
+          ),
           color = NeonCyan,
+          maxLines = 1,
+          softWrap = false,
         )
       }
       Column(horizontalAlignment = Alignment.End) {
-        Text(text = strings.prizePoolLabel, style = MaterialTheme.typography.labelSmall, color = Slate400)
         Text(
-          text = "৳ ${"%.2f".format(match.displayPrizePool)}",
-          style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+          text = strings.prizePoolLabel,
+          style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+          color = Slate400,
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+          text = strings.taka(match.displayPrizePool),
+          style = MaterialTheme.typography.titleMedium.copy(
+            fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
+            fontSize = 15.sp,
+            letterSpacing = 0.sp,
+          ),
           color = Gold400,
+          maxLines = 1,
+          softWrap = false,
+          modifier = Modifier.padding(end = 2.dp),
         )
       }
     }
@@ -257,7 +331,16 @@ fun MatchCard(
         .testTag("seat_status_bar_${match.matchId}"),
       contentAlignment = Alignment.Center,
     ) {
-      val strings = LocalAppStrings.current
+      val seatText = when {
+        isCompleted -> strings.labelMatchCompleted.uppercase()
+        joinedCount >= effectiveMaxPlayers || isFull ->
+          strings.matchCardSeatJoined(strings.number(effectiveMaxPlayers), strings.number(effectiveMaxPlayers))
+        joinedCount > 0 ->
+          strings.matchCardSeatJoined(strings.number(joinedCount), strings.number(effectiveMaxPlayers))
+        else ->
+          strings.matchCardSeatJoined(strings.number(0), strings.number(effectiveMaxPlayers))
+      }
+
       when {
         isCompleted -> {
           Box(
@@ -267,16 +350,19 @@ fun MatchCard(
             contentAlignment = Alignment.Center,
           ) {
             Text(
-              text = strings.labelMatchCompleted.uppercase(),
+              text = seatText,
               style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.5.sp,
+                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
+                letterSpacing = if (strings === BengaliStrings) 0.sp else 0.5.sp,
+                fontSize = 12.sp,
               ),
               color = Color.White,
+              maxLines = 1,
+              softWrap = false,
             )
           }
         }
-        joinedCount >= 2 || isFull -> {
+        joinedCount >= effectiveMaxPlayers || isFull -> {
           Box(
             modifier = Modifier
               .fillMaxSize()
@@ -284,26 +370,29 @@ fun MatchCard(
             contentAlignment = Alignment.Center,
           ) {
             Text(
-              text = "2/2 JOINED",
+              text = seatText,
               style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp,
+                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Bold,
+                letterSpacing = if (strings === BengaliStrings) 0.sp else 0.5.sp,
+                fontSize = 12.sp,
               ),
               color = Color.White,
+              maxLines = 1,
+              softWrap = false,
             )
           }
         }
-        joinedCount == 1 -> {
+        joinedCount > 0 -> {
           Row(modifier = Modifier.fillMaxSize()) {
             Box(
               modifier = Modifier
-                .weight(1f)
+                .weight(joinedCount.toFloat())
                 .fillMaxHeight()
                 .background(barColorBlue)
             )
             Box(
               modifier = Modifier
-                .weight(1f)
+                .weight((effectiveMaxPlayers - joinedCount).coerceAtLeast(1).toFloat())
                 .fillMaxHeight()
                 .background(barColorRed)
             )
@@ -313,12 +402,15 @@ fun MatchCard(
             contentAlignment = Alignment.Center,
           ) {
             Text(
-              text = "1/2 JOINED",
+              text = seatText,
               style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp,
+                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Bold,
+                letterSpacing = if (strings === BengaliStrings) 0.sp else 0.5.sp,
+                fontSize = 12.sp,
               ),
               color = Color.White,
+              maxLines = 1,
+              softWrap = false,
             )
           }
         }
@@ -330,12 +422,15 @@ fun MatchCard(
             contentAlignment = Alignment.Center,
           ) {
             Text(
-              text = "0/2 JOINED",
+              text = seatText,
               style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp,
+                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Bold,
+                letterSpacing = if (strings === BengaliStrings) 0.sp else 0.5.sp,
+                fontSize = 12.sp,
               ),
               color = Color.White,
+              maxLines = 1,
+              softWrap = false,
             )
           }
         }
@@ -346,13 +441,12 @@ fun MatchCard(
 
     when {
       isCompleted -> {
-        val strings = LocalAppStrings.current
         val bannerBg = if (isUserWinner) Gold500.copy(alpha = 0.15f) else if (isUserLoser) Rose900.copy(alpha = 0.3f) else Emerald900.copy(alpha = 0.3f)
         val bannerBorder = if (isUserWinner) Gold400.copy(alpha = 0.6f) else if (isUserLoser) Rose500.copy(alpha = 0.4f) else Emerald500.copy(alpha = 0.3f)
         val bannerTextColor = if (isUserWinner) Gold400 else if (isUserLoser) Rose400 else Emerald400
         val bannerText = when {
-          isUserWinner -> "${strings.labelMatchCompleted} • ${strings.badgeVictory} (৳ ${"%.2f".format(match.displayPrizePool)})"
-          isUserLoser -> "${strings.labelMatchCompleted} • ${strings.badgeDefeat}"
+          isUserWinner -> strings.matchCardWinnerBanner(strings.taka(match.displayPrizePool))
+          isUserLoser -> strings.matchCardDefeatBanner
           else -> strings.labelMatchCompleted
         }
         Row(
@@ -361,20 +455,31 @@ fun MatchCard(
             .clip(RoundedCornerShape(8.dp))
             .background(bannerBg)
             .border(BorderStroke(1.dp, bannerBorder), RoundedCornerShape(8.dp))
-            .padding(10.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
           horizontalArrangement = Arrangement.SpaceBetween,
           verticalAlignment = Alignment.CenterVertically,
         ) {
           Text(
             text = bannerText,
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.labelMedium.copy(
+              fontWeight = FontWeight.Bold,
+              fontSize = 13.sp,
+            ),
             color = bannerTextColor,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(end = 4.dp),
           )
           if (onCardClick != null) {
             Text(
               text = "${strings.labelViewResult} →",
-              style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+              style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.sp,
+              ),
               color = Gold400,
+              maxLines = 1,
+              softWrap = false,
             )
           }
         }
@@ -389,8 +494,8 @@ fun MatchCard(
           verticalAlignment = Alignment.CenterVertically,
         ) {
           Text(
-            text = "Match Cancelled • Entry fees refunded",
-            style = MaterialTheme.typography.bodySmall,
+            text = strings.matchCardCancelledBanner,
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
             color = Rose400,
           )
         }
@@ -405,8 +510,8 @@ fun MatchCard(
           verticalAlignment = Alignment.CenterVertically,
         ) {
           Text(
-            text = if (isPaused) "Match Paused by Super Admin" else "Match Disabled",
-            style = MaterialTheme.typography.bodySmall,
+            text = if (isPaused) strings.matchCardPausedBanner else strings.matchCardDisabledBanner,
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
             color = Amber400,
           )
         }
@@ -417,14 +522,6 @@ fun MatchCard(
           horizontalArrangement = Arrangement.SpaceBetween,
           verticalAlignment = Alignment.CenterVertically,
         ) {
-          val strings = LocalAppStrings.current
-          val timeFormatted = remember(match.scheduledTime) {
-            if (match.scheduledTime > 0) {
-              SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(match.scheduledTime))
-            } else {
-              "Upcoming"
-            }
-          }
           MatchCountdownTimer(match.scheduledTime)
           when {
             isJoined -> {
@@ -439,7 +536,7 @@ fun MatchCard(
             }
             isCodeAdded || isRunning -> {
               TournamentButton(
-                text = if (isRunning) "IN PROGRESS" else "CODE READY",
+                text = if (isRunning) strings.matchCardButtonInProgress else strings.matchCardButtonCodeReady,
                 onClick = { onCardClick?.invoke() },
                 variant = TournamentButtonVariant.SECONDARY,
                 modifier = Modifier.height(40.dp),
@@ -448,7 +545,7 @@ fun MatchCard(
             }
             isUpcoming -> {
               TournamentButton(
-                text = "UPCOMING",
+                text = strings.matchCardButtonUpcoming,
                 onClick = { onCardClick?.invoke() },
                 enabled = false,
                 variant = TournamentButtonVariant.SECONDARY,
@@ -458,7 +555,7 @@ fun MatchCard(
             }
             isFull -> {
               TournamentButton(
-                text = "SEAT FULL",
+                text = strings.matchCardButtonSeatFull,
                 onClick = { onCardClick?.invoke() },
                 enabled = false,
                 modifier = Modifier.height(40.dp),
@@ -484,9 +581,13 @@ fun MatchCard(
 fun MatchCountdownTimer(scheduledTimeMs: Long) {
   val strings = LocalAppStrings.current
   var timeRemaining by remember(scheduledTimeMs) { mutableStateOf(scheduledTimeMs - System.currentTimeMillis()) }
-  val timeFormat = remember { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
-  val scheduledTimeStr = remember(scheduledTimeMs) {
-    if (scheduledTimeMs > 0) timeFormat.format(Date(scheduledTimeMs)) else "Upcoming"
+  val scheduledTimeStr = remember(scheduledTimeMs, strings) {
+    if (scheduledTimeMs > 0) {
+      val rawTime = SimpleDateFormat("hh:mm a", Locale.US).format(Date(scheduledTimeMs))
+      strings.digits(rawTime)
+    } else {
+      strings.matchCardUpcoming
+    }
   }
 
   LaunchedEffect(scheduledTimeMs) {
@@ -496,23 +597,24 @@ fun MatchCountdownTimer(scheduledTimeMs: Long) {
     }
   }
 
-  val countdownText = remember(timeRemaining) {
+  val countdownText = remember(timeRemaining, strings) {
     if (timeRemaining <= 0) {
-      "00:00:00"
+      strings.digits("00:00:00")
     } else {
       val hours = (timeRemaining / (1000 * 60 * 60)) % 24
       val minutes = (timeRemaining / (1000 * 60)) % 60
       val seconds = (timeRemaining / 1000) % 60
-      if (hours > 0) {
+      val raw = if (hours > 0) {
         "%02d:%02d:%02d".format(hours, minutes, seconds)
       } else {
         "%02d:%02d".format(minutes, seconds)
       }
+      strings.digits(raw)
     }
   }
 
   val isExpired = timeRemaining <= 0
-  val labelText = if (strings is com.example.core.i18n.BengaliStrings) "বাকি" else "Left"
+  val labelText = strings.matchCardTimeLeft
 
   Surface(
     shape = RoundedCornerShape(8.dp),
@@ -540,10 +642,11 @@ fun MatchCountdownTimer(scheduledTimeMs: Long) {
         text = scheduledTimeStr,
         style = MaterialTheme.typography.labelSmall.copy(
           fontWeight = FontWeight.Bold,
-          fontSize = 10.5.sp
+          fontSize = 11.sp
         ),
         color = Slate300,
-        maxLines = 1
+        maxLines = 1,
+        softWrap = false,
       )
 
       // Vertical Micro-Divider
@@ -557,12 +660,14 @@ fun MatchCountdownTimer(scheduledTimeMs: Long) {
       Text(
         text = "$labelText $countdownText",
         style = MaterialTheme.typography.labelSmall.copy(
-          fontWeight = FontWeight.Black,
-          fontSize = 11.sp,
-          letterSpacing = 0.5.sp
+          fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
+          fontSize = 11.5.sp,
+          letterSpacing = if (strings === BengaliStrings) 0.sp else 0.5.sp
         ),
         color = if (isExpired) Color(0xFFEF4444) else Gold400,
-        maxLines = 1
+        maxLines = 1,
+        softWrap = false,
+        modifier = Modifier.padding(end = 2.dp)
       )
     }
   }
@@ -589,40 +694,33 @@ fun MatchStatusBadge(
   val isUpcoming = status.equals(MatchStatus.UPCOMING.name, ignoreCase = true)
 
   val strings = LocalAppStrings.current
-  val isBN = strings is com.example.core.i18n.BengaliStrings
   val (bgColor, textColor, label) = when {
     isCompleted && isWinner -> Triple(Gold400.copy(alpha = 0.2f), Gold400, strings.badgeVictory)
     isCompleted && (isLoser || isJoined) -> Triple(Rose600.copy(alpha = 0.2f), Rose400, strings.badgeDefeat)
     isLoser -> Triple(Rose600.copy(alpha = 0.2f), Rose400, strings.badgeDefeat)
     isWinner -> Triple(Gold400.copy(alpha = 0.2f), Gold400, strings.badgeVictory)
-    isCompleted -> Triple(NeonEmerald.copy(alpha = 0.18f), NeonEmerald, if (isBN) "সম্পন্ন" else "COMPLETED")
-    isJoined -> Triple(Emerald400.copy(alpha = 0.18f), Emerald400, if (isBN) "যুক্ত" else "JOINED")
-    isCancelled -> Triple(Rose600.copy(alpha = 0.2f), Rose400, if (isBN) "বাতিল" else "CANCELLED")
-    isPaused -> Triple(Amber600.copy(alpha = 0.2f), Amber400, if (isBN) "স্থগিত" else "PAUSED")
-    isDisabled -> Triple(Slate700.copy(alpha = 0.5f), Slate400, if (isBN) "অক্ষম" else "DISABLED")
-    isUpcoming -> Triple(Amber500.copy(alpha = 0.2f), Amber400, if (isBN) "আসন্ন" else "UPCOMING")
-    isRunning -> Triple(Indigo600.copy(alpha = 0.25f), Indigo400, if (isBN) "চলমান" else "RUNNING")
-    isResultSubmitted -> Triple(Purple600.copy(alpha = 0.25f), Purple400, if (isBN) "রিভিউ" else "REVIEW")
-    isCodeAdded -> Triple(NeonCyan.copy(alpha = 0.18f), NeonCyan, if (isBN) "কোড রেডি" else "CODE READY")
+    isCompleted -> Triple(NeonEmerald.copy(alpha = 0.18f), NeonEmerald, strings.matchCardStatusCompleted)
+    isJoined -> Triple(Emerald400.copy(alpha = 0.18f), Emerald400, strings.matchCardStatusJoined)
+    isCancelled -> Triple(Rose600.copy(alpha = 0.2f), Rose400, strings.matchCardStatusCancelled)
+    isPaused -> Triple(Amber600.copy(alpha = 0.2f), Amber400, strings.matchCardStatusPaused)
+    isDisabled -> Triple(Slate700.copy(alpha = 0.5f), Slate400, strings.matchCardStatusDisabled)
+    isUpcoming -> Triple(Amber500.copy(alpha = 0.2f), Amber400, strings.matchCardStatusUpcoming)
+    isRunning -> Triple(Indigo600.copy(alpha = 0.25f), Indigo400, strings.matchCardStatusRunning)
+    isResultSubmitted -> Triple(Purple600.copy(alpha = 0.25f), Purple400, strings.matchCardStatusReview)
+    isCodeAdded -> Triple(NeonCyan.copy(alpha = 0.18f), NeonCyan, strings.matchCardStatusCodeReady)
     isFull -> {
-      val countText = if (isBN) {
-        val bnCount = joinedPlayersCount.toString().map { if (it.isDigit()) '০' + (it - '0') else it }.joinToString("")
-        val bnMax = maxPlayers.toString().map { if (it.isDigit()) '০' + (it - '0') else it }.joinToString("")
-        "$bnCount/$bnMax"
-      } else {
-        "$joinedPlayersCount/$maxPlayers"
-      }
-      Triple(Rose600.copy(alpha = 0.2f), Rose400, if (isBN) "পূর্ণ ($countText)" else "FULL ($countText)")
+      Triple(
+        Rose600.copy(alpha = 0.2f),
+        Rose400,
+        strings.matchCardStatusFull(strings.number(joinedPlayersCount), strings.number(maxPlayers))
+      )
     }
     else -> {
-      val countText = if (isBN) {
-        val bnCount = joinedPlayersCount.toString().map { if (it.isDigit()) '০' + (it - '0') else it }.joinToString("")
-        val bnMax = maxPlayers.toString().map { if (it.isDigit()) '০' + (it - '0') else it }.joinToString("")
-        "$bnCount/$bnMax"
-      } else {
-        "$joinedPlayersCount/$maxPlayers"
-      }
-      Triple(NeonCyan.copy(alpha = 0.16f), NeonCyan, if (isBN) "$countText স্লট" else "$countText SLOTS")
+      Triple(
+        NeonCyan.copy(alpha = 0.16f),
+        NeonCyan,
+        strings.matchCardStatusSlots(strings.number(joinedPlayersCount), strings.number(maxPlayers))
+      )
     }
   }
 
@@ -635,10 +733,13 @@ fun MatchStatusBadge(
     Text(
       text = label,
       style = MaterialTheme.typography.labelSmall.copy(
-        fontWeight = FontWeight.Black,
-        letterSpacing = 0.4.sp,
+        fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
+        letterSpacing = if (strings === BengaliStrings) 0.sp else 0.4.sp,
+        fontSize = 11.5.sp,
       ),
       color = textColor,
+      maxLines = 1,
+      softWrap = false,
       modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
     )
   }

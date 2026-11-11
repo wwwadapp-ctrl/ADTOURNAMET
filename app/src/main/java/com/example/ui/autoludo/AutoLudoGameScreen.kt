@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
@@ -33,6 +34,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,7 +44,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import com.example.core.i18n.LocalAppStrings
+import com.example.core.i18n.taka
 import com.example.R
 import android.media.AudioAttributes
 import android.media.AudioManager
@@ -68,6 +75,7 @@ fun AutoLudoGameScreen(
     onBackClick: () -> Unit
 ) {
     val isPreviewMode = LocalInspectionMode.current || matchId.contains("preview") || matchId.contains("mock")
+    val strings = LocalAppStrings.current
     val coroutineScope = rememberCoroutineScope()
 
     var match by remember { mutableStateOf<AutoLudoMatchEntity?>(null) }
@@ -330,7 +338,7 @@ fun AutoLudoGameScreen(
             }
         }
 
-        // Winner Dialog
+        // Winner / Loser Dialog
         if (currentMatch.status == "COMPLETED") {
             val winnerUid = if (currentMatch.winnerUid.isNotBlank()) currentMatch.winnerUid else currentMatch.gameState.winnerUid
             val isMe = currentUid == winnerUid
@@ -340,55 +348,13 @@ fun AutoLudoGameScreen(
                 currentMatch.gameState.lastActionLog.contains("Disqualified")
             val winnerName = if (winnerUid == currentMatch.player1Uid) currentMatch.player1Name else if (winnerUid == currentMatch.player2Uid) currentMatch.player2Name else "বিজয়ী"
 
-            AlertDialog(
-                onDismissRequest = { onBackClick() },
-                title = { 
-                    Text(
-                        if (isMe) "অভিনন্দন! আপনি বিজয়ী!" else "গেম সমাপ্ত!", 
-                        fontWeight = FontWeight.Bold 
-                    ) 
-                },
-                text = {
-                    Column {
-                        if (isMe) {
-                            if (isOpponentForfeit || currentMatch.forfeitedByUid.isNotBlank()) {
-                                Text(
-                                    "বিপক্ষ খেলোয়াড় সারেন্ডার করেছেন! আপনি বিজয়ী হয়েছেন! ৳${String.format("%.2f", currentMatch.prizePool)} আপনার গেম ওয়ালেটে যোগ হয়েছে!",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            } else if (isOpponentDisqualified) {
-                                Text(
-                                    "বিপক্ষ খেলোয়াড় ডিসকোয়ালিফাই হয়েছেন! আপনি বিজয়ী হয়েছেন! ৳${String.format("%.2f", currentMatch.prizePool)} আপনার গেম ওয়ালেটে যোগ হয়েছে!",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            } else {
-                                Text(
-                                    "অভিনন্দন! আপনি বিজয়ী হয়েছেন! ৳${String.format("%.2f", currentMatch.prizePool)} আপনার গেম ওয়ালেটে যোগ হয়েছে!",
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                            }
-                        } else {
-                            if (isOpponentDisqualified) {
-                                Text("আপনি ৩ বার চাল মিস করায় ডিসকোয়ালিফাই হয়েছেন! $winnerName গেমটি জিতেছেন।")
-                            } else {
-                                Text("দুঃখিত! $winnerName গেমটি জিতেছেন। ভালো খেলার জন্য ধন্যবাদ।")
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = { onBackClick() },
-                        colors = ButtonDefaults.buttonColors(containerColor = Emerald600)
-                    ) {
-                        Text("ওকে", fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                },
-                containerColor = Color(0xFF1565C0),
-                titleContentColor = Color(0xFFFFD700),
-                textContentColor = Color.White
+            AutoLudoResultDialog(
+                isWin = isMe,
+                prizePool = currentMatch.prizePool,
+                winnerName = winnerName,
+                isOpponentForfeit = isOpponentForfeit,
+                isOpponentDisqualified = isOpponentDisqualified,
+                onDismiss = onBackClick
             )
         }
 
@@ -400,32 +366,109 @@ fun AutoLudoGameScreen(
                 currentMatch.player1Name.ifBlank { "প্লেয়ার ১" }
             }
 
-            AlertDialog(
-                onDismissRequest = { showExitConfirmDialog = false },
-                title = { Text("আপনি কি ম্যাচ থেকে বের হতে চান?", fontWeight = FontWeight.Bold) },
-                text = { Text("আপনি বের হয়ে গেলে $opponentName-কে বিজয়ী ঘোষণা করা হবে।") },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            showExitConfirmDialog = false
-                            AutoLudoManager.forfeitMatch(currentMatch.matchId, currentUid) { _, _ ->
-                                onBackClick()
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
-                    ) {
-                        Text("হ্যাঁ", color = Color.White)
-                    }
+            AutoLudoExitDialog(
+                opponentName = opponentName,
+                onConfirm = {
+                    showExitConfirmDialog = false
+                    AutoLudoManager.forfeitMatch(currentMatch.matchId, currentUid) { _, _ -> onBackClick() }
                 },
-                dismissButton = {
-                    OutlinedButton(onClick = { showExitConfirmDialog = false }) {
-                        Text("না")
-                    }
-                },
-                containerColor = Color(0xFF1565C0),
-                titleContentColor = Color.White,
-                textContentColor = Color.White.copy(alpha = 0.9f)
+                onDismiss = { showExitConfirmDialog = false }
             )
+        }
+    }
+}
+
+@Composable
+fun AutoLudoResultDialog(
+    isWin: Boolean,
+    prizePool: Double,
+    winnerName: String,
+    isOpponentForfeit: Boolean,
+    isOpponentDisqualified: Boolean,
+    onDismiss: () -> Unit
+) {
+    val strings = LocalAppStrings.current
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.9f),
+            shape = RoundedCornerShape(24.dp),
+            color = Color.Transparent,
+            border = BorderStroke(1.5.dp, Brush.verticalGradient(listOf(Color(0xFFFFD54F), Color(0xFFFF9800))))
+        ) {
+            Column(
+                modifier = Modifier
+                    .background(Brush.verticalGradient(listOf(Color(0xFF0F1B4D), Color(0xFF2A1B5E))))
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (isWin) {
+                    // Win: Trophy icon + Sparkles
+                    Box(modifier = Modifier.size(80.dp).background(Gold400.copy(alpha = 0.2f), CircleShape), contentAlignment = Alignment.Center) {
+                         Text("🏆", fontSize = 40.sp)
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(text = strings.autoLudoResultWinTitle, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Gold400, textAlign = TextAlign.Center)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    val reason = if (isOpponentForfeit) "Opponent surrendered." else if (isOpponentDisqualified) "Opponent disqualified." else strings.autoLudoResultWinReason
+                    Text(text = reason, color = Color.White, textAlign = TextAlign.Center)
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Surface(shape = RoundedCornerShape(50), color = Gold400.copy(alpha = 0.2f)) {
+                         Text(strings.autoLudoResultWinPrize(strings.taka(prizePool)), modifier = Modifier.padding(16.dp, 8.dp), color = Gold400, fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    // Lose: Calm style
+                    Icon(Icons.Default.Info, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(80.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(text = strings.autoLudoResultLoseTitle, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(text = strings.autoLudoResultLoseReason(winnerName), color = Color.White.copy(alpha = 0.7f), textAlign = TextAlign.Center)
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Gold400)) {
+                    Text(text = strings.autoLudoResultOk, color = DeepNavyBg, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AutoLudoExitDialog(
+    opponentName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val strings = LocalAppStrings.current
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.9f),
+            shape = RoundedCornerShape(24.dp),
+            color = Color.Transparent,
+            border = BorderStroke(1.5.dp, Brush.verticalGradient(listOf(Color(0xFFFFD54F), Color(0xFFFF9800))))
+        ) {
+            Column(
+                modifier = Modifier
+                    .background(Brush.verticalGradient(listOf(Color(0xFF0F1B4D), Color(0xFF2A1B5E))))
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(text = strings.autoLudoExitTitle, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = strings.autoLudoExitMessage(opponentName), color = Color.White.copy(alpha = 0.7f), textAlign = TextAlign.Center)
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                        Text(text = strings.autoLudoExitNo, color = Color.White)
+                    }
+                    Button(onClick = onConfirm, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) {
+                        Text(text = strings.autoLudoExitYes, color = Color.White)
+                    }
+                }
+            }
         }
     }
 }
@@ -501,6 +544,7 @@ fun AutoLudoBoardScreen(
     onPassTurn: (Boolean) -> Unit = {},
     onBackClick: () -> Unit
 ) {
+    val strings = LocalAppStrings.current
     val isPreviewMode = LocalInspectionMode.current || match.matchId.contains("preview") || match.matchId.contains("mock")
     val gameState = match.gameState
     
@@ -714,7 +758,7 @@ fun AutoLudoBoardScreen(
             // Action Log Indicator (Non-blocking)
             if (gameState.lastActionLog.isNotBlank()) {
                 Text(
-                    text = gameState.lastActionLog,
+                    text = strings.displayActionLog(gameState.lastActionLog),
                     color = Color.White,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,

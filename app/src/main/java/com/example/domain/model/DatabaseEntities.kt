@@ -153,7 +153,10 @@ data class TransactionEntity(
   val id: String = "",
   val title: String = "",
   val timestamp: Long = 0L,
+  val direction: String = "",
+  val amountMinorUnits: Long = 0L,
 ) {
+  val displayMinorUnits: Long get() = if (amountMinorUnits > 0L) amountMinorUnits else amount
   val effectiveId: String get() = id.ifBlank { transactionId.ifBlank { referenceId } }
   val effectiveTitle: String get() = title.ifBlank {
     val typeUpper = type.uppercase()
@@ -372,7 +375,9 @@ data class NotificationEntity(
   val id: String = "",
   val userId: String = "",
   val title: String = "",
+  val titleEn: String = "",
   val message: String = "",
+  val messageEn: String = "",
   val type: String = "",
   val timestamp: Long = 0L,
   val read: Boolean = false,

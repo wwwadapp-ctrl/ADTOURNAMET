@@ -33,26 +33,30 @@ import com.example.domain.model.TransactionEntity
 import com.example.domain.model.TransactionStatus
 import com.example.domain.model.UserEntity
 import com.example.domain.model.WalletEntity
+import com.example.ui.components.StatusBadge
 import com.example.ui.components.UnifiedEsportsTopBar
 import com.example.ui.theme.*
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.example.core.i18n.*
+import androidx.compose.ui.text.style.TextOverflow
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 
 private val Slate900 = Color(0xFF0F172A)
 private val Slate850 = Color(0xFF131E35)
 private val Slate800 = Color(0xFF1E293B)
 private val Slate700 = Color(0xFF334155)
 private val Slate600 = Color(0xFF475569)
+private val Slate500 = Color(0xFF64748B)
 private val Slate400 = Color(0xFF94A3B8)
 private val Slate300 = Color(0xFFCBD5E1)
+private val Slate50 = Color(0xFFF8FAFC)
 
-enum class TransactionFilter(val displayName: String, val testTag: String) {
-  ALL("ALL", "transactions_filter_all"),
-  DEPOSIT("DEPOSIT", "transactions_filter_deposit"),
-  MATCH("MATCH", "transactions_filter_match"),
-  WINNING("WINNING", "transactions_filter_winning"),
-  WITHDRAW("WITHDRAW", "transactions_filter_withdraw"),
+enum class TransactionFilter(val testTag: String) {
+  ALL("transactions_filter_all"),
+  DEPOSIT("transactions_filter_deposit"),
+  MATCH("transactions_filter_match"),
+  WINNING("transactions_filter_winning"),
+  WITHDRAW("transactions_filter_withdraw"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,12 +87,14 @@ fun TransactionsScreen(
       when (selectedFilter) {
         TransactionFilter.ALL -> true
         TransactionFilter.DEPOSIT -> type == "DEPOSIT"
-        TransactionFilter.MATCH -> type in listOf("MATCH_ENTRY", "MATCH_ENTRY_FEE", "MATCH_REFUND", "REFUND")
+        TransactionFilter.MATCH -> type in listOf("MATCH_ENTRY", "MATCH_JOIN", "MATCH_REFUND", "REFUND", "MATCH_ENTRY_FEE")
         TransactionFilter.WINNING -> type in listOf("MATCH_PRIZE", "MATCH_PRIZE_CREDIT", "PRIZE_WIN", "WIN", "WINNING")
         TransactionFilter.WITHDRAW -> type in listOf("WITHDRAW", "WITHDRAWAL", "WITHDRAW_HOLD", "WITHDRAW_RELEASE")
       }
-    }
+    }.sortedByDescending { if (it.timestamp > 0L) it.timestamp else it.createdAt }
   }
+  
+  val strings = LocalAppStrings.current
 
   Scaffold(
     topBar = {
@@ -120,19 +126,20 @@ fun TransactionsScreen(
             .padding(top = 2.dp, bottom = 4.dp),
         ) {
           Text(
-            text = "TRANSACTION HISTORY",
+            text = strings.txHistoryTitle,
             style = MaterialTheme.typography.headlineSmall.copy(
               fontWeight = FontWeight.Black,
               letterSpacing = 1.sp,
+              fontSize = 20.sp,
             ),
             color = Color.White,
           )
           Spacer(modifier = Modifier.height(2.dp))
           Text(
-            text = "Track your deposits, match entries, winnings and withdrawals.",
+            text = strings.txHistorySubtitle,
             style = MaterialTheme.typography.bodySmall.copy(
               color = Slate400,
-              fontSize = 12.sp,
+              fontSize = 13.sp,
             ),
           )
         }
@@ -173,20 +180,21 @@ fun TransactionsScreen(
                       .background(Emerald400),
                   )
                   Text(
-                    text = "AVAILABLE BALANCE",
+                    text = strings.availableBalanceNotice("").replace(": ৳", "").uppercase(),
                     style = MaterialTheme.typography.labelSmall.copy(
                       fontWeight = FontWeight.Bold,
                       letterSpacing = 0.5.sp,
-                      fontSize = 11.sp,
+                      fontSize = 12.sp,
                     ),
                     color = Gold400,
                   )
                 }
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                  text = "৳ ${"%.2f".format(wallet?.availableAmount ?: 0.0)}",
+                  text = strings.taka(wallet?.availableAmount ?: 0.0),
                   style = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Black,
+                    fontSize = 24.sp,
                   ),
                   color = Color.White,
                 )
@@ -220,16 +228,16 @@ fun TransactionsScreen(
             ) {
               Column(modifier = Modifier.weight(1f)) {
                 Text(
-                  text = "Deposited",
+                  text = strings.statDeposited,
                   style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                   ),
                   color = Slate400,
                 )
                 Text(
-                  text = "৳ ${"%,.2f".format(wallet?.totalDepositedAmount ?: 0.0)}",
-                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                  text = strings.takaWhole(wallet?.totalDepositedAmount ?: 0.0),
+                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
                   color = Cyan400,
                 )
               }
@@ -239,16 +247,16 @@ fun TransactionsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
               ) {
                 Text(
-                  text = "Winnings",
+                  text = strings.statWinnings,
                   style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                   ),
                   color = Slate400,
                 )
                 Text(
-                  text = "৳ ${"%,.2f".format(wallet?.winningsAmount ?: 0.0)}",
-                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                  text = strings.takaWhole(wallet?.winningsAmount ?: 0.0),
+                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
                   color = Emerald400,
                 )
               }
@@ -258,16 +266,16 @@ fun TransactionsScreen(
                 horizontalAlignment = Alignment.End,
               ) {
                 Text(
-                  text = "Withdrawn",
+                  text = strings.statWithdrawn,
                   style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                   ),
                   color = Slate400,
                 )
                 Text(
-                  text = "৳ ${"%,.2f".format(wallet?.totalWithdrawnAmount ?: 0.0)}",
-                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                  text = strings.takaWhole(wallet?.totalWithdrawnAmount ?: 0.0),
+                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
                   color = Amber400,
                 )
               }
@@ -284,6 +292,13 @@ fun TransactionsScreen(
         ) {
           items(TransactionFilter.values()) { filter ->
             val isSelected = selectedFilter == filter
+            val displayName = when (filter) {
+              TransactionFilter.ALL -> strings.txHistoryFilterAll
+              TransactionFilter.DEPOSIT -> strings.txHistoryFilterDeposit
+              TransactionFilter.MATCH -> strings.txHistoryFilterMatch
+              TransactionFilter.WINNING -> strings.txHistoryFilterWinning
+              TransactionFilter.WITHDRAW -> strings.txHistoryFilterWithdraw
+            }
             Surface(
               onClick = { selectedFilter = filter },
               shape = RoundedCornerShape(20.dp),
@@ -299,10 +314,10 @@ fun TransactionsScreen(
                 contentAlignment = Alignment.Center,
               ) {
                 Text(
-                  text = filter.displayName,
+                  text = displayName,
                   style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                   ),
                   color = if (isSelected) Gold400 else Slate300,
                 )
@@ -395,17 +410,17 @@ fun TransactionsScreen(
               }
               Spacer(modifier = Modifier.height(14.dp))
               Text(
-                text = if (selectedFilter == TransactionFilter.ALL) "No transactions yet" else "No transactions in this category",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                text = if (selectedFilter == TransactionFilter.ALL) strings.txHistoryEmptyTitle else strings.txHistoryEmptyFilterTitle,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 16.sp),
                 color = Color.White,
               )
               Spacer(modifier = Modifier.height(4.dp))
               Text(
                 text = if (selectedFilter == TransactionFilter.ALL)
-                  "Your completed deposits, match entries, winnings and withdrawals will be safely recorded here."
+                  strings.txHistoryEmptyDesc
                 else
-                  "No transactions found for the selected filter.",
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                  strings.txHistoryEmptyFilterDesc,
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                 color = Slate400,
                 modifier = Modifier.padding(horizontal = 16.dp),
               )
@@ -424,130 +439,30 @@ fun TransactionsScreen(
 
 @Composable
 private fun TransactionCard(txn: TransactionEntity) {
+  val strings = LocalAppStrings.current
   val clipboardManager = LocalClipboardManager.current
-  val typeUpper = txn.type.uppercase()
+  val context = LocalContext.current
+  val display = buildTxDisplay(txn, strings)
 
-  val isWithdraw = typeUpper in listOf("WITHDRAW", "WITHDRAWAL", "WITHDRAW_HOLD", "WITHDRAW_RELEASE")
-  val isDeposit = typeUpper == "DEPOSIT"
-  val isCredit = !isWithdraw && (typeUpper in listOf("DEPOSIT", "MATCH_PRIZE", "MATCH_PRIZE_CREDIT", "PRIZE_WIN", "WIN", "WINNING", "MATCH_REFUND", "REFUND", "ADMIN_CREDIT"))
-
-  // Visual Category Styling & Labels (Strictly approved user-facing labels)
-  val (categoryIcon, iconTint, iconBg, titleText) = when {
-    isWithdraw -> Quadruple(
-      Icons.Default.ArrowUpward,
-      Amber400,
-      Amber400.copy(alpha = 0.15f),
-      "উইথড্র",
-    )
-    isDeposit -> Quadruple(
-      Icons.Default.AddCircle,
-      Cyan400,
-      Cyan400.copy(alpha = 0.15f),
-      "ডিপোজিট",
-    )
-    typeUpper in listOf("MATCH_PRIZE", "MATCH_PRIZE_CREDIT", "PRIZE_WIN", "WIN", "WINNING") -> Quadruple(
-      Icons.Default.EmojiEvents,
-      Gold400,
-      Gold500.copy(alpha = 0.15f),
-      "Winning",
-    )
-    typeUpper in listOf("MATCH_REFUND", "REFUND") -> Quadruple(
-      Icons.AutoMirrored.Filled.RotateLeft,
-      Emerald400,
-      Emerald400.copy(alpha = 0.15f),
-      "Match Refund",
-    )
-    typeUpper in listOf("MATCH_ENTRY", "MATCH_ENTRY_FEE") -> Quadruple(
-      Icons.Default.SportsEsports,
-      Rose400,
-      Rose400.copy(alpha = 0.15f),
-      "Match Entry",
-    )
-    typeUpper == "ADMIN_CREDIT" -> Quadruple(
-      Icons.Default.AddCircle,
-      Emerald400,
-      Emerald400.copy(alpha = 0.15f),
-      "Admin Credit",
-    )
-    typeUpper == "ADMIN_DEBIT" -> Quadruple(
-      Icons.Default.RemoveCircle,
-      Rose400,
-      Rose400.copy(alpha = 0.15f),
-      "Admin Debit",
-    )
-    typeUpper == "ADMIN_ADJUSTMENT" -> Quadruple(
-      Icons.Default.Tune,
-      Slate400,
-      Slate800,
-      "Admin Adjustment",
-    )
-    typeUpper == "COMMISSION" -> Quadruple(
-      Icons.Default.ReceiptLong,
-      Slate400,
-      Slate800,
-      "Commission",
-    )
-    else -> Quadruple(
-      Icons.Default.ReceiptLong,
-      Slate400,
-      Slate800,
-      txn.title.ifBlank { txn.description.ifBlank { txn.type.replace('_', ' ') } },
-    )
+  val icon = when (display.iconKind) {
+    "withdraw" -> Icons.Default.ArrowUpward
+    "deposit" -> Icons.Default.AddCircleOutline
+    "prize" -> Icons.Default.EmojiEvents
+    "refund" -> Icons.Default.RotateLeft
+    "game" -> Icons.Default.SportsEsports
+    "admin" -> Icons.Default.Build
+    else -> Icons.Default.SportsEsports
   }
-
-  // Date Formatting with safe fallback
-  val txTime = if (txn.timestamp > 0L) txn.timestamp else txn.createdAt
-  val dateFormatted = remember(txTime) {
-    if (txTime > 0L) {
-      SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date(txTime))
-    } else {
-      "Date unavailable"
-    }
+  
+  val iconTint = when (display.iconKind) {
+    "withdraw" -> Amber400
+    "deposit" -> Cyan400
+    "prize" -> Gold400
+    "refund" -> Emerald400
+    "admin" -> Rose400
+    else -> Rose400
   }
-
-  // Subtitle / Description / Source
-  val displayDescription = remember(txn.description, txn.source) {
-    if (txn.description.isNotBlank() && txn.description != titleText) {
-      txn.description
-    } else {
-      txn.source.ifBlank { "APP" }
-    }
-  }
-
-  // Status Badge using exact domain TransactionStatus (No invented statuses)
-  val statusUpper = txn.status.uppercase()
-  val (statusColor, statusBg, statusLabel) = when (statusUpper) {
-    TransactionStatus.COMPLETED.name -> Triple(
-      Emerald400,
-      Emerald500.copy(alpha = 0.12f),
-      TransactionStatus.COMPLETED.name,
-    )
-    TransactionStatus.PENDING.name -> Triple(
-      Gold400,
-      Gold500.copy(alpha = 0.12f),
-      TransactionStatus.PENDING.name,
-    )
-    TransactionStatus.FAILED.name -> Triple(
-      Rose400,
-      Rose600.copy(alpha = 0.12f),
-      TransactionStatus.FAILED.name,
-    )
-    TransactionStatus.CANCELLED.name -> Triple(
-      Slate400,
-      Slate700.copy(alpha = 0.35f),
-      TransactionStatus.CANCELLED.name,
-    )
-    TransactionStatus.REJECTED.name -> Triple(
-      Rose400,
-      Rose600.copy(alpha = 0.12f),
-      TransactionStatus.REJECTED.name,
-    )
-    else -> Triple(
-      Slate400,
-      Slate800,
-      statusUpper.ifBlank { TransactionStatus.COMPLETED.name },
-    )
-  }
+  val iconBg = iconTint.copy(alpha = 0.15f)
 
   Surface(
     color = Slate850,
@@ -580,7 +495,7 @@ private fun TransactionCard(txn: TransactionEntity) {
               contentAlignment = Alignment.Center,
             ) {
               Icon(
-                imageVector = categoryIcon,
+                imageVector = icon,
                 contentDescription = null,
                 tint = iconTint,
                 modifier = Modifier.size(22.dp),
@@ -594,57 +509,55 @@ private fun TransactionCard(txn: TransactionEntity) {
               horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
               Text(
-                text = titleText,
+                text = display.title,
                 style = MaterialTheme.typography.titleSmall.copy(
                   fontWeight = FontWeight.Bold,
-                  fontSize = 13.sp,
+                  fontSize = 14.sp,
                 ),
                 color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
               )
 
-              // Status Badge
-              Surface(
-                shape = RoundedCornerShape(4.dp),
-                color = statusBg,
-                border = BorderStroke(0.5.dp, statusColor.copy(alpha = 0.4f)),
-              ) {
-                Text(
-                  text = statusLabel,
-                  style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.Bold,
-                  ),
-                  color = statusColor,
-                  modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                )
-              }
+              StatusBadge(statusText = display.statusText)
             }
 
-            Spacer(modifier = Modifier.height(2.dp))
+            if (display.description.isNotBlank()) {
+              Spacer(modifier = Modifier.height(2.dp))
+              Text(
+                text = display.description,
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                color = Slate400,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+              )
+            }
 
-            Text(
-              text = "$dateFormatted • $displayDescription",
-              style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-              color = Slate400,
-            )
+            if (display.dateText.isNotBlank()) {
+              Spacer(modifier = Modifier.height(2.dp))
+              Text(
+                text = display.dateText,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                color = Slate500,
+              )
+            }
           }
         }
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Amount presentation with ৳ (Never ₹, INR, or $)
-        val amountPrefix = if (isWithdraw) "- ৳" else if (isDeposit) "+ ৳" else if (isCredit) "+ ৳" else "- ৳"
+        val amountPrefix = if (display.isVoid) "" else if (display.isCredit) "+ " else "- "
         Text(
-          text = "$amountPrefix ${"%,.2f".format(txn.amountInCurrency)}",
+          text = "$amountPrefix${strings.takaFromMinor(txn.displayMinorUnits)}",
           style = MaterialTheme.typography.titleMedium.copy(
             fontWeight = FontWeight.Black,
-            fontSize = 14.sp,
+            fontSize = 16.sp,
           ),
-          color = if (isCredit) Emerald400 else Rose400,
+          color = if (display.isVoid) Slate400 else if (display.isCredit) Emerald400 else Rose400,
         )
       }
 
-      // Reference / TrxID with one-tap copy if present
       if (txn.referenceId.isNotBlank()) {
         Spacer(modifier = Modifier.height(8.dp))
         HorizontalDivider(color = Slate800, thickness = 0.5.dp)
@@ -656,10 +569,12 @@ private fun TransactionCard(txn: TransactionEntity) {
           horizontalArrangement = Arrangement.SpaceBetween,
         ) {
           Text(
-            text = "Ref: ${txn.referenceId}",
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+            text = "${strings.txHistoryRefLabel} ${txn.referenceId}",
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
             color = Slate400,
             modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
           )
 
           Surface(
@@ -668,8 +583,9 @@ private fun TransactionCard(txn: TransactionEntity) {
             modifier = Modifier
               .clickable {
                 clipboardManager.setText(AnnotatedString(txn.referenceId))
+                Toast.makeText(context, strings.txHistoryCopied, Toast.LENGTH_SHORT).show()
               }
-              .testTag("copy_ref_${txn.transactionId}"),
+              .testTag("copy_ref_${txn.effectiveId}"),
           ) {
             Row(
               modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -678,14 +594,14 @@ private fun TransactionCard(txn: TransactionEntity) {
             ) {
               Icon(
                 imageVector = Icons.Default.ContentCopy,
-                contentDescription = "Copy Reference",
+                contentDescription = strings.txHistoryCopyAction,
                 tint = Gold400,
-                modifier = Modifier.size(11.dp),
+                modifier = Modifier.size(12.dp),
               )
               Text(
-                text = "COPY",
+                text = strings.txHistoryCopyAction,
                 style = MaterialTheme.typography.labelSmall.copy(
-                  fontSize = 8.sp,
+                  fontSize = 10.sp,
                   fontWeight = FontWeight.Bold,
                 ),
                 color = Gold400,

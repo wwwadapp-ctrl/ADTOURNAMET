@@ -59,7 +59,7 @@ import com.example.domain.repository.NotificationRepository
 import coil.request.ImageRequest
 import coil.size.Precision
 import com.example.R
-import com.example.core.i18n.LocalAppStrings
+import com.example.core.i18n.*
 import com.example.domain.model.AppSettingsEntity
 import com.example.domain.model.GameType
 import com.example.domain.model.MatchEntity
@@ -103,7 +103,7 @@ private fun rememberGuideBanners(): List<GuideBannerItem> {
         title = strings.depositGuideTitle,
         description = strings.depositGuideSub,
         ctaText = strings.viewGuideCta,
-        badgeText = "DEPOSIT GUIDE",
+        badgeText = strings.homeBadgeDeposit,
         icon = Icons.Default.AccountBalanceWallet,
         accentColor = Gold400,
         secondaryColor = Cyan400,
@@ -114,7 +114,7 @@ private fun rememberGuideBanners(): List<GuideBannerItem> {
         title = strings.matchJoinGuideTitle,
         description = strings.matchJoinGuideSub,
         ctaText = strings.viewGuideCta,
-        badgeText = "JOIN GUIDE",
+        badgeText = strings.homeBadgeJoin,
         icon = Icons.Default.PlayArrow,
         accentColor = Cyan400,
         secondaryColor = Indigo400,
@@ -125,7 +125,7 @@ private fun rememberGuideBanners(): List<GuideBannerItem> {
         title = strings.resultGuideTitle,
         description = strings.resultGuideSub,
         ctaText = strings.viewGuideCta,
-        badgeText = "RESULT GUIDE",
+        badgeText = strings.homeBadgeResult,
         icon = Icons.Default.Star,
         accentColor = Amber400,
         secondaryColor = Emerald400,
@@ -136,7 +136,7 @@ private fun rememberGuideBanners(): List<GuideBannerItem> {
         title = strings.rulesGuideTitle,
         description = strings.rulesGuideSub,
         ctaText = strings.viewGuideCta,
-        badgeText = "FAIR PLAY RULES",
+        badgeText = strings.homeBadgeRules,
         icon = Icons.Default.Info,
         accentColor = Gold400,
         secondaryColor = Rose400,
@@ -160,7 +160,7 @@ fun HomeScreen(
   onProfileClick: () -> Unit,
   onRulesClick: () -> Unit,
   onSupportClick: () -> Unit,
-  onAdminClick: () -> Unit,
+  onAdminClick: (() -> Unit)? = null,
   onReferClick: () -> Unit = {},
   onHistoryClick: () -> Unit = {},
   onAllMatchesClick: () -> Unit = {},
@@ -261,7 +261,7 @@ fun HomeScreen(
       item {
         LobbyBoardGamesSection(
             onLudoClick = onAutoLudoClick,
-            onCarromClick = { android.widget.Toast.makeText(context, "ক্যারম পুল শীঘ্রই আসছে", android.widget.Toast.LENGTH_SHORT).show() }
+            onCarromClick = { android.widget.Toast.makeText(context, strings.homeCarromComingSoon, android.widget.Toast.LENGTH_SHORT).show() }
         )
       }
 
@@ -328,7 +328,7 @@ fun HomeScreen(
                 .padding(vertical = 24.dp, horizontal = 16.dp),
             ) {
               EmptyState(
-                title = "বর্তমানে কোনো ম্যাচ উপলব্ধ নেই",
+                title = strings.homeEmptyMatchesTitle,
                 description = strings.noAvailableMatchesSubtext,
                 actionButtonText = strings.refreshMatches,
                 onActionClick = { viewModel.refresh() },
@@ -426,6 +426,7 @@ fun HomeReferralBanner(
   onClick: () -> Unit,
   modifier: Modifier = Modifier
 ) {
+  val strings = LocalAppStrings.current
   Surface(
     modifier = modifier
       .fillMaxWidth()
@@ -460,14 +461,25 @@ fun HomeReferralBanner(
         Spacer(modifier = Modifier.width(12.dp))
         Column {
           Text(
-            "বন্ধু রেফার করলেই ৳৪০ বোনাস!",
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-            color = Color.White
+            text = strings.homeReferTitle(strings.taka(40.0)),
+            style = MaterialTheme.typography.labelLarge.copy(
+              fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
+              fontSize = 14.sp,
+              letterSpacing = 0.sp
+            ),
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
           )
+          Spacer(modifier = Modifier.height(2.dp))
           Text(
-            "প্রথম ডিপোজিটে ক্যাশ রিওয়ার্ড",
-            style = MaterialTheme.typography.labelSmall,
-            color = Gold400
+            text = strings.homeReferSubtitle,
+            style = MaterialTheme.typography.labelSmall.copy(
+              fontSize = 12.sp
+            ),
+            color = Gold400,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
           )
         }
       }
@@ -477,10 +489,15 @@ fun HomeReferralBanner(
         modifier = Modifier.padding(start = 8.dp)
       ) {
         Text(
-          "রেফার করুন >",
-          style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
+          text = strings.homeReferCta,
+          style = MaterialTheme.typography.labelSmall.copy(
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp
+          ),
           color = Slate950,
-          modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+          modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
         )
       }
     }
@@ -561,10 +578,13 @@ fun HomeQuickActions(
             maxLines = 1,
           )
           Text(
-            text = "${strings.depositAction} ৳",
-            style = MaterialTheme.typography.labelSmall,
+            text = strings.homeQuickDepositSub,
+            style = MaterialTheme.typography.labelSmall.copy(
+              fontSize = 12.sp
+            ),
             color = NeonCyan,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis
           )
         }
       }
@@ -621,15 +641,20 @@ fun HomeQuickActions(
             style = MaterialTheme.typography.labelLarge.copy(
               fontWeight = FontWeight.Bold,
               letterSpacing = 0.5.sp,
+              fontSize = 14.sp
             ),
             color = Color.White,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis
           )
           Text(
-            text = "${strings.withdrawAction} ৳",
-            style = MaterialTheme.typography.labelSmall,
+            text = strings.homeQuickWithdrawSub,
+            style = MaterialTheme.typography.labelSmall.copy(
+              fontSize = 12.sp
+            ),
             color = Gold400,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis
           )
         }
       }
@@ -947,6 +972,7 @@ private fun GuideBannerCard(
 
 @Composable
 private fun AutoGamesSectionHeading(modifier: Modifier = Modifier) {
+  val strings = LocalAppStrings.current
   Row(
     modifier = modifier
       .fillMaxWidth()
@@ -970,11 +996,11 @@ private fun AutoGamesSectionHeading(modifier: Modifier = Modifier) {
       )
       Spacer(modifier = Modifier.width(6.dp))
       Text(
-        text = "★ অটো গেম ★",
+        text = strings.homeAutoGamesHeading,
         style = MaterialTheme.typography.titleMedium.copy(
-          fontWeight = FontWeight.Black,
-          fontSize = 14.sp,
-          letterSpacing = 2.sp
+          fontWeight = FontWeight.Bold,
+          fontSize = 16.sp,
+          letterSpacing = 1.sp
         ),
         color = Gold400
       )
@@ -1026,9 +1052,9 @@ private fun TournamentSectionHeading(modifier: Modifier = Modifier) {
       Text(
         text = strings.tournamentsHeading,
         style = MaterialTheme.typography.titleMedium.copy(
-          fontWeight = FontWeight.Black,
-          letterSpacing = 2.sp,
-          fontSize = 14.sp,
+          fontWeight = FontWeight.Bold,
+          letterSpacing = 1.sp,
+          fontSize = 16.sp,
         ),
         color = Gold400,
       )
@@ -1623,6 +1649,7 @@ private fun LobbyBoardGamesSection(
   onCarromClick: () -> Unit,
   modifier: Modifier = Modifier
 ) {
+  val strings = LocalAppStrings.current
   Row(
     modifier = modifier
       .fillMaxWidth()
@@ -1631,18 +1658,18 @@ private fun LobbyBoardGamesSection(
     verticalAlignment = Alignment.CenterVertically
   ) {
     BoardGameCard(
-      title = "অটো লুডু",
-      subtitle = "ইনস্ট্যান্ট বোর্ড গেম",
-      badge = "১v১ ফাস্ট",
+      title = strings.homeAutoLudoTitle,
+      subtitle = strings.homeAutoLudoSub,
+      badge = strings.homeAutoLudoBadge,
       badgeColor = Emerald400,
       iconType = 0, // Dice
       modifier = Modifier.weight(1f),
       onClick = onLudoClick
     )
     BoardGameCard(
-      title = "ক্যারম পুল",
-      subtitle = "বোর্ড স্ট্রাইক ব্যাটেল",
-      badge = "নতুন",
+      title = strings.homeCarromTitle,
+      subtitle = strings.homeCarromSub,
+      badge = strings.homeNewBadge,
       badgeColor = Gold400,
       iconType = 1, // Striker/Coin
       modifier = Modifier.weight(1f),
@@ -1746,10 +1773,10 @@ private fun BoardGameCard(
             Text(
               text = subtitle,
               style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 color = Slate400
               ),
-              maxLines = 1,
+              maxLines = 2,
               overflow = TextOverflow.Ellipsis
             )
           }

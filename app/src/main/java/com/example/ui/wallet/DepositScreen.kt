@@ -39,12 +39,8 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.domain.model.UserEntity
 import com.example.domain.model.WalletEntity
-import com.example.ui.components.UnifiedEsportsTopBar
-import com.example.ui.components.TournamentButton
-import com.example.ui.components.TournamentButtonVariant
-import com.example.ui.components.TournamentCard
-import com.example.ui.components.TournamentTextField
-import com.example.core.i18n.LocalAppStrings
+import com.example.ui.components.*
+import com.example.core.i18n.*
 import com.example.ui.theme.*
 
 private val BkashPink = Color(0xFFE2136E)
@@ -65,6 +61,7 @@ fun DepositScreen(
   modifier: Modifier = Modifier,
 ) {
   val strings = LocalAppStrings.current
+  val isBengali = strings === BengaliStrings
   val uiState by viewModel.uiState.collectAsState()
   val context = LocalContext.current
   val clipboardManager = LocalClipboardManager.current
@@ -156,8 +153,8 @@ fun DepositScreen(
           },
           title = {
             Text(
-              text = "Deposit Request Submitted",
-              style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+              text = strings.depositSubmittedTitle,
+              style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 17.sp),
               color = Color.White,
               textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
@@ -168,8 +165,8 @@ fun DepositScreen(
               modifier = Modifier.fillMaxWidth(),
             ) {
               Text(
-                text = "Deposit request submitted! Please wait for Admin approval.",
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                text = strings.depositSubmittedDesc,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium, fontSize = 14.sp),
                 color = Slate200,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
               )
@@ -188,10 +185,10 @@ fun DepositScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                   ) {
-                    Text("Method", style = MaterialTheme.typography.bodySmall, color = Slate400)
+                    Text(strings.depositMethodLabel, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp), color = Slate400)
                     Text(
                       text = selectedMethod,
-                      style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                      style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
                       color = if (selectedMethod == "BKASH") BkashPink else NagadOrange,
                     )
                   }
@@ -199,21 +196,25 @@ fun DepositScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                   ) {
-                    Text("Amount", style = MaterialTheme.typography.bodySmall, color = Slate400)
+                    Text(strings.depositAmountSummaryLabel, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp), color = Slate400)
                     Text(
-                      text = "৳ ${"%.2f".format(amountInput.toDoubleOrNull() ?: 0.0)}",
-                      style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                      text = strings.taka(amountInput.toDoubleOrNull() ?: 0.0),
+                      style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = if (isBengali) FontWeight.Bold else FontWeight.ExtraBold,
+                        fontSize = 13.sp,
+                      ),
                       color = Gold400,
+                      modifier = Modifier.padding(end = 2.dp),
                     )
                   }
                   Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                   ) {
-                    Text("Sender Number", style = MaterialTheme.typography.bodySmall, color = Slate400)
+                    Text(strings.senderMobileLabel, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp), color = Slate400)
                     Text(
                       text = senderNumber,
-                      style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                      style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
                       color = Color.White,
                     )
                   }
@@ -221,10 +222,10 @@ fun DepositScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                   ) {
-                    Text("TrxID", style = MaterialTheme.typography.bodySmall, color = Slate400)
+                    Text(strings.trxIdLabel, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp), color = Slate400)
                     Text(
                       text = trxId,
-                      style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                      style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
                       color = Color.White,
                     )
                   }
@@ -233,14 +234,14 @@ fun DepositScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                   ) {
-                    Text("Status", style = MaterialTheme.typography.bodySmall, color = Slate400)
+                    Text(strings.depositStatusLabel, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp), color = Slate400)
                     Surface(
                       color = Amber500.copy(alpha = 0.2f),
                       shape = RoundedCornerShape(4.dp),
                     ) {
                       Text(
-                        text = "PENDING",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        text = strings.depositStatusPending,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
                         color = Amber400,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                       )
@@ -274,8 +275,9 @@ fun DepositScreen(
         Text(
           text = strings.addMoneyTitle,
           style = MaterialTheme.typography.headlineSmall.copy(
-            fontWeight = FontWeight.Black,
-            letterSpacing = 1.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = if (isBengali) 0.sp else 0.5.sp,
+            fontSize = 20.sp,
           ),
           color = Color.White,
         )
@@ -284,6 +286,7 @@ fun DepositScreen(
           text = strings.depositSubtitle,
           style = MaterialTheme.typography.bodySmall.copy(
             fontWeight = FontWeight.Medium,
+            fontSize = 13.sp,
           ),
           color = Gold400,
         )
@@ -328,17 +331,20 @@ fun DepositScreen(
                 style = MaterialTheme.typography.labelSmall.copy(
                   fontWeight = FontWeight.Bold,
                   letterSpacing = 0.5.sp,
+                  fontSize = 11.sp,
                 ),
                 color = Gold400,
               )
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-              text = "৳ ${"%.2f".format(currentBalanceMinor / 100.0)}",
+              text = strings.takaFromMinor(currentBalanceMinor),
               style = MaterialTheme.typography.titleLarge.copy(
-                fontWeight = FontWeight.Black,
+                fontWeight = if (isBengali) FontWeight.Bold else FontWeight.ExtraBold,
+                fontSize = 22.sp,
               ),
               color = Color.White,
+              modifier = Modifier.padding(end = 2.dp),
             )
           }
 
@@ -372,7 +378,7 @@ fun DepositScreen(
           text = strings.stepSelectMethod,
           style = MaterialTheme.typography.titleMedium.copy(
             fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
+            fontSize = 15.sp,
           ),
           color = Color.White,
         )
@@ -434,7 +440,7 @@ fun DepositScreen(
                 Text(
                   text = if (isBkash) strings.selectedBadge else strings.personalBadge,
                   style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                   ),
                   color = if (isBkash) BkashPink else Slate400,
@@ -496,7 +502,7 @@ fun DepositScreen(
                 Text(
                   text = if (isNagad) strings.selectedBadge else strings.personalBadge,
                   style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                   ),
                   color = if (isNagad) NagadOrange else Slate400,
@@ -533,7 +539,7 @@ fun DepositScreen(
                 )
                 Text(
                   text = strings.sendMoneyLabel(if (selectedMethod == "BKASH") "bKash" else "Nagad"),
-                  style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
+                  style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
                   color = Slate300,
                 )
               }
@@ -542,9 +548,9 @@ fun DepositScreen(
                 shape = RoundedCornerShape(4.dp),
               ) {
                 Text(
-                  text = "OFFICIAL",
+                  text = strings.depositOfficialBadge,
                   color = Emerald400,
-                  style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Black),
+                  style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
                   modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                 )
               }
@@ -558,8 +564,9 @@ fun DepositScreen(
               Text(
                 text = configuredPaymentNumber,
                 style = MaterialTheme.typography.titleLarge.copy(
-                  fontWeight = FontWeight.Black,
+                  fontWeight = FontWeight.Bold,
                   letterSpacing = 1.sp,
+                  fontSize = 20.sp,
                 ),
                 color = Gold400,
               )
@@ -569,7 +576,7 @@ fun DepositScreen(
                   copiedFeedback = true
                   android.widget.Toast.makeText(
                     context,
-                    "$selectedMethod number copied: $rawPaymentNumber",
+                    strings.depositNumberCopiedToast(selectedMethod, rawPaymentNumber),
                     android.widget.Toast.LENGTH_SHORT
                   ).show()
                 },
@@ -592,7 +599,7 @@ fun DepositScreen(
                   )
                   Text(
                     text = if (copiedFeedback) strings.copied.uppercase() else strings.copy.uppercase(),
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp),
                   )
                 }
               }
@@ -613,22 +620,24 @@ fun DepositScreen(
               text = strings.howToDepositTitle,
               style = MaterialTheme.typography.labelSmall.copy(
                 fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
                 color = Slate300,
               ),
             )
             Spacer(modifier = Modifier.height(4.dp))
             val steps = listOf(
-              "1. ${strings.stepSelectMethod.removePrefix("1. ").removePrefix("১. ")}",
-              "2. ${strings.sendMoneyInstructions}",
-              "3. ${strings.trxIdLabel}",
-              "4. ${strings.paymentScreenshotLabel}",
-              "5. ${strings.submitDepositButton}",
+              "${strings.digits("1")}. ${strings.stepSelectMethod.removePrefix("1. ").removePrefix("১. ")}",
+              "${strings.digits("2")}. ${strings.sendMoneyInstructions}",
+              "${strings.digits("3")}. ${strings.trxIdLabel}",
+              "${strings.digits("4")}. ${strings.paymentScreenshotLabel}",
+              "${strings.digits("5")}. ${strings.submitDepositButton}",
             )
             steps.forEach { step ->
               Text(
                 text = step,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                 color = Slate400,
+                lineHeight = 16.sp,
               )
             }
           }
@@ -647,7 +656,7 @@ fun DepositScreen(
           text = strings.stepDepositDetails,
           style = MaterialTheme.typography.titleMedium.copy(
             fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
+            fontSize = 15.sp,
           ),
           color = Color.White,
         )
@@ -672,7 +681,7 @@ fun DepositScreen(
             Text(
               text = displayError,
               color = Rose400,
-              style = MaterialTheme.typography.bodySmall,
+              style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
               modifier = Modifier.padding(10.dp),
             )
           }
@@ -706,7 +715,7 @@ fun DepositScreen(
                   style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.5.sp,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                   ),
                   color = Gold400,
                 )
@@ -719,7 +728,7 @@ fun DepositScreen(
                 Text(
                   text = strings.depositRange,
                   style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 9.sp,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.SemiBold,
                   ),
                   color = Slate300,
@@ -738,7 +747,7 @@ fun DepositScreen(
                 clientError = null
               },
               label = strings.enterAmountLabel,
-              placeholder = "e.g. 100",
+              placeholder = strings.depositAmountPlaceholder,
               helperText = null,
               leadingIcon = Icons.Default.CurrencyExchange,
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -768,16 +777,19 @@ fun DepositScreen(
                   modifier = Modifier.weight(1f),
                 ) {
                   Box(
-                    modifier = Modifier.padding(vertical = 7.dp),
+                    modifier = Modifier.padding(vertical = 7.dp, horizontal = 2.dp),
                     contentAlignment = Alignment.Center,
                   ) {
                     Text(
-                      text = "৳$chipAmount",
+                      text = strings.takaWhole(chipAmount.toDouble()),
                       style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
-                        fontSize = 11.sp,
+                        fontWeight = if (isSelected) (if (isBengali) FontWeight.Bold else FontWeight.ExtraBold) else FontWeight.Bold,
+                        fontSize = 11.5.sp,
                       ),
                       color = if (isSelected) Gold400 else Slate300,
+                      maxLines = 1,
+                      softWrap = false,
+                      modifier = Modifier.padding(end = 2.dp),
                     )
                   }
                 }
@@ -814,7 +826,7 @@ fun DepositScreen(
             clientError = null
           },
           label = strings.trxIdLabel,
-          placeholder = "e.g. 9J8K7L6M",
+          placeholder = strings.depositTrxIdPlaceholder,
           leadingIcon = Icons.Default.Receipt,
           testTag = "deposit_trx_input",
         )
@@ -826,7 +838,7 @@ fun DepositScreen(
           text = strings.paymentScreenshotLabel,
           style = MaterialTheme.typography.titleSmall.copy(
             fontWeight = FontWeight.SemiBold,
-            fontSize = 13.sp,
+            fontSize = 13.5.sp,
           ),
           color = Color.White,
         )
@@ -842,7 +854,7 @@ fun DepositScreen(
             Column(modifier = Modifier.padding(10.dp)) {
               Image(
                 bitmap = imageBitmap!!,
-                contentDescription = "Payment Screenshot Preview",
+                contentDescription = strings.depositScreenshotPreview,
                 modifier = Modifier
                   .fillMaxWidth()
                   .height(160.dp)
@@ -867,7 +879,7 @@ fun DepositScreen(
                   )
                   Text(
                     text = strings.screenshotAttached,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                     color = Emerald400,
                   )
                 }
@@ -882,7 +894,7 @@ fun DepositScreen(
                   ) {
                     Text(
                       text = strings.replace,
-                      style = MaterialTheme.typography.labelSmall,
+                      style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                       color = Cyan400,
                     )
                   }
@@ -895,7 +907,7 @@ fun DepositScreen(
                   ) {
                     Text(
                       text = strings.remove,
-                      style = MaterialTheme.typography.labelSmall,
+                      style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                       color = Rose400,
                     )
                   }
@@ -943,13 +955,14 @@ fun DepositScreen(
                 style = MaterialTheme.typography.labelMedium.copy(
                   fontWeight = FontWeight.Bold,
                   letterSpacing = 0.5.sp,
+                  fontSize = 13.sp,
                 ),
                 color = Color.White,
               )
               Spacer(modifier = Modifier.height(2.dp))
               Text(
                 text = strings.uploadScreenshotSub,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                 color = Slate400,
               )
             }
@@ -978,7 +991,7 @@ fun DepositScreen(
             )
             Text(
               text = strings.depositSecurityNotice,
-              style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+              style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
               color = Slate300,
             )
           }
@@ -993,7 +1006,7 @@ fun DepositScreen(
             val minAmount = (appSettings?.minDepositTaka ?: 50.0).toLong()
             val amountNum = amountInput.toLongOrNull() ?: 0L
             if (amountNum < minAmount) {
-              clientError = "Minimum deposit amount is ৳ $minAmount"
+              clientError = strings.depositMinAmountError(strings.takaWhole(minAmount.toDouble()))
               return@TournamentButton
             }
             if (amountNum > 25000L) {

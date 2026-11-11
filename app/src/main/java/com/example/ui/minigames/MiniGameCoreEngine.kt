@@ -42,6 +42,7 @@ object MiniGameCoreEngine {
 
     // Internal Configuration Models
     private data class GlobalConfig(
+        val miniGamesEnabled: Boolean = false,
         val spinGameActive: Boolean = true,
         val diceGameActive: Boolean = true,
         val headTailGameActive: Boolean = true,
@@ -88,6 +89,7 @@ object MiniGameCoreEngine {
                             val uSnap = uTask.result
                             
                             val global = GlobalConfig(
+                                miniGamesEnabled = gSnap?.child("miniGamesEnabled")?.getValue(Boolean::class.java) ?: false,
                                 spinGameActive = gSnap?.child("spinGameActive")?.getValue(Boolean::class.java) ?: true,
                                 diceGameActive = gSnap?.child("diceGameActive")?.getValue(Boolean::class.java) ?: true,
                                 headTailGameActive = gSnap?.child("headTailGameActive")?.getValue(Boolean::class.java) ?: true,
@@ -146,7 +148,7 @@ object MiniGameCoreEngine {
                 val state = fetchEngineState(uid, dbRef)
 
                 // 2. Global Maintenance Check
-                if (!state.global.scratchCardGameActive) {
+                if (!state.global.miniGamesEnabled || !state.global.scratchCardGameActive) {
                     return Result.failure(IllegalStateException("এই গেমটি বর্তমানে সাময়িকভাবে বন্ধ আছে।"))
                 }
 
@@ -230,7 +232,7 @@ object MiniGameCoreEngine {
                         )
                     )
                 } else {
-                    Result.failure(Exception("Failed to commit game transaction to database"))
+                    Result.failure(Exception("দুঃখিত, খেলাটি সম্পন্ন হয়নি। আপনার কোনো টাকা কাটা হয়নি। সমস্যা থাকলে সাপোর্টে যোগাযোগ করুন।"))
                 }
 
             } catch (e: Exception) {
@@ -264,7 +266,7 @@ object MiniGameCoreEngine {
                 val state = fetchEngineState(uid, dbRef)
 
                 // 2. Global Maintenance Check
-                if (!state.global.spinGameActive) {
+                if (!state.global.miniGamesEnabled || !state.global.spinGameActive) {
                     return Result.failure(IllegalStateException("এই গেমটি বর্তমানে সাময়িকভাবে বন্ধ আছে।"))
                 }
 
@@ -385,7 +387,7 @@ object MiniGameCoreEngine {
                         )
                     )
                 } else {
-                    Result.failure(Exception("Database update failed"))
+                    Result.failure(Exception("দুঃখিত, খেলাটি সম্পন্ন হয়নি। আপনার কোনো টাকা কাটা হয়নি। সমস্যা থাকলে সাপোর্টে যোগাযোগ করুন।"))
                 }
 
             } catch (e: Exception) {
@@ -418,7 +420,7 @@ object MiniGameCoreEngine {
                 val state = fetchEngineState(uid, dbRef)
 
                 // 2. Global Maintenance Check
-                if (!state.global.diceGameActive) {
+                if (!state.global.miniGamesEnabled || !state.global.diceGameActive) {
                     return Result.failure(IllegalStateException("এই গেমটি বর্তমানে সাময়িকভাবে বন্ধ আছে।"))
                 }
 
@@ -503,7 +505,7 @@ object MiniGameCoreEngine {
                         )
                     )
                 } else {
-                    Result.failure(Exception("Database update failed"))
+                    Result.failure(Exception("দুঃখিত, খেলাটি সম্পন্ন হয়নি। আপনার কোনো টাকা কাটা হয়নি। সমস্যা থাকলে সাপোর্টে যোগাযোগ করুন।"))
                 }
 
             } catch (e: Exception) {
@@ -536,7 +538,7 @@ object MiniGameCoreEngine {
                 val state = fetchEngineState(uid, dbRef)
 
                 // 2. Global Maintenance Check
-                if (!state.global.headTailGameActive) {
+                if (!state.global.miniGamesEnabled || !state.global.headTailGameActive) {
                     return Result.failure(IllegalStateException("এই গেমটি বর্তমানে সাময়িকভাবে বন্ধ আছে।"))
                 }
 
@@ -617,7 +619,7 @@ object MiniGameCoreEngine {
                         )
                     )
                 } else {
-                    Result.failure(Exception("Database update failed"))
+                    Result.failure(Exception("দুঃখিত, খেলাটি সম্পন্ন হয়নি। আপনার কোনো টাকা কাটা হয়নি। সমস্যা থাকলে সাপোর্টে যোগাযোগ করুন।"))
                 }
 
             } catch (e: Exception) {

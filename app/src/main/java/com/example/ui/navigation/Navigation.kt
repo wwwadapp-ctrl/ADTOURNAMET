@@ -60,8 +60,6 @@ import com.example.BuildConfig
 import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
-import com.example.ui.admin.AdminScreen
-import com.example.ui.admin.AdminViewModel
 import com.example.ui.auth.*
 import com.example.ui.history.HistoryScreen
 import com.example.ui.home.HomeScreen
@@ -102,7 +100,6 @@ object Destinations {
   const val HISTORY = "history"
   const val SUPPORT = "support"
   const val RULES = "rules"
-  const val ADMIN = "admin"
   const val REFER_EARN = "refer_earn"
   const val AI_SUPPORT = "ai_support"
   const val SPIN_WHEEL = "spin_wheel"
@@ -516,7 +513,6 @@ fun AppNavigation(
           },
           onRulesClick = { navController.navigate(Destinations.RULES) },
           onSupportClick = { navController.navigate(Destinations.SUPPORT) },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           onReferClick = { navController.navigate(Destinations.REFER_EARN) },
           onHistoryClick = { navController.navigate(Destinations.HISTORY) },
           onSpinWheelClick = { navController.navigate(Destinations.SPIN_WHEEL) },
@@ -553,7 +549,6 @@ fun AppNavigation(
               restoreState = false
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           unreadNotificationsCount = unreadNotificationsCount,
         )
       }
@@ -591,7 +586,6 @@ fun AppNavigation(
               restoreState = false
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           matchRepository = container.matchRepository,
         )
       }
@@ -627,7 +621,6 @@ fun AppNavigation(
               restoreState = false
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           onNavigateBack = { navController.popBackStack() },
           notificationRepository = container.notificationRepository,
           onNavigateToTarget = { target ->
@@ -749,7 +742,6 @@ fun AppNavigation(
               restoreState = false
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           onNavigateBack = { navController.popBackStack() },
           onViewRoomCode = { /* Handled in-screen */ },
           onSubmitProof = { /* Handled in-screen */ },
@@ -786,7 +778,6 @@ fun AppNavigation(
               restoreState = false
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           onNavigateBack = { navController.popBackStack() },
         )
       }
@@ -821,7 +812,6 @@ fun AppNavigation(
               restoreState = false
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           onNavigateBack = { navController.popBackStack() },
         )
       }
@@ -856,7 +846,6 @@ fun AppNavigation(
               restoreState = false
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           onNavigateBack = { navController.popBackStack() },
         )
       }
@@ -906,7 +895,6 @@ fun AppNavigation(
               restoreState = false
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           unreadNotificationsCount = unreadNotificationsCount,
         )
       }
@@ -940,7 +928,6 @@ fun AppNavigation(
               restoreState = false
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           onNavigateBack = { navController.popBackStack() },
         )
       }
@@ -974,51 +961,10 @@ fun AppNavigation(
               restoreState = false
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           onNavigateBack = { navController.popBackStack() },
         )
       }
 
-      // 18. SUPER ADMIN DASHBOARD
-      composable(Destinations.ADMIN) { backStackEntry ->
-        val adminViewModel: AdminViewModel = viewModel(
-          key = "AdminViewModel_$activeUserId",
-          factory = remember(activeUserId) {
-            AdminViewModel.Factory(container.adminRepository, activeUserId, container.settingsRepository)
-          }
-        )
-        val walletViewModel: WalletViewModel = viewModel(
-          viewModelStoreOwner = backStackEntry,
-          key = "WalletViewModel_Admin_$activeUserId",
-          factory = remember(activeUserId) {
-            WalletViewModel.Factory(container.walletRepository, activeUserId, authRepository = container.authRepository)
-          }
-        )
-        val walletUiState by walletViewModel.uiState.collectAsState()
-
-        AdminScreen(
-          viewModel = adminViewModel,
-          currentUser = currentUser,
-          wallet = walletUiState.wallet,
-          unreadNotificationsCount = unreadNotificationsCount,
-          onWalletClick = {
-            navController.navigate(Destinations.WALLET) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
-          onNotificationClick = { navController.navigate(Destinations.NOTIFICATIONS) },
-          onProfileClick = {
-            navController.navigate(Destinations.PROFILE) {
-              popUpTo(Destinations.HOME) { saveState = false }
-              launchSingleTop = true
-              restoreState = false
-            }
-          },
-          onNavigateBack = { navController.popBackStack() },
-        )
-      }
 
       // 19. REFER & EARN SCREEN
       composable(Destinations.REFER_EARN) {
@@ -1060,7 +1006,6 @@ fun AppNavigation(
               restoreState = false
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
         )
       }
 
@@ -1105,7 +1050,6 @@ fun AppNavigation(
               restoreState = false
             }
           },
-          onAdminClick = { navController.navigate(Destinations.ADMIN) },
           onNavigateBack = { navController.popBackStack() },
           onNavigateToMatches = {
             navController.navigate(Destinations.MATCHES) {

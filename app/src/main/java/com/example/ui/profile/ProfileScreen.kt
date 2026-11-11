@@ -51,8 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.core.i18n.AppLanguage
-import com.example.core.i18n.LocalAppStrings
+import com.example.core.i18n.*
 import com.example.domain.model.UserEntity
 import com.example.ui.components.*
 import com.example.ui.theme.*
@@ -138,7 +137,7 @@ fun ProfileScreen(
           val uid = currentUser?.userId ?: currentUser?.uid ?: ""
           if (uid.isNotBlank()) {
             viewModel.updatePhoto(uid, dataUrl)
-            bannerMessage = strings.changePhotoTitle
+            bannerMessage = strings.profilePhotoUpdateSuccess
           }
         }
       } catch (_: Exception) {
@@ -150,12 +149,19 @@ fun ProfileScreen(
   val joinDateFormatted = remember(uiState.resolvedJoinDate, currentLanguage) {
     val date = uiState.resolvedJoinDate
     if (date > 0L) {
-      val locale = if (currentLanguage == AppLanguage.BN) Locale("bn", "BD") else Locale.ENGLISH
-      val formatted = SimpleDateFormat("d MMMM yyyy", locale).format(Date(date))
       if (currentLanguage == AppLanguage.BN) {
-        // Only translate ASCII digits to avoid re-translating existing Bengali digits (Unicode arithmetic fix)
-        formatted.map { if (it in '0'..'9') '০' + (it - '0') else it }.joinToString("")
-      } else formatted
+        val bengaliMonths = listOf(
+          "জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন",
+          "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর"
+        )
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = date }
+        val day = strings.digits(cal.get(java.util.Calendar.DAY_OF_MONTH).toString())
+        val month = bengaliMonths[cal.get(java.util.Calendar.MONTH)]
+        val year = strings.digits(cal.get(java.util.Calendar.YEAR).toString())
+        "$day $month $year"
+      } else {
+        SimpleDateFormat("d MMMM yyyy", Locale.ENGLISH).format(Date(date))
+      }
     } else {
       strings.statRecentlyJoined
     }
@@ -362,7 +368,7 @@ fun ProfileScreen(
 
               Text(
                 text = strings.mobileLockedNotice,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                 color = Slate500,
                 modifier = Modifier.padding(top = 6.dp),
               )
@@ -377,7 +383,8 @@ fun ProfileScreen(
               text = strings.careerStatistics,
               style = MaterialTheme.typography.titleSmall.copy(
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
+                letterSpacing = 0.5.sp,
+                fontSize = 15.sp,
               ),
               color = Gold400,
             )
@@ -388,27 +395,38 @@ fun ProfileScreen(
             val winRate = uiState.winRate
             Row(
               modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.spacedBy(10.dp),
+              horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-              StatBox(title = strings.statMatches, value = "$totalMatches", subtitle = strings.statMatchesSub, modifier = Modifier.weight(1f))
+              StatBox(
+                title = strings.statMatches,
+                value = strings.number(totalMatches),
+                subtitle = strings.statMatchesSub,
+                modifier = Modifier.weight(1f)
+              )
               StatBox(
                 title = strings.statWins,
-                value = "$wins",
+                value = strings.number(wins),
                 subtitle = strings.winRateSubtitle(winRate),
                 color = Emerald500,
                 glowColor = Emerald500,
                 modifier = Modifier.weight(1f)
               )
-              StatBox(title = strings.statLosses, value = "$losses", subtitle = strings.statLossesSub, color = Rose500, modifier = Modifier.weight(1f))
+              StatBox(
+                title = strings.statLosses,
+                value = strings.number(losses),
+                subtitle = strings.statLossesSub,
+                color = Rose500,
+                modifier = Modifier.weight(1f)
+              )
             }
             Spacer(modifier = Modifier.height(10.dp))
             Row(
               modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.spacedBy(10.dp),
+              horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
               StatBox(
                 title = strings.statTotalWinnings,
-                value = "৳ ${"%.2f".format(currentUser.getDisplayTotalWinnings())}",
+                value = strings.taka(currentUser.getDisplayTotalWinnings()),
                 subtitle = strings.statAllTimeRewards,
                 color = Gold400,
                 glowColor = Gold400,
@@ -612,6 +630,13 @@ fun ProfileScreen(
 
         // 6. FAIR PLAY & INTEGRITY POLICY
         item {
+          val localizedStatus = when (currentUser.status.trim().uppercase()) {
+            "ACTIVE" -> strings.profileStatusActive
+            "BANNED" -> strings.profileStatusBanned
+            "SUSPENDED" -> strings.profileStatusSuspended
+            "PENDING" -> strings.profileStatusPending
+            else -> currentUser.status
+          }
           TournamentCard(
             modifier = Modifier.fillMaxWidth(),
             backgroundColor = NavyCard,
@@ -619,15 +644,15 @@ fun ProfileScreen(
           ) {
             Text(
               text = strings.fairPlayTitle,
-              style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 15.sp),
               color = Gold400,
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-              text = strings.fairPlayText(currentUser.status),
-              style = MaterialTheme.typography.bodySmall,
+              text = strings.fairPlayText(localizedStatus),
+              style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.5.sp),
               color = Slate400,
-              lineHeight = 18.sp,
+              lineHeight = 20.sp,
             )
           }
         }
@@ -809,20 +834,21 @@ fun ProfileScreen(
       onDismissRequest = { showSignOutDialog = false },
       title = {
         Text(
-          text = if (currentLanguage == AppLanguage.BN) "লগআউট নিশ্চিত করুন" else "Confirm Logout",
+          text = strings.profileLogoutDialogTitle,
+          style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 16.sp),
           color = Color.White
         )
       },
       text = {
         Text(
-          text = if (currentLanguage == AppLanguage.BN) "আপনি কি লগআউট করতে চান?" else "Are you sure you want to logout?",
+          text = strings.profileLogoutDialogMessage,
           color = Slate300,
-          style = MaterialTheme.typography.bodyMedium,
+          style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
         )
       },
       confirmButton = {
         TournamentButton(
-          text = strings.signOutButton,
+          text = strings.profileLogoutConfirmButton,
           variant = TournamentButtonVariant.DANGER,
           onClick = {
             showSignOutDialog = false
@@ -832,7 +858,7 @@ fun ProfileScreen(
       },
       dismissButton = {
         TextButton(onClick = { showSignOutDialog = false }) {
-          Text(if (currentLanguage == AppLanguage.BN) "বাতিল" else strings.cancel, color = Slate400)
+          Text(strings.cancel, color = Slate400)
         }
       },
       containerColor = NavyCard,
@@ -862,6 +888,7 @@ private fun AvatarPresetItem(
   isSelected: Boolean,
   onClick: () -> Unit,
 ) {
+  val strings = LocalAppStrings.current
   Surface(
     modifier = Modifier
       .size(54.dp)
@@ -878,7 +905,7 @@ private fun AvatarPresetItem(
     ) {
       Icon(
         imageVector = preset.icon,
-        contentDescription = preset.label,
+        contentDescription = strings.profileAvatarPreset(preset.id),
         tint = Color.White,
         modifier = Modifier.size(28.dp),
       )
@@ -1047,9 +1074,10 @@ private fun SupportChannelItem(
           color = Slate800,
           shape = RoundedCornerShape(4.dp),
         ) {
+          val strings = LocalAppStrings.current
           Text(
-            text = "OFFLINE",
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+            text = strings.profileSupportOffline,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
             color = Slate400,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
           )
@@ -1068,6 +1096,7 @@ private fun StatBox(
   glowColor: Color? = null,
   modifier: Modifier = Modifier,
 ) {
+  val isBengali = LocalAppStrings.current === BengaliStrings
   val infiniteTransition = rememberInfiniteTransition(label = "StatGlow")
   val glowAlpha by infiniteTransition.animateFloat(
     initialValue = 0.04f,
@@ -1108,25 +1137,35 @@ private fun StatBox(
       },
   ) {
     Column(
-      modifier = Modifier.padding(12.dp),
+      modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
       Text(
         text = title,
-        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.5.sp),
         color = Slate400,
+        maxLines = 1,
+        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
       )
       Spacer(modifier = Modifier.height(4.dp))
       Text(
         text = value,
-        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+        style = MaterialTheme.typography.titleMedium.copy(
+          fontWeight = if (isBengali) FontWeight.Bold else FontWeight.ExtraBold,
+          fontSize = 15.sp,
+        ),
         color = color,
+        maxLines = 1,
+        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        modifier = Modifier.padding(end = 2.dp),
       )
       Spacer(modifier = Modifier.height(2.dp))
       Text(
         text = subtitle,
-        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
         color = Slate500,
+        maxLines = 1,
+        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
       )
     }
   }

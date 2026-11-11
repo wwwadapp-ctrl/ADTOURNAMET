@@ -73,6 +73,12 @@ class RoomCodeNotificationTest {
       composeTestRule.setContent {
         NotificationsScreen(
           userId = userId,
+          currentUser = null,
+          wallet = null,
+          unreadNotificationsCount = 0,
+          onWalletClick = {},
+          onNotificationClick = {},
+          onProfileClick = {},
           onNavigateBack = {},
           notificationRepository = notificationRepository,
         )
@@ -112,6 +118,12 @@ class RoomCodeNotificationTest {
       composeTestRule.setContent {
         NotificationsScreen(
           userId = userId,
+          currentUser = null,
+          wallet = null,
+          unreadNotificationsCount = 0,
+          onWalletClick = {},
+          onNotificationClick = {},
+          onProfileClick = {},
           onNavigateBack = {},
           notificationRepository = notificationRepository,
         )
@@ -229,6 +241,12 @@ class RoomCodeNotificationTest {
       composeTestRule.setContent {
         NotificationsScreen(
           userId = userId,
+          currentUser = null,
+          wallet = null,
+          unreadNotificationsCount = 0,
+          onWalletClick = {},
+          onNotificationClick = {},
+          onProfileClick = {},
           onNavigateBack = {},
           notificationRepository = notificationRepository,
         )

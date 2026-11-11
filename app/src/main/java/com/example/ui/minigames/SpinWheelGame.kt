@@ -62,6 +62,10 @@ import com.google.firebase.database.ValueEventListener
 import java.security.SecureRandom
 import kotlin.math.PI
 import com.example.core.config.FirebaseConfig
+import com.example.core.i18n.LocalAppStrings
+import com.example.core.i18n.digits
+import com.example.core.i18n.taka
+import com.example.core.i18n.takaWhole
 import com.google.firebase.database.FirebaseDatabase
 import kotlin.math.cos
 import kotlin.math.sin
@@ -100,6 +104,11 @@ fun SpinWheelScreen(
     var isTransferModalVisible by remember { mutableStateOf(false) }
     var currentReservePool by remember { mutableStateOf(0.0) }
 
+    // Global Config states
+    var isMiniGamesEnabled by remember { mutableStateOf(true) }
+    var isSpinGameActive by remember { mutableStateOf(true) }
+    val isGameActive = isMiniGamesEnabled && isSpinGameActive
+
     // Observe Reserve Pool balance
     DisposableEffect(Unit) {
         val database = FirebaseManager.getDatabase()
@@ -111,7 +120,21 @@ fun SpinWheelScreen(
             override fun onCancelled(error: DatabaseError) {}
         }
         ref?.addValueEventListener(listener)
-        onDispose { ref?.removeEventListener(listener) }
+
+        val configRef = database?.getReference("miniGames/globalConfig")
+        val configListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                isMiniGamesEnabled = snapshot.child("miniGamesEnabled").value?.toString()?.toBoolean() ?: true
+                isSpinGameActive = snapshot.child("spinGameActive").value?.toString()?.toBoolean() ?: true
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        configRef?.addValueEventListener(configListener)
+
+        onDispose { 
+            ref?.removeEventListener(listener)
+            configRef?.removeEventListener(configListener)
+        }
     }
 
     // Observe Game Wallet Balance
@@ -175,6 +198,9 @@ fun SpinWheelScreen(
     var isSpinning by remember { mutableStateOf(false) }
     val animatedRotation = remember { Animatable(0f) }
     var selectedBetAmount by remember { mutableStateOf(1L) } 
+    
+    val strings = LocalAppStrings.current
+    
     var showWinDialog by remember { mutableStateOf(false) }
     var lastWinAmount by remember { mutableStateOf(0.0) }
     var lastWinMultiplier by remember { mutableStateOf(0) }
@@ -224,9 +250,9 @@ fun SpinWheelScreen(
     val context = LocalContext.current
 
     fun performBetAndSpin() {
-        if (isSpinning) return
+        if (isSpinning || !isGameActive) return
         if (gameBalance < selectedBetAmount) {
-            Toast.makeText(context, "অপর্যাপ্ত ব্যালেন্স", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, strings.spinToastNoBalance, Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -273,7 +299,7 @@ fun SpinWheelScreen(
             }.onFailure { error ->
                 Toast.makeText(
                     context, 
-                    error.message ?: "ট্রানজেকশন ব্যর্থ হয়েছে", 
+                    error.message ?: strings.spinToastFailed, 
                     Toast.LENGTH_SHORT
                 ).show()
             }
@@ -333,9 +359,15 @@ fun SpinWheelScreen(
                                 border = BorderStroke(1.dp, Color(0x33FFD700))
                             ) {
                                 Text(
-                                    text = "মেইন: ৳${"%.2f".format(userBalance)}",
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
+                                    text = "${strings.spinChipMain}: ${strings.taka(userBalance)}",
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.Bold, 
+                                        fontSize = 13.sp,
+                                        letterSpacing = if (strings == com.example.core.i18n.BengaliStrings) 0.sp else androidx.compose.ui.unit.TextUnit.Unspecified
+                                    ),
+                                    maxLines = 1,
+                                    softWrap = false,
                                     color = Color.White
                                 )
                             }
@@ -351,22 +383,25 @@ fun SpinWheelScreen(
                             ) {
                                 Row(
                                     modifier = Modifier
-                                        .height(44.dp)
-                                        .padding(start = 14.dp, end = 8.dp),
+                                        .height(38.dp)
+                                        .padding(start = 12.dp, end = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        "গেম: ৳${"%.2f".format(gameBalance)}",
+                                        text = "${strings.spinChipGame}: ${strings.taka(gameBalance)}",
                                         style = MaterialTheme.typography.labelMedium.copy(
-                                            fontWeight = FontWeight.ExtraBold,
-                                            fontSize = 14.sp
+                                            fontWeight = if (strings == com.example.core.i18n.BengaliStrings) FontWeight.Bold else FontWeight.Black,
+                                            fontSize = 13.sp,
+                                            letterSpacing = if (strings == com.example.core.i18n.BengaliStrings) 0.sp else androidx.compose.ui.unit.TextUnit.Unspecified
                                         ),
+                                        maxLines = 1,
+                                        softWrap = false,
                                         color = CasinoGold
                                     )
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Box(
                                         modifier = Modifier
-                                            .size(26.dp)
+                                            .size(24.dp)
                                             .clip(CircleShape)
                                             .background(CasinoGold),
                                         contentAlignment = Alignment.Center
@@ -375,7 +410,7 @@ fun SpinWheelScreen(
                                             Icons.Default.Add,
                                             contentDescription = "Add",
                                             tint = Color.Black,
-                                            modifier = Modifier.size(18.dp)
+                                            modifier = Modifier.size(16.dp)
                                         )
                                     }
                                 }
@@ -395,12 +430,30 @@ fun SpinWheelScreen(
                 // --- CENTERED LUXURY GAME TITLE ---
                 Spacer(modifier = Modifier.height(8.dp))
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (!isGameActive) {
+                        Surface(
+                            modifier = Modifier.padding(bottom = 12.dp).fillMaxWidth().padding(horizontal = 20.dp),
+                            color = Color.Red.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                strings.spinClosedBanner,
+                                modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp),
+                                color = Color.Red,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+
                     Text(
-                        "MONEY WHEEL",
+                        strings.spinTitle,
                         style = MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = FontWeight.Black,
                             fontSize = 24.sp,
-                            letterSpacing = 2.sp,
+                            letterSpacing = if (strings == com.example.core.i18n.BengaliStrings) 0.sp else 2.sp,
                             brush = Brush.verticalGradient(listOf(CasinoGoldLight, CasinoGold))
                         )
                     )
@@ -411,12 +464,12 @@ fun SpinWheelScreen(
                         border = BorderStroke(1.dp, CasinoGold.copy(alpha = 0.3f))
                     ) {
                         Text(
-                            "★ রয়্যাল হুইল ★",
+                            strings.spinSubtitle,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = CasinoGold,
-                                letterSpacing = 1.sp
+                                letterSpacing = if (strings == com.example.core.i18n.BengaliStrings) 0.sp else 1.sp
                             )
                         )
                     }
@@ -426,19 +479,20 @@ fun SpinWheelScreen(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     // Wheel Stand (Tripod)
-                    Canvas(modifier = Modifier.size(150.dp, 100.dp).align(Alignment.BottomCenter).offset(y = 20.dp)) {
+                    Canvas(modifier = Modifier.size(120.dp, 40.dp).align(Alignment.BottomCenter).offset(y = 0.dp)) {
                         val path = Path().apply {
                             moveTo(size.width / 2, 0f)
-                            lineTo(size.width * 0.2f, size.height)
-                            lineTo(size.width * 0.8f, size.height)
+                            lineTo(size.width * 0.3f, size.height)
+                            lineTo(size.width * 0.7f, size.height)
                             close()
                         }
                         drawPath(path, brush = Brush.verticalGradient(listOf(CasinoGold, CasinoGoldDark)))
-                        drawCircle(CasinoGold, radius = 10f, center = Offset(size.width/2, 0f))
+                        drawCircle(CasinoGold, radius = 8f, center = Offset(size.width/2, 0f))
                     }
 
                     // The Main Wheel Container
@@ -515,8 +569,9 @@ fun SpinWheelScreen(
                                 
                                 drawContext.canvas.nativeCanvas.save()
                                 drawContext.canvas.nativeCanvas.rotate(startAngle + sliceAngle / 2 + 90f, tx, ty)
+                                val multiplierText = if (slice.multiplier > 0) strings.digits(slice.multiplier.toString()) + "x" else strings.digits("0") + "x"
                                 drawContext.canvas.nativeCanvas.drawText(
-                                    slice.label,
+                                    multiplierText,
                                     tx,
                                     ty,
                                     android.graphics.Paint().apply {
@@ -580,8 +635,13 @@ fun SpinWheelScreen(
                 CasinoBettingConsole(
                     selectedBet = selectedBetAmount.toInt(),
                     onBetSelected = { selectedBetAmount = it.toLong() },
-                    actionButtonText = if (gameBalance < selectedBetAmount) "অপর্যাপ্ত ব্যালেন্স" else "স্পিন করুন (SPIN)",
-                    isActionEnabled = !isSpinning && selectedBetAmount > 0 && gameBalance >= selectedBetAmount,
+                    actionButtonText = when {
+                        !isGameActive -> strings.spinClosedBanner
+                        gameBalance < selectedBetAmount -> strings.spinNoBalance
+                        isSpinning -> strings.spinSpinning
+                        else -> strings.spinButton
+                    },
+                    isActionEnabled = !isSpinning && selectedBetAmount > 0 && gameBalance >= selectedBetAmount && isGameActive,
                     onActionClick = { performBetAndSpin() }
                 )
             }
@@ -650,7 +710,7 @@ fun SpinWheelScreen(
                 ) {
                     val isWin = lastWinMultiplier > 0
                     Text(
-                        text = if (isWin) "অভিনন্দন!" else "দুঃখিত!",
+                        text = if (isWin) strings.mgWinTitle else strings.mgLossTitle,
                         style = MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = FontWeight.Black,
                             brush = if (isWin) Brush.verticalGradient(listOf(RadiantGold, CasinoGold)) else null
@@ -662,12 +722,12 @@ fun SpinWheelScreen(
                     
                     if (isWin) {
                         Text(
-                            text = "আপনি ${lastWinMultiplier}x জিতেছেন!",
+                            text = strings.spinResultWin(strings.digits(lastWinMultiplier.toString())),
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                             color = Color.White
                         )
                         Text(
-                            text = "৳ ${"%.2f".format(lastWinAmount)} আপনার ওয়ালেটে যুক্ত হয়েছে।",
+                            text = strings.spinResultAdded(strings.taka(lastWinAmount)),
                             style = MaterialTheme.typography.bodyMedium,
                             color = CasinoGoldLight,
                             textAlign = TextAlign.Center,
@@ -675,7 +735,7 @@ fun SpinWheelScreen(
                         )
                     } else {
                         Text(
-                            text = "এবার ভাগ্য সহায় হয়নি। আবার চেষ্টা করুন!",
+                            text = strings.mgLossMessage,
                             style = MaterialTheme.typography.bodyLarge,
                             color = Color.White.copy(alpha = 0.8f),
                             textAlign = TextAlign.Center
@@ -685,7 +745,7 @@ fun SpinWheelScreen(
                     Spacer(modifier = Modifier.height(28.dp))
                     
                     TournamentButton(
-                        text = "বন্ধ করুন",
+                        text = strings.mgCloseButton,
                         onClick = { showWinDialog = false },
                         modifier = Modifier.fillMaxWidth()
                     )

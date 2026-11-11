@@ -20,12 +20,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.core.i18n.*
 import com.example.ui.components.TournamentButton
 
 @Composable
@@ -37,6 +38,7 @@ fun CasinoPokerChip(
     chipSize: androidx.compose.ui.unit.Dp = 50.dp,
     accentColor: Color = Color(0xFFFFD700) // Gold
 ) {
+    val strings = LocalAppStrings.current
     val chipColor = if (isSelected) Color(0xFF4B0082) else Color.Transparent
     val textColor = if (isSelected) Color.White else accentColor
 
@@ -74,10 +76,13 @@ fun CasinoPokerChip(
                 }
             }
             Text(
-                "৳$amount",
+                text = "৳${strings.digits(amount.toString())}",
                 color = textColor,
                 fontSize = (chipSize.value * 0.32).sp,
-                fontWeight = FontWeight.Black
+                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.padding(horizontal = 2.dp)
             )
         }
     }
@@ -93,32 +98,33 @@ fun CasinoBettingConsole(
     modifier: Modifier = Modifier,
     betOptions: List<Int> = listOf(1, 3, 5, 8, 10)
 ) {
+    val strings = LocalAppStrings.current
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 16.dp),
         color = Color.White.copy(alpha = 0.08f),
         shape = RoundedCornerShape(24.dp),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             // Big Selected Chip
             Box(
                 modifier = Modifier
-                    .size(80.dp)
+                    .size(72.dp)
                     .drawBehind {
                         drawCircle(Color(0xFFFFD700).copy(alpha = 0.1f), radius = size.width / 1.6f)
                     },
                 contentAlignment = Alignment.Center
             ) {
-                CasinoPokerChip(amount = selectedBet, isSelected = true, onClick = {}, enabled = true, chipSize = 72.dp)
+                CasinoPokerChip(amount = selectedBet, isSelected = true, onClick = {}, enabled = true, chipSize = 64.dp)
             }
 
-            Column(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
+            Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
@@ -128,21 +134,21 @@ fun CasinoBettingConsole(
                             amount = amount,
                             isSelected = selectedBet == amount,
                             onClick = { onBetSelected(amount) },
-                            chipSize = 38.dp,
+                            chipSize = 36.dp,
                             enabled = isActionEnabled || selectedBet == amount
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 
                 Button(
                     onClick = onActionClick,
                     enabled = isActionEnabled,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
-                        .shadow(8.dp, RoundedCornerShape(25.dp)),
-                    shape = RoundedCornerShape(25.dp),
+                        .height(48.dp)
+                        .shadow(6.dp, RoundedCornerShape(24.dp)),
+                    shape = RoundedCornerShape(24.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.Transparent,
                         disabledContainerColor = Color.White.copy(alpha = 0.1f)
@@ -159,9 +165,14 @@ fun CasinoBettingConsole(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            actionButtonText,
-                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
-                            color = Color.White
+                            text = actionButtonText,
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.ExtraBold,
+                                fontSize = 15.sp
+                            ),
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -178,14 +189,15 @@ fun PokerChip(
     accentColor: Color,
     onClick: (Long) -> Unit
 ) {
+    val strings = LocalAppStrings.current
     Surface(
         modifier = Modifier
-            .size(56.dp)
+            .size(54.dp)
             .clickable(enabled = enabled) { onClick(amount) },
         shape = CircleShape,
         color = if (isSelected) accentColor else Color.Transparent,
         border = BorderStroke(2.dp, accentColor),
-        shadowElevation = if (isSelected) 10.dp else 0.dp
+        shadowElevation = if (isSelected) 8.dp else 0.dp
     ) {
         Box(contentAlignment = Alignment.Center) {
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -196,9 +208,15 @@ fun PokerChip(
                 )
             }
             Text(
-                text = "৳$amount",
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
-                color = if (isSelected) Color.Black else accentColor
+                text = "৳${strings.digits(amount.toString())}",
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
+                    fontSize = 13.sp
+                ),
+                color = if (isSelected) Color.Black else accentColor,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.padding(horizontal = 2.dp)
             )
         }
     }
@@ -217,11 +235,12 @@ fun TransferModal(
     onDismiss: () -> Unit,
     onConfirm: (Double, String) -> Unit
 ) {
+    val strings = LocalAppStrings.current
     var currentStep by remember { mutableStateOf(1) }
     var selectedType by remember { mutableStateOf("ADD") } // ADD or WITHDRAW
     var transferAmount by remember { mutableStateOf("") }
 
-    // Helper to convert Bengali numerals to English
+    // Helper to convert Bengali numerals to English for logic
     fun String.toEnglishDigits(): String {
         val bengali = listOf('০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯')
         var result = this
@@ -246,21 +265,22 @@ fun TransferModal(
             border = BorderStroke(2.dp, accentColor)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier.padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (currentStep == 1) {
                     Text(
-                        "মিনি গেম ওয়ালেট",
+                        text = strings.mgWalletTitle,
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Black,
+                            fontSize = 20.sp,
                             brush = Brush.verticalGradient(listOf(accentColorLight, accentColor))
                         )
                     )
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
                     TransferActionCard(
-                        title = "টাকা যোগ করুন (Add Money)",
-                        subtitle = "মেইন ব্যালেন্স থেকে গেম ওয়ালেটে টাকা আনুন",
+                        title = strings.mgAddMoneyTitle,
+                        subtitle = strings.mgAddMoneySubtitle,
                         icon = Icons.Default.AddCircle,
                         color = accentColor,
                         onClick = {
@@ -270,8 +290,8 @@ fun TransferModal(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     TransferActionCard(
-                        title = "টাকা তুলুন (Withdraw to Main)",
-                        subtitle = "গেম ব্যালেন্স থেকে জিতে নেওয়া টাকা মেইন ওয়ালেটে নিন",
+                        title = strings.mgWithdrawMoneyTitle,
+                        subtitle = strings.mgWithdrawMoneySubtitle,
                         icon = Icons.Default.ArrowUpward,
                         color = Color(0xFF4CAF50),
                         onClick = {
@@ -279,35 +299,43 @@ fun TransferModal(
                             currentStep = 2
                         }
                     )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    TournamentButton(text = "বন্ধ করুন", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
+                    Spacer(modifier = Modifier.height(20.dp))
+                    TournamentButton(
+                        text = strings.mgCloseButton,
+                        onClick = onDismiss,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 } else {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(onClick = { currentStep = 1 }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.back, tint = Color.White)
                         }
                         Text(
-                            text = if (selectedType == "ADD") "গেম ওয়ালেটে যোগ" else "মেইন ওয়ালেটে উত্তোলন",
-                            style = MaterialTheme.typography.titleMedium,
+                            text = if (selectedType == "ADD") strings.mgTransferAddTitle else strings.mgTransferWithdrawTitle,
+                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
                             color = accentColor,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
                         )
                     }
                     Spacer(modifier = Modifier.height(16.dp))
-                    LockedField(label = "ইউজার আইডি (UID)", value = uid)
+                    LockedField(label = strings.mgLabelUid, value = uid)
+                    Spacer(modifier = Modifier.height(8.dp))
                     val displayUserName = if (userName.isNotBlank() && userName != "Player" && userName != "User") userName 
                         else (com.example.core.firebase.FirebaseManager.getAuth()?.currentUser?.displayName?.ifBlank { null } ?: "User")
-                    LockedField(label = "ইউজারের নাম", value = displayUserName)
+                    LockedField(label = strings.mgLabelUserName, value = displayUserName)
                     
                     val displayPhone = if (userPhone.isNotBlank()) userPhone 
                         else (com.example.core.firebase.FirebaseManager.getAuth()?.currentUser?.phoneNumber?.ifBlank { null } ?: "")
                     
                     if (displayPhone.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        LockedField(label = "মোবাইল নম্বর", value = displayPhone)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LockedField(label = strings.mgLabelMobile, value = displayPhone)
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     Surface(
@@ -317,11 +345,12 @@ fun TransferModal(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = if (selectedType == "ADD") "আপনার মেইন ব্যালেন্স: ৳${"%.2f".format(mainBalance)}" 
-                                   else "আপনার গেম ব্যালেন্স: ৳${"%.2f".format(gameBalance)}",
+                            text = if (selectedType == "ADD") strings.mgMainBalance(strings.taka(mainBalance))
+                                   else strings.mgGameBalance(strings.taka(gameBalance)),
                             modifier = Modifier.padding(12.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = accentColor
+                            style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+                            color = accentColor,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                     Spacer(modifier = Modifier.height(16.dp))
@@ -335,11 +364,16 @@ fun TransferModal(
                                 border = BorderStroke(1.dp, if (transferAmount == amount.toString()) accentColor else Color.White.copy(alpha = 0.1f))
                             ) {
                                 Text(
-                                    text = "৳$amount",
-                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    text = "৳${strings.digits(amount.toString())}",
+                                    modifier = Modifier.padding(vertical = 10.dp),
                                     textAlign = TextAlign.Center,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = if (transferAmount == amount.toString()) accentColor else Color.White
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    ),
+                                    color = if (transferAmount == amount.toString()) accentColor else Color.White,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                         }
@@ -348,25 +382,26 @@ fun TransferModal(
                     OutlinedTextField(
                         value = transferAmount,
                         onValueChange = { if (it.all { c -> c.isDigit() || c == '.' || c in '০'..'৯' }) transferAmount = it },
-                        label = { Text("পরিমাণ (৳)", color = Color.White.copy(alpha = 0.5f)) },
+                        label = { Text(strings.mgAmountPlaceholder, color = Color.White.copy(alpha = 0.5f), fontSize = 14.sp) },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White, unfocusedTextColor = Color.White,
                             focusedBorderColor = accentColor, unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
                         ),
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp),
                         shape = RoundedCornerShape(12.dp),
                         singleLine = true
                     )
                     if (transferAmount.isNotBlank() && !isAmountValid) {
                         Text(
-                            text = if (amountDouble > sourceBalance) "ব্যালেন্স অপর্যাপ্ত!" else "সঠিক পরিমাণ লিখুন",
+                            text = if (amountDouble > sourceBalance) strings.mgErrorInsufficient else strings.mgErrorInvalidAmount,
                             color = Color.Red,
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                             modifier = Modifier.align(Alignment.Start).padding(start = 4.dp, top = 4.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
                     Button(
                         onClick = { onConfirm(amountDouble, selectedType) },
                         modifier = Modifier.fillMaxWidth().height(48.dp),
@@ -374,7 +409,12 @@ fun TransferModal(
                         colors = ButtonDefaults.buttonColors(containerColor = accentColor),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("কনফার্ম রিকোয়েস্ট", color = Color.Black, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = strings.mgConfirmRequest,
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
                     }
                 }
             }
@@ -396,8 +436,18 @@ fun TransferActionCard(title: String, subtitle: String, icon: ImageVector, color
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column {
-                Text(title, style = MaterialTheme.typography.titleSmall, color = Color.White, fontWeight = FontWeight.Bold)
-                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall.copy(fontSize = 14.sp),
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                    color = Color.White.copy(alpha = 0.6f),
+                    lineHeight = 15.sp
+                )
             }
         }
     }
@@ -406,7 +456,7 @@ fun TransferActionCard(title: String, subtitle: String, icon: ImageVector, color
 @Composable
 fun LockedField(label: String, value: String) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
+        Text(label, style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp), color = Color.White.copy(alpha = 0.5f))
         Spacer(modifier = Modifier.height(4.dp))
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -414,7 +464,14 @@ fun LockedField(label: String, value: String) {
             color = Color.White.copy(alpha = 0.03f),
             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
         ) {
-            Text(text = value, modifier = Modifier.padding(10.dp), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f))
+            Text(
+                text = value,
+                modifier = Modifier.padding(10.dp),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = Color.White.copy(alpha = 0.8f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -428,10 +485,11 @@ fun WinLossDialog(
     accentColorLight: Color,
     onDismiss: () -> Unit
 ) {
+    val strings = LocalAppStrings.current
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.85f)
+                .fillMaxWidth(0.9f)
                 .wrapContentHeight(),
             shape = RoundedCornerShape(28.dp),
             color = backgroundColor,
@@ -442,21 +500,31 @@ fun WinLossDialog(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = if (isWin) "অভিনন্দন!" else "দুঃখিত!",
+                    text = if (isWin) strings.mgWinTitle else strings.mgLossTitle,
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Black,
+                        fontSize = 24.sp,
                         brush = if (isWin) Brush.verticalGradient(listOf(accentColorLight, accentColor)) else null
                     ),
                     color = if (isWin) Color.Unspecified else Color.White
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = if (isWin) "আপনি ৳${"%.2f".format(amount)} জিতেছেন!" else "এবার ভাগ্য সহায় হয়নি। আবার চেষ্টা করুন!",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
+                    text = if (isWin) strings.mgWinMessage(strings.taka(amount)) else strings.mgLossMessage,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        fontSize = 18.sp,
+                        lineHeight = 24.sp
+                    ),
                     color = Color.White
                 )
                 Spacer(modifier = Modifier.height(28.dp))
-                TournamentButton(text = "বন্ধ করুন", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
+                TournamentButton(
+                    text = strings.mgCloseButton,
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }

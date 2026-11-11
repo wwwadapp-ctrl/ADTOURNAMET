@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
 import com.example.R
 import com.example.domain.model.UserEntity
 import com.example.domain.model.WalletEntity
@@ -33,6 +34,8 @@ import com.example.ui.components.TournamentButton
 import com.example.ui.components.TournamentCard
 import com.example.ui.components.TournamentTextField
 import com.example.ui.theme.*
+import com.example.core.i18n.*
+import com.example.ui.minigames.TransferModal
 
 private val Slate900 = Color(0xFF0F172A)
 private val Slate850 = Color(0xFF131E35)
@@ -59,6 +62,7 @@ fun WithdrawScreen(
   onNavigateBack: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
+  val strings = LocalAppStrings.current
   val uiState by viewModel.uiState.collectAsState()
   val appSettings by viewModel.appSettings.collectAsState()
   val availableBalance = uiState.wallet?.availableBalance ?: 0L
@@ -133,13 +137,13 @@ fun WithdrawScreen(
           )
           Spacer(modifier = Modifier.height(12.dp))
           Text(
-            text = "Withdrawal Requested",
+            text = strings.withdrawSuccessTitle,
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
             color = Color.White,
           )
           Text(
             text = uiState.successMessage
-              ?: "Your withdrawal request of ৳ ${"%.2f".format(amountNum.toDouble())} via $methodLabel has been submitted for admin processing.",
+              ?: strings.withdrawSuccessDesc(strings.taka(amountNum.toDouble()), methodLabel),
             style = MaterialTheme.typography.bodyMedium,
             color = Slate300,
             modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
@@ -158,9 +162,9 @@ fun WithdrawScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
               ) {
-                Text(text = "Status", style = MaterialTheme.typography.bodySmall, color = Slate400)
+                Text(text = strings.withdrawStatusLabel, style = MaterialTheme.typography.bodySmall, color = Slate400)
                 Text(
-                  text = "PENDING ADMIN APPROVAL",
+                  text = strings.withdrawStatusPending,
                   style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
                   color = Gold400,
                 )
@@ -169,23 +173,23 @@ fun WithdrawScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
               ) {
-                Text(text = "Payout Method", style = MaterialTheme.typography.bodySmall, color = Slate400)
+                Text(text = strings.withdrawPayoutMethodLabel, style = MaterialTheme.typography.bodySmall, color = Slate400)
                 Text(text = methodLabel, style = MaterialTheme.typography.bodySmall, color = Color.White)
               }
               Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
               ) {
-                Text(text = "Recipient Account", style = MaterialTheme.typography.bodySmall, color = Slate400)
+                Text(text = strings.withdrawRecipientAccountLabel, style = MaterialTheme.typography.bodySmall, color = Slate400)
                 Text(text = recipientNumber, style = MaterialTheme.typography.bodySmall, color = Color.White)
               }
               Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
               ) {
-                Text(text = "Requested Amount", style = MaterialTheme.typography.bodySmall, color = Slate400)
+                Text(text = strings.withdrawRequestedAmountLabel, style = MaterialTheme.typography.bodySmall, color = Slate400)
                 Text(
-                  text = "৳ ${"%.2f".format(amountNum.toDouble())}",
+                  text = strings.taka(amountNum.toDouble()),
                   style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
                   color = Emerald400,
                 )
@@ -194,7 +198,7 @@ fun WithdrawScreen(
           }
 
           TournamentButton(
-            text = "BACK TO WALLET",
+            text = strings.withdrawBackToWallet,
             onClick = {
               viewModel.clearMessages()
               onNavigateBack()
@@ -212,19 +216,20 @@ fun WithdrawScreen(
           .padding(top = 2.dp, bottom = 12.dp),
       ) {
         Text(
-          text = "WITHDRAW",
+          text = strings.withdrawHeaderTitle,
           style = MaterialTheme.typography.headlineSmall.copy(
             fontWeight = FontWeight.Black,
             letterSpacing = 1.sp,
+            fontSize = 20.sp
           ),
           color = Color.White,
         )
         Spacer(modifier = Modifier.height(2.dp))
         Text(
-          text = "Cash out your winnings • Fast & Secure",
+          text = strings.withdrawHeaderSubtitle,
           style = MaterialTheme.typography.bodySmall.copy(
             color = Slate400,
-            fontSize = 12.sp,
+            fontSize = 13.sp,
           ),
         )
       }
@@ -251,7 +256,7 @@ fun WithdrawScreen(
           horizontalArrangement = Arrangement.SpaceBetween,
           verticalAlignment = Alignment.CenterVertically,
         ) {
-          Column {
+          Column(modifier = Modifier.weight(1f)) {
             Row(
               verticalAlignment = Alignment.CenterVertically,
               horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -263,21 +268,27 @@ fun WithdrawScreen(
                   .background(Emerald400),
               )
               Text(
-                text = "AVAILABLE BALANCE",
+                text = strings.withdrawAvailableBalanceLabel,
                 style = MaterialTheme.typography.labelSmall.copy(
                   fontWeight = FontWeight.Bold,
                   letterSpacing = 0.5.sp,
+                  fontSize = 12.sp
                 ),
                 color = Gold400,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
               )
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-              text = "৳ ${"%.2f".format(uiState.wallet?.availableAmount ?: 0.0)}",
+              text = strings.taka(uiState.wallet?.availableAmount ?: 0.0),
               style = MaterialTheme.typography.titleLarge.copy(
                 fontWeight = FontWeight.Black,
+                fontSize = 22.sp
               ),
               color = Color.White,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis
             )
           }
 
@@ -310,11 +321,11 @@ fun WithdrawScreen(
       ) {
         Column(modifier = Modifier.padding(12.dp)) {
           Text(
-            text = "SELECT PAYMENT METHOD",
+            text = strings.withdrawSelectMethodLabel,
             style = MaterialTheme.typography.labelSmall.copy(
               fontWeight = FontWeight.Bold,
               letterSpacing = 0.5.sp,
-              fontSize = 11.sp,
+              fontSize = 15.sp,
             ),
             color = Gold400,
           )
@@ -322,7 +333,7 @@ fun WithdrawScreen(
 
           Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
           ) {
             val isBkash = selectedMethod == "BKASH"
             val isNagad = selectedMethod == "NAGAD"
@@ -339,7 +350,7 @@ fun WithdrawScreen(
               modifier = Modifier.weight(1f),
             ) {
               Row(
-                modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
+                modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Start,
               ) {
@@ -363,7 +374,7 @@ fun WithdrawScreen(
                     )
                   }
                 }
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Column {
                   Text(
                     text = "bKash",
@@ -372,14 +383,18 @@ fun WithdrawScreen(
                       fontSize = 14.sp,
                     ),
                     color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                   )
                   Text(
-                    text = if (isBkash) "Selected" else "Personal",
+                    text = if (isBkash) strings.withdrawMethodSelected else strings.withdrawMethodPersonal,
                     style = MaterialTheme.typography.labelSmall.copy(
-                      fontSize = 10.sp,
+                      fontSize = 12.sp,
                       fontWeight = FontWeight.Medium,
                     ),
                     color = if (isBkash) BkashPink else Slate400,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                   )
                 }
               }
@@ -397,7 +412,7 @@ fun WithdrawScreen(
               modifier = Modifier.weight(1f),
             ) {
               Row(
-                modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
+                modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Start,
               ) {
@@ -421,7 +436,7 @@ fun WithdrawScreen(
                     )
                   }
                 }
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Column {
                   Text(
                     text = "Nagad",
@@ -430,14 +445,18 @@ fun WithdrawScreen(
                       fontSize = 14.sp,
                     ),
                     color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                   )
                   Text(
-                    text = if (isNagad) "Selected" else "Personal",
+                    text = if (isNagad) strings.withdrawMethodSelected else strings.withdrawMethodPersonal,
                     style = MaterialTheme.typography.labelSmall.copy(
-                      fontSize = 10.sp,
+                      fontSize = 12.sp,
                       fontWeight = FontWeight.Medium,
                     ),
                     color = if (isNagad) NagadOrange else Slate400,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                   )
                 }
               }
@@ -464,6 +483,7 @@ fun WithdrawScreen(
             Row(
               verticalAlignment = Alignment.CenterVertically,
               horizontalArrangement = Arrangement.spacedBy(6.dp),
+              modifier = Modifier.weight(1f)
             ) {
               Icon(
                 imageVector = Icons.Default.Paid,
@@ -472,13 +492,15 @@ fun WithdrawScreen(
                 modifier = Modifier.size(16.dp),
               )
               Text(
-                text = "WITHDRAW AMOUNT",
+                text = strings.withdrawAmountLabel,
                 style = MaterialTheme.typography.labelSmall.copy(
                   fontWeight = FontWeight.Bold,
                   letterSpacing = 0.5.sp,
-                  fontSize = 11.sp,
+                  fontSize = 15.sp,
                 ),
                 color = Gold400,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
               )
             }
             val minAmount = (appSettings?.minWithdrawalTaka ?: 200.0).toLong()
@@ -488,13 +510,15 @@ fun WithdrawScreen(
               border = BorderStroke(0.5.dp, Gold400.copy(alpha = 0.4f)),
             ) {
               Text(
-                text = "Min ৳$minAmount • Max ৳10,000",
+                text = strings.withdrawLimitNotice(strings.number(minAmount)),
                 style = MaterialTheme.typography.labelSmall.copy(
-                  fontSize = 9.sp,
+                  fontSize = 11.sp,
                   fontWeight = FontWeight.SemiBold,
                 ),
                 color = Slate300,
                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
               )
             }
           }
@@ -508,8 +532,8 @@ fun WithdrawScreen(
               amountInput = it.filter { char -> char.isDigit() }
               clientError = null
             },
-            label = "Enter Amount (BDT)",
-            placeholder = "e.g. 200",
+            label = strings.withdrawEnterAmountHint,
+            placeholder = strings.withdrawEnterAmountPlaceholder,
             helperText = null,
             leadingIcon = Icons.Default.CurrencyExchange,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -539,16 +563,18 @@ fun WithdrawScreen(
                 modifier = Modifier.weight(1f),
               ) {
                 Box(
-                  modifier = Modifier.padding(vertical = 7.dp),
+                  modifier = Modifier.padding(vertical = 7.dp, horizontal = 2.dp),
                   contentAlignment = Alignment.Center,
                 ) {
                   Text(
-                    text = "৳$chipAmount",
+                    text = strings.takaWhole(chipAmount.toDouble()),
                     style = MaterialTheme.typography.labelSmall.copy(
                       fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
-                      fontSize = 11.sp,
+                      fontSize = 12.sp,
                     ),
                     color = if (isSelected) Gold400 else Slate300,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                   )
                 }
               }
@@ -573,13 +599,16 @@ fun WithdrawScreen(
             verticalAlignment = Alignment.CenterVertically,
           ) {
             Text(
-              text = "RECIPIENT $methodLabel NUMBER",
+              text = strings.withdrawRecipientLabel(methodLabel.uppercase()),
               style = MaterialTheme.typography.labelSmall.copy(
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.5.sp,
-                fontSize = 11.sp,
+                fontSize = 15.sp,
               ),
               color = Gold400,
+              modifier = Modifier.weight(1f, fill = false),
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis
             )
 
             if (savedNumber.isNotBlank() && !isUsingSavedNumber) {
@@ -592,9 +621,9 @@ fun WithdrawScreen(
                 modifier = Modifier.height(24.dp),
               ) {
                 Text(
-                  text = "Use Saved Number",
+                  text = strings.withdrawUseSavedNumber,
                   style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                   ),
                   color = Cyan400,
@@ -613,8 +642,8 @@ fun WithdrawScreen(
                 clientError = null
               }
             },
-            label = "Your Personal $methodLabel Number",
-            placeholder = "01XXXXXXXXX",
+            label = strings.withdrawRecipientHint(methodLabel),
+            placeholder = strings.withdrawRecipientPlaceholder,
             leadingIcon = Icons.Default.Phone,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
             testTag = "withdraw_recipient_input",
@@ -635,9 +664,11 @@ fun WithdrawScreen(
                 modifier = Modifier.size(13.dp),
               )
               Text(
-                text = "Verified Saved $methodLabel Account",
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                text = strings.withdrawVerifiedBadge(methodLabel),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                 color = Emerald400,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
               )
             } else {
               Icon(
@@ -647,9 +678,10 @@ fun WithdrawScreen(
                 modifier = Modifier.size(13.dp),
               )
               Text(
-                text = "Ensure this $methodLabel account belongs to you for prompt payout.",
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                text = strings.withdrawSecurityHint(methodLabel),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                 color = Slate400,
+                lineHeight = 16.sp
               )
             }
           }
@@ -665,13 +697,13 @@ fun WithdrawScreen(
         border = BorderStroke(1.dp, Slate700),
         modifier = Modifier.fillMaxWidth(),
       ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
           Text(
-            text = "WITHDRAWAL SUMMARY",
+            text = strings.withdrawSummaryTitle,
             style = MaterialTheme.typography.labelSmall.copy(
               fontWeight = FontWeight.Bold,
               letterSpacing = 0.5.sp,
-              fontSize = 11.sp,
+              fontSize = 15.sp,
             ),
             color = Slate300,
           )
@@ -682,10 +714,10 @@ fun WithdrawScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
           ) {
-            Text(text = "Withdrawal Amount", style = MaterialTheme.typography.bodySmall, color = Slate400)
+            Text(text = strings.withdrawSummaryAmount, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = Slate400)
             Text(
-              text = "৳ ${"%.2f".format(amountNum.toDouble())}",
-              style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+              text = strings.taka(amountNum.toDouble()),
+              style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
               color = Color.White,
             )
           }
@@ -694,10 +726,10 @@ fun WithdrawScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
           ) {
-            Text(text = "Payment Method", style = MaterialTheme.typography.bodySmall, color = Slate400)
+            Text(text = strings.withdrawSummaryMethod, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = Slate400)
             Text(
               text = methodLabel,
-              style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+              style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
               color = if (selectedMethod == "BKASH") BkashPink else NagadOrange,
             )
           }
@@ -706,11 +738,13 @@ fun WithdrawScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
           ) {
-            Text(text = "Receiving Number", style = MaterialTheme.typography.bodySmall, color = Slate400)
+            Text(text = strings.withdrawSummaryNumber, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = Slate400)
             Text(
-              text = recipientNumber.ifBlank { "Not specified" },
-              style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+              text = recipientNumber.ifBlank { strings.optional },
+              style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
               color = Color.White,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis
             )
           }
 
@@ -722,13 +756,13 @@ fun WithdrawScreen(
             verticalAlignment = Alignment.CenterVertically,
           ) {
             Text(
-              text = "Total to Receive",
-              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+              text = strings.withdrawSummaryTotal,
+              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 16.sp),
               color = Gold400,
             )
             Text(
-              text = "৳ ${"%.2f".format(amountNum.toDouble())}",
-              style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+              text = strings.taka(amountNum.toDouble()),
+              style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, fontSize = 18.sp),
               color = Emerald400,
             )
           }
@@ -756,33 +790,28 @@ fun WithdrawScreen(
               modifier = Modifier.size(16.dp),
             )
             Text(
-              text = "SECURITY & GUIDELINES",
+              text = strings.withdrawSecurityTitle,
               style = MaterialTheme.typography.labelSmall.copy(
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.5.sp,
-                fontSize = 11.sp,
+                fontSize = 15.sp,
               ),
               color = Cyan400,
             )
           }
-          Spacer(modifier = Modifier.height(6.dp))
-          val minWithdrawal = (appSettings?.minWithdrawalTaka ?: 200.0).toInt()
-          Text(
-            text = "• At most ONE active or pending withdrawal is permitted at a time.\n" +
-              "• Minimum withdrawal is ৳$minWithdrawal (Max ৳10,000 per transaction).\n" +
-              "• Withdrawal amount is held securely in pending funds until processed.\n" +
-              "• Admin approval & verification is required for all cash-out requests.\n" +
-              "• If rejected, the held amount is automatically released back to your wallet.",
-            style = MaterialTheme.typography.bodySmall.copy(
-              color = Slate400,
-              fontSize = 11.sp,
-              lineHeight = 16.sp,
-            ),
-          )
+          Spacer(modifier = Modifier.height(8.dp))
+          val minWithdrawal = (appSettings?.minWithdrawalTaka ?: 200.0).toLong()
+          Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(text = strings.withdrawGuideline1, style = MaterialTheme.typography.bodySmall.copy(color = Slate400, fontSize = 14.sp, lineHeight = 18.sp))
+            Text(text = strings.withdrawGuideline2(strings.number(minWithdrawal)), style = MaterialTheme.typography.bodySmall.copy(color = Slate400, fontSize = 14.sp, lineHeight = 18.sp))
+            Text(text = strings.withdrawGuideline3, style = MaterialTheme.typography.bodySmall.copy(color = Slate400, fontSize = 14.sp, lineHeight = 18.sp))
+            Text(text = strings.withdrawGuideline4, style = MaterialTheme.typography.bodySmall.copy(color = Slate400, fontSize = 14.sp, lineHeight = 18.sp))
+            Text(text = strings.withdrawGuideline5, style = MaterialTheme.typography.bodySmall.copy(color = Slate400, fontSize = 14.sp, lineHeight = 18.sp))
+          }
         }
       }
 
-      Spacer(modifier = Modifier.height(14.dp))
+      Spacer(modifier = Modifier.height(16.dp))
 
       // 10. ERROR / VALIDATION MESSAGE
       val displayError = clientError ?: uiState.errorMessage
@@ -811,6 +840,7 @@ fun WithdrawScreen(
               color = Color.White,
               style = MaterialTheme.typography.bodySmall.copy(
                 fontWeight = FontWeight.Medium,
+                fontSize = 14.sp
               ),
             )
           }
@@ -819,23 +849,23 @@ fun WithdrawScreen(
 
       // 9. MAIN CTA: "WITHDRAW NOW"
       TournamentButton(
-        text = "WITHDRAW NOW",
+        text = strings.withdrawNowButton,
         onClick = {
           val minAmount = (appSettings?.minWithdrawalTaka ?: 200.0).toLong()
           if (amountNum < minAmount) {
-            clientError = "Minimum withdrawal amount is ৳ $minAmount"
+            clientError = strings.withdrawMinError(strings.number(minAmount))
             return@TournamentButton
           }
           if (amountNum > 10000L) {
-            clientError = "Maximum withdrawal amount is ৳ 10,000"
+            clientError = strings.withdrawMaxError
             return@TournamentButton
           }
           if (amountMinor > (uiState.wallet?.availableBalance ?: 0L)) {
-            clientError = "Insufficient available balance. You have ৳ ${"%.2f".format(uiState.wallet?.availableAmount ?: 0.0)}"
+            clientError = strings.withdrawInsufficientError(strings.taka(uiState.wallet?.availableAmount ?: 0.0))
             return@TournamentButton
           }
           if (recipientNumber.length < 11) {
-            clientError = "Please enter a valid 11-digit recipient mobile number"
+            clientError = strings.withdrawInvalidMobileError
             return@TournamentButton
           }
           viewModel.submitWithdrawal(

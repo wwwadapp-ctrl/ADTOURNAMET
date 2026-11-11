@@ -49,9 +49,13 @@ object UserNotificationManager {
           val unreadNotifications = notifications.filter { !it.effectiveRead }
           
           unreadNotifications.forEach { notif ->
-            if (shouldNotify(context, notif.effectiveId)) {
-              showSystemNotification(context, notif)
-              markAsNotified(context, notif.effectiveId)
+            try {
+              if (shouldNotify(context, notif.effectiveId)) {
+                showSystemNotification(context, notif)
+                markAsNotified(context, notif.effectiveId)
+              }
+            } catch (e: Throwable) {
+              com.example.core.logging.AppLogger.e("UserNotificationManager", "Failed to process notif ${notif.effectiveId}: ${e.message}")
             }
           }
         }
@@ -170,12 +174,22 @@ object UserNotificationManager {
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
+    val isEnglish = try {
+      com.example.core.security.SessionManager(context).getAppLanguage() == com.example.core.i18n.AppLanguage.EN
+    } catch (e: Throwable) {
+      android.util.Log.w("UserNotificationManager", "Language lookup failed, using Bengali", e)
+      false
+    }
+
+    val displayTitle = if (isEnglish && notification.titleEn.isNotBlank()) notification.titleEn else notification.title
+    val displayMessage = if (isEnglish && notification.messageEn.isNotBlank()) notification.messageEn else notification.effectiveMessage
+
     val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
     val builder = try {
       NotificationCompat.Builder(context, CHANNEL_ID)
         .setSmallIcon(android.R.drawable.stat_notify_more)
-        .setContentTitle(notification.title)
-        .setContentText(notification.effectiveMessage)
+        .setContentTitle(displayTitle)
+        .setContentText(displayMessage)
         .setPriority(NotificationCompat.PRIORITY_HIGH)
         .setAutoCancel(true)
         .setSound(defaultSoundUri)

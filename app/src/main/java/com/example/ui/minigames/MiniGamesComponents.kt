@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
+import com.example.core.i18n.*
 
 data class MiniGame(
     val id: String,
@@ -47,22 +48,23 @@ enum class MiniGameType {
 fun MiniGamesSection(
     onGameClick: (MiniGameType) -> Unit
 ) {
-    val games = remember {
+    val strings = LocalAppStrings.current
+    val games = remember(strings) {
         listOf(
             MiniGame(
-                "1", "রয়্যাল হুইল", "স্পিন করে জিতুন", "HOT", 
+                "1", strings.miniGamesRoyalWheelTitle, strings.miniGamesRoyalWheelSub, strings.miniGamesRoyalWheelBadge, 
                 Icons.Default.Refresh, Color(0xFFFFD700), MiniGameType.SPIN
             ),
             MiniGame(
-                "2", "জোড়-বেজোড়", "ছক্কার চাল", "1.9x WIN", 
+                "2", strings.miniGamesDiceTitle, strings.miniGamesDiceSub, strings.miniGamesDiceBadge, 
                 Icons.Default.Build, Emerald400, MiniGameType.DICE
             ),
             MiniGame(
-                "3", "হেড-টেল", "ইনস্ট্যান্ট টস", "POPULAR", 
+                "3", strings.miniGamesHeadTailTitle, strings.miniGamesHeadTailSub, strings.miniGamesHeadTailBadge, 
                 Icons.Default.Face, Cyan400, MiniGameType.HEAD_TAIL
             ),
             MiniGame(
-                "4", "স্ক্র্যাচ কার্ড", "ঘষে জিতুন", "JACKPOT", 
+                "4", strings.miniGamesScratchTitle, strings.miniGamesScratchSub, strings.miniGamesScratchBadge, 
                 Icons.Default.Star, Amber500, MiniGameType.SCRATCH
             )
         )
@@ -79,7 +81,7 @@ fun MiniGamesSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "মিনি গেমস (Mini Games)",
+                text = strings.miniGamesTitle,
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
@@ -87,7 +89,7 @@ fun MiniGamesSection(
                 color = Color.White
             )
             Text(
-                text = "সব দেখুন",
+                text = strings.miniGamesViewAll,
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = FontWeight.SemiBold,
                     color = Gold400
@@ -106,7 +108,17 @@ fun MiniGamesSection(
             userScrollEnabled = false
         ) {
             items(games) { game ->
-                MiniGameCard(game = game, onClick = { onGameClick(game.type) })
+                // Localized game data
+                val localizedGame = remember(game, strings) {
+                    when(game.type) {
+                        MiniGameType.SPIN -> game.copy(title = strings.miniGamesRoyalWheelTitle, subtitle = strings.miniGamesRoyalWheelSub, badge = strings.miniGamesRoyalWheelBadge)
+                        MiniGameType.DICE -> game.copy(title = strings.miniGamesDiceTitle, subtitle = strings.miniGamesDiceSub, badge = strings.miniGamesDiceBadge)
+                        MiniGameType.HEAD_TAIL -> game.copy(title = strings.miniGamesHeadTailTitle, subtitle = strings.miniGamesHeadTailSub, badge = strings.miniGamesHeadTailBadge)
+                        MiniGameType.SCRATCH -> game.copy(title = strings.miniGamesScratchTitle, subtitle = strings.miniGamesScratchSub, badge = strings.miniGamesScratchBadge)
+                        MiniGameType.EVEN_ODD -> game // Keep or define key if needed
+                    }
+                }
+                MiniGameCard(game = localizedGame, onClick = { onGameClick(game.type) })
             }
         }
     }
@@ -117,6 +129,7 @@ fun MiniGameCard(
     game: MiniGame,
     onClick: () -> Unit
 ) {
+    val strings = LocalAppStrings.current
     val isRoyalWheel = game.type == MiniGameType.SPIN
     val isDiceRoll = game.type == MiniGameType.DICE
     val isHeadTail = game.type == MiniGameType.HEAD_TAIL
@@ -166,12 +179,7 @@ fun MiniGameCard(
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
                         BadgeCard(
-                            text = when {
-                                isRoyalWheel -> "রয়্যাল হুইল"
-                                isHeadTail -> "১.৯ গুণ জয়"
-                                isScratch -> "জ্যাকপট কার্ড"
-                                else -> "১.৯ গুণ জয়"
-                            }, 
+                            text = game.badge,
                             color = when {
                                 isRoyalWheel -> Color(0xFFFFD700)
                                 isScratch -> Amber500
@@ -185,10 +193,11 @@ fun MiniGameCard(
                             Text(
                                 text = game.title,
                                 style = MaterialTheme.typography.labelLarge.copy(
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 13.5.sp
+                                    fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
+                                    fontSize = 13.sp,
+                                    letterSpacing = if (strings === BengaliStrings) 0.sp else (-0.5).sp
                                 ),
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                                 color = Color.White
                             )
@@ -212,16 +221,18 @@ fun MiniGameCard(
                         ) {
                             Text(
                                 text = when {
-                                    isRoyalWheel -> "সর্বোচ্চ ৫০x"
-                                    isScratch -> "ঘষে জিতুন"
-                                    else -> "Payout: 1.9x"
+                                    isRoyalWheel -> strings.miniGamesRoyalWheelPayout
+                                    isScratch -> strings.miniGamesScratchAction
+                                    else -> strings.miniGamesDicePayout
                                 },
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 9.sp,
+                                    fontSize = 9.5.sp,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = if (isRoyalWheel || isScratch) Color(0xFFFFD700) else Emerald400
-                                )
+                                ),
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }
@@ -304,8 +315,10 @@ fun MiniGameCard(
                             text = game.title,
                             style = MaterialTheme.typography.labelLarge.copy(
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
+                                fontSize = 13.sp
                             ),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                             color = Color.White
                         )
                         Text(
@@ -313,6 +326,8 @@ fun MiniGameCard(
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontSize = 11.sp
                             ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             color = Slate400
                         )
                     }
@@ -650,9 +665,10 @@ fun BadgeCard(text: String, color: Color) {
             text = text,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
             style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 8.sp,
+                fontSize = 9.5.sp,
                 fontWeight = FontWeight.Black
             ),
+            maxLines = 1,
             color = color
         )
     }

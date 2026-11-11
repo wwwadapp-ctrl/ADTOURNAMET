@@ -32,6 +32,11 @@ import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalInspectionMode
 import com.example.core.config.FirebaseConfig
+import com.example.core.i18n.LocalAppStrings
+import com.example.core.i18n.BengaliStrings
+import com.example.core.i18n.taka
+import com.example.core.i18n.takaWhole
+import com.example.core.i18n.digits
 import com.example.domain.model.UserEntity
 import com.example.domain.model.WalletEntity
 import com.example.ui.components.TournamentButton
@@ -56,12 +61,17 @@ fun AutoLudoScreen(
     val isPreview = LocalInspectionMode.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val strings = LocalAppStrings.current
+
     var showCreateMatchDialog by remember { mutableStateOf(false) }
     var showJoinConfirmDialog by remember { mutableStateOf(false) }
     var selectedMatchToJoin by remember { mutableStateOf<AutoLudoMatchEntity?>(null) }
     var activeReadyRoomMatchId by remember { mutableStateOf<String?>(null) }
     var showTransferModal by remember { mutableStateOf(false) }
-    var selectedFilter by remember { mutableStateOf("সব ম্যাচ") }
+    
+    var selectedFilterIndex by remember { mutableIntStateOf(0) }
+    val filters = listOf(strings.autoLudoFilterAll, strings.autoLudoFilterRecent, strings.autoLudoFilterMy, strings.autoLudoFilterFree)
+    val selectedFilter = filters.getOrElse(selectedFilterIndex) { filters[0] }
     
     // User Data for TransferModal
     val authUser = remember { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser }
@@ -114,11 +124,12 @@ fun AutoLudoScreen(
                 AutoLudoMatchEntity(
                     matchId = "preview_1",
                     title = "Auto Ludo || Match No:- 123",
+                    matchNumber = "3",
                     entryFee = 50.0,
                     prizePool = 90.0,
                     joinedPlayersCount = 1,
                     status = "WAITING",
-                    scheduledTimeFormatted = "Today 07:30 PM"
+                    scheduledTimeFormatted = "Today 05:55 PM"
                 )
             ))
         }
@@ -201,11 +212,9 @@ fun AutoLudoScreen(
         }
     }
     
-    val filters = listOf("সব ম্যাচ", "সাম্প্রতিক ম্যাচ", "আমার ম্যাচ", "ফ্রি ম্যাচ")
-    
     val filteredMatches = when (selectedFilter) {
-        "আমার ম্যাচ" -> liveMatches.filter { it.creatorUid == currentUid || it.player1Uid == currentUid || it.player2Uid == currentUid }
-        "ফ্রি ম্যাচ" -> liveMatches.filter { it.entryFee == 0.0 }
+        strings.autoLudoFilterMy -> liveMatches.filter { it.creatorUid == currentUid || it.player1Uid == currentUid || it.player2Uid == currentUid }
+        strings.autoLudoFilterFree -> liveMatches.filter { it.entryFee == 0.0 }
         else -> liveMatches
     }
 
@@ -218,11 +227,13 @@ fun AutoLudoScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "ম্যাচ লিস্ট",
+                            strings.autoLudoHeaderTitle,
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
-                            )
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         
                         Spacer(modifier = Modifier.weight(1f))
@@ -237,7 +248,7 @@ fun AutoLudoScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(Icons.Default.ArrowBack, contentDescription = strings.back, tint = Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -269,10 +280,10 @@ fun AutoLudoScreen(
                     .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                filters.forEach { filter ->
-                    val isSelected = selectedFilter == filter
+                filters.forEachIndexed { index, filter ->
+                    val isSelected = selectedFilterIndex == index
                     Surface(
-                        onClick = { selectedFilter = filter },
+                        onClick = { selectedFilterIndex = index },
                         shape = RoundedCornerShape(20.dp),
                         color = if (isSelected) Purple600.copy(alpha = 0.8f) else MidnightNavyCard,
                         border = BorderStroke(1.dp, if (isSelected) Purple400 else Slate800),
@@ -287,7 +298,8 @@ fun AutoLudoScreen(
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                 ),
-                                color = if (isSelected) Color.White else Slate400
+                                color = if (isSelected) Color.White else Slate400,
+                                maxLines = 1
                             )
                         }
                     }
@@ -305,7 +317,7 @@ fun AutoLudoScreen(
                 if (filteredMatches.isEmpty()) {
                     item {
                         Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("কোন ম্যাচ পাওয়া যায়নি", color = Slate500)
+                            Text(strings.autoLudoNoMatches, color = Slate500)
                         }
                     }
                 }
@@ -316,7 +328,7 @@ fun AutoLudoScreen(
                         onJoinClick = {
                             val epoch = if (match.scheduledTimeMillis > 0L) match.scheduledTimeMillis else parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
                             if (epoch > 0L && System.currentTimeMillis() >= epoch) {
-                                Toast.makeText(context, "ম্যাচ শুরুর সময় উত্তীর্ণ হয়ে গেছে!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, strings.autoLudoTimeExpiredToast, Toast.LENGTH_SHORT).show()
                             } else {
                                 selectedMatchToJoin = match
                                 showJoinConfirmDialog = true
@@ -326,7 +338,7 @@ fun AutoLudoScreen(
                             activeReadyRoomMatchId = match.matchId
                         },
                         onTutorialClick = {
-                            Toast.makeText(context, "টিউটোরিয়াল শীঘ্রই আসছে", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, strings.autoLudoTutorialSoonToast, Toast.LENGTH_SHORT).show()
                         }
                     )
                 }
@@ -350,9 +362,9 @@ fun AutoLudoScreen(
                         scheduledTimeMillis = scheduledEpochMillis
                     )
                     if (res.isSuccess) {
-                        Toast.makeText(context, "ম্যাচ সফলভাবে তৈরি হয়েছে", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, strings.autoLudoMatchCreatedSuccess, Toast.LENGTH_SHORT).show()
                     } else {
-                        Toast.makeText(context, res.exceptionOrNull()?.message ?: "ম্যাচ তৈরিতে ব্যর্থ হয়েছে", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, res.exceptionOrNull()?.message ?: strings.autoLudoMatchCreatedFail, Toast.LENGTH_LONG).show()
                     }
                 }
             }
@@ -374,9 +386,9 @@ fun AutoLudoScreen(
                         playerName = userName
                     )
                     if (res.isSuccess) {
-                        Toast.makeText(context, "ম্যাচে সফলভাবে জয়েন করেছেন! নির্ধারিত সময়ে প্রবেশ করুন।", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, strings.autoLudoJoinSuccessToast, Toast.LENGTH_LONG).show()
                     } else {
-                        Toast.makeText(context, res.exceptionOrNull()?.message ?: "জয়েন করতে ব্যর্থ হয়েছে", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, res.exceptionOrNull()?.message ?: strings.autoLudoJoinFailToast, Toast.LENGTH_LONG).show()
                     }
                 }
             }
@@ -411,10 +423,10 @@ fun AutoLudoScreen(
                 )
                 requestRef.setValue(requestData) { err, _ ->
                     if (err == null) {
-                        Toast.makeText(context, "অনুরোধটি সফলভাবে অ্যাডমিনের কাছে পাঠানো হয়েছে", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, strings.autoLudoTransferReqSuccess, Toast.LENGTH_SHORT).show()
                         showTransferModal = false
                     } else {
-                        Toast.makeText(context, "অনুরোধ পাঠাতে ব্যর্থ হয়েছে: ${err.message}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, strings.autoLudoTransferReqFail(err.message ?: ""), Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -449,7 +461,7 @@ fun AutoLudoScreen(
             }
             "COMPLETED" -> {
                 if (activeReadyRoomMatchId != null) {
-                    Toast.makeText(context, "ম্যাচ শেষ হয়েছে! ফলাফল নির্ধারিত হয়েছে।", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, strings.autoLudoMatchEndedToast, Toast.LENGTH_LONG).show()
                     activeReadyRoomMatchId = null
                 }
             }
@@ -463,9 +475,9 @@ fun AutoLudoScreen(
                     }
                     val actionLog = currentMatch.gameState.lastActionLog
                     val msg = if (actionLog.contains("Opponent", ignoreCase = true)) {
-                        "প্রতিপক্ষ না পাওয়ায় ম্যাচ বাতিল ও টাকা ফেরত দেওয়া হয়েছে।"
+                        strings.autoLudoCancelOpponentMissing
                     } else {
-                        "উভয় প্লেয়ার প্রস্তুত না থাকায় ম্যাচ বাতিল করা হয়েছে।"
+                        strings.autoLudoCancelBothNotReady
                     }
                     Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                     activeReadyRoomMatchId = null
@@ -521,6 +533,7 @@ private fun TopBalanceHUD(
     onGameWalletAddClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalAppStrings.current
     Row(
         modifier = modifier.padding(end = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -528,13 +541,13 @@ private fun TopBalanceHUD(
     ) {
         // Main Balance Pill
         BalancePill(
-            label = "Main Balance",
+            label = strings.spinChipMain,
             amount = mainBalance,
             isHighlight = false
         )
-// Game Wallet Pill (Gold Luxury Border)
+        // Game Wallet Pill (Gold Luxury Border)
         BalancePill(
-            label = "Game Wallet",
+            label = strings.spinChipGame,
             amount = gameWalletBalance,
             isHighlight = true,
             onAddClick = onGameWalletAddClick
@@ -549,6 +562,7 @@ private fun BalancePill(
     isHighlight: Boolean,
     onAddClick: (() -> Unit)? = null
 ) {
+    val strings = LocalAppStrings.current
     val borderColor = if (isHighlight) Gold400 else Color.White.copy(alpha = 0.15f)
     val borderWidth = if (isHighlight) 1.5.dp else 1.dp
 
@@ -573,15 +587,18 @@ private fun BalancePill(
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                    color = if (isHighlight) Gold400 else Color(0xFF94A3B8)
+                    color = if (isHighlight) Gold400 else Color(0xFF94A3B8),
+                    maxLines = 1
                 )
                 Text(
-                    text = "৳${"%.2f".format(amount)}",
+                    text = strings.taka(amount),
                     style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
+                        fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
+                        fontSize = 12.sp,
+                        letterSpacing = if (strings === BengaliStrings) 0.sp else 0.5.sp
                     ),
-                    color = Color.White
+                    color = Color.White,
+                    maxLines = 1
                 )
             }
 
@@ -596,7 +613,7 @@ private fun BalancePill(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
-                        contentDescription = "Add Funds",
+                        contentDescription = label,
                         tint = Color(0xFF0F172A),
                         modifier = Modifier.size(16.dp)
                     )
@@ -611,6 +628,7 @@ private fun CreateMatchBanner(
     onCreateClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalAppStrings.current
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -624,7 +642,7 @@ private fun CreateMatchBanner(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "আপনি নিজের মন মত ম্যাচ তৈরি করতে চাইলে নিচের বাটনে ক্লিক করে তৈরি করুন।",
+                text = strings.autoLudoCreateBannerText,
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontSize = 13.sp,
                     color = Slate300,
@@ -654,11 +672,12 @@ private fun CreateMatchBanner(
                         Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            "+ ম্যাচ তৈরি করুন",
+                            strings.autoLudoCreateButton,
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
-                            )
+                            ),
+                            maxLines = 1
                         )
                     }
                 }
@@ -669,7 +688,7 @@ private fun CreateMatchBanner(
 
 private fun parseScheduledEpoch(formatted: String, createdAt: Long = 0L): Long {
     return try {
-        val clean = formatted.replace("Today", "").trim()
+        val clean = formatted.replace("Today", "").replace("Tomorrow", "").trim()
         val parts = clean.split(" ")
         val timeParts = parts[0].split(":")
         val h = timeParts[0].toInt()
@@ -703,6 +722,7 @@ private fun AutoLudoMatchCard(
     onEnterClick: () -> Unit,
     onTutorialClick: () -> Unit
 ) {
+    val strings = LocalAppStrings.current
     val isJoined = match.player1Uid == currentUid || match.player2Uid == currentUid
     val isFull = match.joinedPlayersCount >= match.maxPlayers || match.status != "WAITING"
     
@@ -740,6 +760,29 @@ private fun AutoLudoMatchCard(
             delay(1000L)
         }
     }
+
+    val matchNum = match.matchNumber.ifBlank {
+        val regex = Regex("\\d+")
+        val matchResult = regex.find(match.title)
+        matchResult?.value ?: "1"
+    }
+    val formattedMatchNum = strings.digits(matchNum)
+    val displayTitle = strings.autoLudoCardTitle(formattedMatchNum)
+
+    val formattedTime = remember(match.scheduledTimeFormatted, strings) {
+        val raw = match.scheduledTimeFormatted
+        if (raw.startsWith("Today", ignoreCase = true)) {
+            val timePart = raw.replace("Today", "", ignoreCase = true).trim()
+            val digitsTime = strings.digits(timePart)
+            if (strings === BengaliStrings) "আজ $digitsTime" else "Today $timePart"
+        } else if (raw.startsWith("Tomorrow", ignoreCase = true)) {
+            val timePart = raw.replace("Tomorrow", "", ignoreCase = true).trim()
+            val digitsTime = strings.digits(timePart)
+            if (strings === BengaliStrings) "আগামীকাল $digitsTime" else "Tomorrow $timePart"
+        } else {
+            strings.digits(raw)
+        }
+    }
     
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -755,7 +798,7 @@ private fun AutoLudoMatchCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = match.title,
+                    text = displayTitle,
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -771,10 +814,11 @@ private fun AutoLudoMatchCard(
                     border = BorderStroke(0.5.dp, Slate700)
                 ) {
                     Text(
-                        text = match.scheduledTimeFormatted,
+                        text = formattedTime,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                        color = Slate300
+                        color = Slate300,
+                        maxLines = 1
                     )
                 }
             }
@@ -791,11 +835,12 @@ private fun AutoLudoMatchCard(
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    "🤖 এটা সম্পূর্ণ অটো ম্যাচ",
+                    strings.autoLudoAutoMatchBadge,
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Bold,
                         color = Emerald400
-                    )
+                    ),
+                    maxLines = 1
                 )
 
                 if (isJoined) {
@@ -806,10 +851,11 @@ private fun AutoLudoMatchCard(
                         border = BorderStroke(0.5.dp, Amber600.copy(alpha = 0.5f))
                     ) {
                         Text(
-                            "আপনার ম্যাচ",
+                            strings.autoLudoMyMatchBadge,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
-                            color = Amber400
+                            color = Amber400,
+                            maxLines = 1
                         )
                     }
                 }
@@ -833,8 +879,15 @@ private fun AutoLudoMatchCard(
                         modifier = Modifier.padding(vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("প্রাইজ", style = MaterialTheme.typography.labelSmall, color = Slate400)
-                        Text("${match.prizePool.toInt()} ৳", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold), color = Gold400)
+                        Text(strings.autoLudoPrizeLabel, style = MaterialTheme.typography.labelSmall, color = Slate400, maxLines = 1)
+                        Text(
+                            strings.takaWhole(match.prizePool),
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black
+                            ),
+                            color = Gold400,
+                            maxLines = 1
+                        )
                     }
                 }
                 
@@ -849,8 +902,15 @@ private fun AutoLudoMatchCard(
                         modifier = Modifier.padding(vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("এন্ট্রি", style = MaterialTheme.typography.labelSmall, color = Slate400)
-                        Text("${match.entryFee.toInt()} ৳", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold), color = Slate200)
+                        Text(strings.autoLudoEntryLabel, style = MaterialTheme.typography.labelSmall, color = Slate400, maxLines = 1)
+                        Text(
+                            strings.takaWhole(match.entryFee),
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black
+                            ),
+                            color = Slate200,
+                            maxLines = 1
+                        )
                     }
                 }
             }
@@ -865,23 +925,27 @@ private fun AutoLudoMatchCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val progressText = when {
-                        isMissingOpponent -> "❌ প্রতিপক্ষ আসেনি"
-                        isInactivityCancelled -> "❌ প্লেয়ার অনুপস্থিত"
-                        match.status == "READY_COUNTDOWN" -> "ম্যাচ শুরু হচ্ছে..."
-                        match.status == "PLAYING" -> "ম্যাচ চলছে"
-                        isFull && !isJoined -> "ম্যাচ পূর্ণ হয়েছে"
-                        isJoined && match.status == "WAITING" -> "প্রতিপক্ষের জন্য অপেক্ষা"
-                        else -> "২ জন হলেই ম্যাচ শুরু হবে"
+                        match.status == "COMPLETED" -> strings.autoLudoMatchFinished
+                        isMissingOpponent -> strings.autoLudoStatusOpponentMissing
+                        isInactivityCancelled -> strings.autoLudoStatusPlayerAbsent
+                        match.status == "READY_COUNTDOWN" -> strings.autoLudoStatusStarting
+                        match.status == "PLAYING" -> strings.autoLudoStatusPlaying
+                        isFull && !isJoined -> strings.autoLudoStatusFull
+                        isJoined && match.status == "WAITING" -> strings.autoLudoStatusWaitingOpponent
+                        else -> strings.autoLudoStatusWaitingTwo
                     }
                     Text(
                         text = progressText,
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (isFull) Emerald400 else Rose400
+                        color = if (match.status == "COMPLETED") Emerald400 else (if (isFull) Emerald400 else Rose400),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "Players: ${match.joinedPlayersCount}/${match.maxPlayers}",
+                        text = strings.autoLudoPlayersCount(match.joinedPlayersCount, match.maxPlayers),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
+                        color = Color.White,
+                        maxLines = 1
                     )
                 }
                 
@@ -894,7 +958,7 @@ private fun AutoLudoMatchCard(
                         .fillMaxWidth()
                         .height(8.dp)
                         .clip(RoundedCornerShape(4.dp)),
-                    color = if (isFull) Emerald400 else Rose400,
+                    color = if (match.status == "COMPLETED") Emerald400 else (if (isFull) Emerald400 else Rose400),
                     trackColor = Slate800,
                     strokeCap = StrokeCap.Round
                 )
@@ -915,10 +979,18 @@ private fun AutoLudoMatchCard(
                     border = BorderStroke(1.dp, Slate700),
                     contentPadding = PaddingValues(0.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    ) {
                         Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("ⓘ টিউটোরিয়াল", style = MaterialTheme.typography.labelMedium)
+                        Text(
+                            strings.autoLudoTutorialButton,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
                 
@@ -927,25 +999,36 @@ private fun AutoLudoMatchCard(
                 var buttonColor = Emerald600
                 var isEnabled = true
                 var onClickAction: () -> Unit = {}
+                var buttonIcon: androidx.compose.ui.graphics.vector.ImageVector? = null
 
                 when {
                     isMissingOpponent -> {
-                        buttonText = "বাতিল (টাকা ফেরত)"
+                        buttonText = strings.autoLudoRefundCancelled
+                        buttonIcon = Icons.Default.Close
                         buttonColor = Rose600.copy(alpha = 0.25f)
                         isEnabled = false
-                        onClickAction = { }
                     }
                     isInactivityCancelled -> {
-                        buttonText = "অনুপস্থিত (টাকা ফেরত)"
+                        buttonText = strings.autoLudoRefundAbsent
+                        buttonIcon = Icons.Default.Close
                         buttonColor = Rose600.copy(alpha = 0.25f)
                         isEnabled = false
-                        onClickAction = { }
+                    }
+                    match.status == "COMPLETED" -> {
+                        buttonText = when {
+                            match.winnerUid == currentUid -> strings.autoLudoMatchWonFinished
+                            isJoined -> strings.autoLudoMatchLostFinished
+                            else -> strings.autoLudoMatchFinished
+                        }
+                        buttonIcon = null
+                        buttonColor = Slate800
+                        isEnabled = false
                     }
                     isJoined && match.status == "WAITING" && match.joinedPlayersCount < match.maxPlayers -> {
-                        buttonText = "⏳ অপেক্ষায় আছেন"
+                        buttonText = strings.autoLudoWaitingStatus
+                        buttonIcon = Icons.Default.HourglassEmpty
                         buttonColor = Amber600.copy(alpha = 0.2f)
                         isEnabled = false
-                        onClickAction = { }
                     }
                     isJoined && (match.status == "READY_COUNTDOWN" || match.joinedPlayersCount >= match.maxPlayers) -> {
                         if (remainingMillis > 0L) {
@@ -957,45 +1040,37 @@ private fun AutoLudoMatchCard(
                             } else {
                                 String.format("%02d:%02d", min, sec)
                             }
-                            buttonText = "⏳ শুরুর বাকি: $timeStr"
+                            buttonText = strings.autoLudoStartingIn(strings.digits(timeStr))
+                            buttonIcon = Icons.Default.HourglassEmpty
                             buttonColor = Amber600.copy(alpha = 0.25f)
                             isEnabled = false
-                            onClickAction = { }
                         } else {
-                            buttonText = "🎮 খেলায় প্রবেশ করুন"
+                            buttonText = strings.autoLudoEnterGameButton
+                            buttonIcon = Icons.Default.Games
                             buttonColor = Emerald600
                             isEnabled = true
                             onClickAction = { onEnterClick() }
                         }
                     }
                     isFull -> {
-                        buttonText = "✖ ম্যাচ ফুল"
+                        buttonText = strings.autoLudoMatchFullButton
+                        buttonIcon = Icons.Default.Close
                         buttonColor = Rose600.copy(alpha = 0.2f)
                         isEnabled = false
-                        onClickAction = { }
                     }
                     isExpired -> {
-                        buttonText = "সময় শেষ"
+                        buttonText = strings.autoLudoTimeExpired
+                        buttonIcon = Icons.Default.HourglassEmpty
                         buttonColor = Rose600.copy(alpha = 0.25f)
                         isEnabled = false
-                        onClickAction = { }
                     }
                     else -> {
-                        buttonText = "● জয়েন করুন"
+                        buttonText = strings.autoLudoJoinButton
+                        buttonIcon = Icons.Default.PlayArrow
                         buttonColor = Emerald600
                         isEnabled = true
                         onClickAction = { onJoinClick() }
                     }
-                }
-
-                val buttonIcon = when (buttonText) {
-                    "● জয়েন করুন" -> Icons.Default.PlayArrow
-                    "🎮 খেলায় প্রবেশ করুন" -> Icons.Default.Games
-                    "✖ ম্যাচ ফুল" -> Icons.Default.Close
-                    "সময় শেষ" -> Icons.Default.HourglassEmpty
-                    "বাতিল (টাকা ফেরত)" -> Icons.Default.Close
-                    "অনুপস্থিত (টাকা ফেরত)" -> Icons.Default.Close
-                    else -> Icons.Default.HourglassEmpty
                 }
 
                 Button(
@@ -1004,9 +1079,9 @@ private fun AutoLudoMatchCard(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (buttonText == "🎮 খেলায় প্রবেশ করুন") Gold400 else buttonColor,
+                        containerColor = if (buttonText == strings.autoLudoEnterGameButton) Gold400 else buttonColor,
                         disabledContainerColor = buttonColor,
-                        contentColor = if (isEnabled) (if (buttonText == "🎮 খেলায় প্রবেশ করুন") Color(0xFF0D47A1) else Color.White) else Slate400,
+                        contentColor = if (isEnabled) (if (buttonText == strings.autoLudoEnterGameButton) Color(0xFF0D47A1) else Color.White) else Slate400,
                         disabledContentColor = Slate400
                     ),
                     contentPadding = PaddingValues(0.dp)
@@ -1016,13 +1091,15 @@ private fun AutoLudoMatchCard(
                         horizontalArrangement = Arrangement.Center,
                         modifier = Modifier.padding(horizontal = 4.dp)
                     ) {
-                        Icon(
-                            buttonIcon,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (isEnabled) (if (buttonText == "🎮 খেলায় প্রবেশ করুন") Color(0xFF0D47A1) else Color.White) else Slate400
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        if (buttonIcon != null) {
+                            Icon(
+                                buttonIcon!!,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = if (isEnabled) (if (buttonText == strings.autoLudoEnterGameButton) Color(0xFF0D47A1) else Color.White) else Slate400
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                        }
                         Text(
                             text = buttonText,
                             style = MaterialTheme.typography.labelMedium.copy(
@@ -1047,6 +1124,7 @@ private fun CreateAutoLudoMatchDialog(
     onDismiss: () -> Unit,
     onConfirm: (Int, String, Long) -> Unit
 ) {
+    val strings = LocalAppStrings.current
     var entryFeeText by remember { mutableStateOf("") }
     val entryFee = entryFeeText.toIntOrNull() ?: 0
     val winnings = if (entryFee > 0) (entryFee * 1.8).toInt() else 0
@@ -1136,11 +1214,12 @@ private fun CreateAutoLudoMatchDialog(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "নতুন ম্যাচ তৈরি করুন",
+                        strings.autoLudoCreateDialogTitle,
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.ExtraBold,
                             color = Color.White
-                        )
+                        ),
+                        maxLines = 1
                     )
                 }
                 
@@ -1170,12 +1249,15 @@ private fun CreateAutoLudoMatchDialog(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("গেম ওয়ালেট ব্যালেন্স", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold), color = Slate200)
+                                Text(strings.autoLudoGameWalletBalance, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold), color = Slate200, maxLines = 1)
                             }
                             Text(
-                                "৳ %.2f".format(gameWalletBalance),
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
-                                color = if (gameWalletBalance > 0.0) Gold400 else Rose400
+                                strings.taka(gameWalletBalance),
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black
+                                ),
+                                color = if (gameWalletBalance > 0.0) Gold400 else Rose400,
+                                maxLines = 1
                             )
                         }
                     }
@@ -1185,15 +1267,16 @@ private fun CreateAutoLudoMatchDialog(
                     // Input Field
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            "এন্ট্রি ফি (10 - 10,000)",
+                            strings.autoLudoEntryFeeHeader,
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                             color = Slate200,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            maxLines = 1
                         )
                         OutlinedTextField(
                             value = entryFeeText,
                             onValueChange = { if (it.all { char -> char.isDigit() }) entryFeeText = it },
-                            placeholder = { Text("এন্ট্রি ফি দিন", color = Slate500) },
+                            placeholder = { Text(strings.autoLudoEntryFeePlaceholder, color = Slate500, maxLines = 1) },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -1213,10 +1296,11 @@ private fun CreateAutoLudoMatchDialog(
                     // Time Selector
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            "ম্যাচ শুরুর সময় (আজ)",
+                            strings.autoLudoStartTimeLabel,
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                             color = Slate200,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            maxLines = 1
                         )
                         
                         Row(
@@ -1224,21 +1308,21 @@ private fun CreateAutoLudoMatchDialog(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             TimeDropdown(
-                                label = "Hour",
+                                label = strings.autoLudoHourLabel,
                                 options = hours,
                                 selected = selectedHour,
                                 onSelect = { selectedHour = it },
                                 modifier = Modifier.weight(1f)
                             )
                             TimeDropdown(
-                                label = "Min",
+                                label = strings.autoLudoMinLabel,
                                 options = minutes,
                                 selected = selectedMinute,
                                 onSelect = { selectedMinute = it },
                                 modifier = Modifier.weight(1f)
                             )
                             TimeDropdown(
-                                label = "AM/PM",
+                                label = strings.autoLudoAmPmLabel,
                                 options = amPmList,
                                 selected = selectedAmPm,
                                 onSelect = { selectedAmPm = it },
@@ -1264,7 +1348,7 @@ private fun CreateAutoLudoMatchDialog(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "অনুগ্রহ করে বর্তমান সময়ের পরের সময় নির্বাচন করুন",
+                                    text = strings.autoLudoFutureTimeError,
                                     color = Color(0xFFFCA5A5),
                                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                                 )
@@ -1287,13 +1371,16 @@ private fun CreateAutoLudoMatchDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text("উইনিং প্রাইজ:", style = MaterialTheme.typography.labelSmall, color = Gold400)
-                                Text("ম্যাচ শেষে আপনার ওয়ালেটে যোগ হবে", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = Slate400)
+                                Text(strings.autoLudoWinningPrizeLabel, style = MaterialTheme.typography.labelSmall, color = Gold400, maxLines = 1)
+                                Text(strings.autoLudoWinningPrizeSub, style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = Slate400, maxLines = 1)
                             }
                             Text(
-                                "$winnings ৳",
-                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
-                                color = Gold400
+                                strings.taka(winnings.toDouble()),
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black
+                                ),
+                                color = Gold400,
+                                maxLines = 1
                             )
                         }
                     }
@@ -1317,7 +1404,7 @@ private fun CreateAutoLudoMatchDialog(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "আপনার গেম ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই (প্রয়োজন: ৳${entryFee}, বর্তমান ব্যালেন্স: ৳${gameWalletBalance.toInt()})",
+                                text = strings.autoLudoInsufficientBalanceCreate(strings.taka(entryFee.toDouble()), strings.taka(gameWalletBalance)),
                                 color = Color(0xFFFCA5A5),
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             )
@@ -1337,7 +1424,7 @@ private fun CreateAutoLudoMatchDialog(
                             shape = RoundedCornerShape(12.dp),
                             border = BorderStroke(1.dp, Slate700)
                         ) {
-                            Text("বাতিল", color = Slate300)
+                            Text(strings.cancel, color = Slate300, maxLines = 1)
                         }
                         
                         Button(
@@ -1368,7 +1455,7 @@ private fun CreateAutoLudoMatchDialog(
                                 disabledContainerColor = Purple600.copy(alpha = 0.3f)
                             )
                         ) {
-                            Text("নিশ্চিত করুন", fontWeight = FontWeight.Bold)
+                            Text(strings.autoLudoConfirm, fontWeight = FontWeight.Bold, maxLines = 1)
                         }
                     }
                 }
@@ -1384,6 +1471,7 @@ private fun JoinMatchConfirmDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
+    val strings = LocalAppStrings.current
     val targetEpoch = remember(match.scheduledTimeMillis, match.scheduledTimeFormatted, match.createdAt) {
         if (match.scheduledTimeMillis > 0L) match.scheduledTimeMillis
         else parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
@@ -1401,15 +1489,16 @@ private fun JoinMatchConfirmDialog(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    "ম্যাচে জয়েন করুন",
+                    strings.autoLudoJoinDialogTitle,
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White
+                    color = Color.White,
+                    maxLines = 1
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    "এন্ট্রি ফি: ৳ %.2f কাটা হবে".format(match.entryFee),
+                    strings.autoLudoJoinFeeNotice(strings.taka(match.entryFee)),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Slate300,
                     textAlign = TextAlign.Center
@@ -1429,9 +1518,10 @@ private fun JoinMatchConfirmDialog(
                         Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Emerald400, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "ব্যালেন্স: ৳ %.2f".format(gameWalletBalance),
+                            strings.autoLudoBalanceLabel(strings.taka(gameWalletBalance)),
                             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White
+                            color = Color.White,
+                            maxLines = 1
                         )
                     }
                 }
@@ -1441,7 +1531,7 @@ private fun JoinMatchConfirmDialog(
                 if (isExpired) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        "ম্যাচ শুরুর সময় উত্তীর্ণ হয়ে গেছে!",
+                        strings.autoLudoMatchTimeExpiredError,
                         color = Color(0xFFFCA5A5),
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
@@ -1456,7 +1546,7 @@ private fun JoinMatchConfirmDialog(
                 } else if (!hasSufficientBalance) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        "আপনার গেম ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই\n(প্রয়োজন: ৳ %.2f)".format(match.entryFee),
+                        strings.autoLudoInsufficientBalanceJoin(strings.taka(match.entryFee)),
                         color = Color(0xFFFCA5A5),
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
@@ -1482,7 +1572,7 @@ private fun JoinMatchConfirmDialog(
                         shape = RoundedCornerShape(12.dp),
                         border = BorderStroke(1.dp, Slate700)
                     ) {
-                        Text("বাতিল", color = Slate300)
+                        Text(strings.cancel, color = Slate300, maxLines = 1)
                     }
                     
                     Button(
@@ -1495,7 +1585,7 @@ private fun JoinMatchConfirmDialog(
                             disabledContainerColor = Emerald600.copy(alpha = 0.3f)
                         )
                     ) {
-                        Text("নিশ্চিত করুন", fontWeight = FontWeight.Bold)
+                        Text(strings.autoLudoConfirm, fontWeight = FontWeight.Bold, maxLines = 1)
                     }
                 }
             }
@@ -1513,6 +1603,7 @@ private fun TimeDropdown(
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val strings = LocalAppStrings.current
 
     ExposedDropdownMenuBox(
         expanded = expanded,
@@ -1520,9 +1611,10 @@ private fun TimeDropdown(
         modifier = modifier
     ) {
         OutlinedTextField(
-            value = selected,
+            value = strings.digits(selected),
             onValueChange = {},
             readOnly = true,
+            label = { Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier.menuAnchor(),
             shape = RoundedCornerShape(12.dp),
@@ -1544,7 +1636,7 @@ private fun TimeDropdown(
         ) {
             options.forEach { option ->
                 DropdownMenuItem(
-                    text = { Text(option, color = Color.White) },
+                    text = { Text(strings.digits(option), color = Color.White, maxLines = 1) },
                     onClick = {
                         onSelect(option)
                         expanded = false
@@ -1555,5 +1647,3 @@ private fun TimeDropdown(
         }
     }
 }
-
-

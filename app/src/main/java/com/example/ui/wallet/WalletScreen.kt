@@ -24,18 +24,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.R
-import com.example.core.i18n.LocalAppStrings
 import com.example.domain.model.UserEntity
 import com.example.domain.model.WalletEntity
-import com.example.ui.components.PremiumNotificationBellButton
 import com.example.ui.components.StatusBadge
 import com.example.ui.components.UnifiedEsportsTopBar
 import com.example.ui.theme.*
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import com.example.core.i18n.*
+import androidx.compose.ui.text.style.TextOverflow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+private val Slate900 = Color(0xFF0D1527)
+private val Slate850 = Color(0xFF131E3A)
+private val Slate800 = Color(0xFF1F2E4D)
+private val Slate700 = Color(0xFF334155)
+private val Slate600 = Color(0xFF475569)
+private val Slate500 = Color(0xFF64748B)
+private val Slate400 = Color(0xFF94A3B8)
+private val Slate300 = Color(0xFFCBD5E1)
+private val Slate50 = Color(0xFFF8FAFC)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -140,7 +148,8 @@ fun WalletScreen(
         Text(
           text = strings.walletSubtitle,
           style = MaterialTheme.typography.bodySmall.copy(
-            fontWeight = FontWeight.Medium,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp
           ),
           color = Gold400,
         )
@@ -186,12 +195,15 @@ fun WalletScreen(
                     .background(NeonEmerald),
                 )
                 Text(
-                  text = "মেইন ক্যাশ ব্যালেন্স (CASH)",
+                  text = strings.walletMainCashLabel,
                   style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp,
+                    letterSpacing = 0.5.sp,
+                    fontSize = 12.sp
                   ),
                   color = Gold400,
+                  maxLines = 1,
+                  overflow = TextOverflow.Ellipsis
                 )
               }
               Spacer(modifier = Modifier.height(8.dp))
@@ -202,13 +214,18 @@ fun WalletScreen(
                   strokeWidth = 2.dp,
                 )
               } else {
+                val mainBalanceText = strings.taka(uiState.mainBalance)
                 Text(
-                  text = "৳ ${"%.2f".format(uiState.mainBalance)}",
+                  text = mainBalanceText,
                   style = MaterialTheme.typography.displaySmall.copy(
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = (-0.5).sp,
+                    fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
+                    letterSpacing = 0.sp,
+                    fontSize = if (mainBalanceText.length > 10) 24.sp else 28.sp
                   ),
                   color = Color.White,
+                  maxLines = 1,
+                  softWrap = false,
+                  modifier = Modifier.padding(end = 4.dp)
                 )
               }
             }
@@ -296,8 +313,8 @@ fun WalletScreen(
                   modifier = Modifier.size(14.dp),
                 )
                 Text(
-                  text = strings.pendingEscrowNotice("%.2f".format(wallet?.pendingAmount ?: 0.0)),
-                  style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                  text = strings.pendingEscrowNotice(strings.takaWhole(wallet?.pendingAmount ?: 0.0)),
+                  style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                   color = Slate300,
                 )
               }
@@ -348,12 +365,15 @@ fun WalletScreen(
                     .background(Gold400),
                 )
                 Text(
-                  text = "বোনাস ব্যালেন্স (BONUS)",
+                  text = strings.walletBonusLabel,
                   style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp,
+                    letterSpacing = 0.5.sp,
+                    fontSize = 12.sp
                   ),
                   color = Gold400,
+                  maxLines = 1,
+                  overflow = TextOverflow.Ellipsis
                 )
               }
               Spacer(modifier = Modifier.height(8.dp))
@@ -364,19 +384,24 @@ fun WalletScreen(
                   strokeWidth = 2.dp,
                 )
               } else {
+                val bonusBalanceText = strings.taka(uiState.bonusBalance)
                 Text(
-                  text = "৳ ${"%.2f".format(uiState.bonusBalance)}",
+                  text = bonusBalanceText,
                   style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = (-0.5).sp,
+                    fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
+                    letterSpacing = 0.sp,
+                    fontSize = if (bonusBalanceText.length > 10) 18.sp else 20.sp
                   ),
                   color = Color.White,
+                  maxLines = 1,
+                  softWrap = false,
+                  modifier = Modifier.padding(end = 4.dp)
                 )
               }
               Spacer(modifier = Modifier.height(4.dp))
               Text(
-                text = "প্রতিটি ম্যাচে ১০% বোনাস ব্যবহার করা যাবে",
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                text = strings.walletBonusUsageHint,
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                 color = Slate400,
               )
             }
@@ -466,9 +491,9 @@ fun WalletScreen(
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-              text = "${strings.depositAction} →",
+              text = strings.depositAction,
               style = MaterialTheme.typography.bodySmall.copy(
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
               ),
               color = Cyan400,
@@ -530,9 +555,9 @@ fun WalletScreen(
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-              text = "${strings.withdrawAction} →",
+              text = strings.withdrawAction,
               style = MaterialTheme.typography.bodySmall.copy(
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
               ),
               color = Gold400,
@@ -570,13 +595,18 @@ fun WalletScreen(
               color = Cyan400,
             )
             Spacer(modifier = Modifier.height(4.dp))
+            val depositedText = strings.takaWhole(effectiveTotalDeposited)
             Text(
-              text = "৳ ${"%.2f".format(effectiveTotalDeposited)}",
+              text = depositedText,
               style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Black,
-                fontSize = 14.sp,
+                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
+                letterSpacing = 0.sp,
+                fontSize = if (depositedText.length > 8) 12.sp else 14.sp,
               ),
               color = Color.White,
+              maxLines = 1,
+              softWrap = false,
+              modifier = Modifier.padding(end = 4.dp)
             )
           }
         }
@@ -603,13 +633,18 @@ fun WalletScreen(
               color = Emerald400,
             )
             Spacer(modifier = Modifier.height(4.dp))
+            val winningsText = strings.takaWhole(effectiveTotalWinnings)
             Text(
-              text = "৳ ${"%.2f".format(effectiveTotalWinnings)}",
+              text = winningsText,
               style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Black,
-                fontSize = 14.sp,
+                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
+                letterSpacing = 0.sp,
+                fontSize = if (winningsText.length > 8) 12.sp else 14.sp,
               ),
               color = Emerald400,
+              maxLines = 1,
+              softWrap = false,
+              modifier = Modifier.padding(end = 4.dp)
             )
           }
         }
@@ -636,13 +671,18 @@ fun WalletScreen(
               color = Amber400,
             )
             Spacer(modifier = Modifier.height(4.dp))
+            val withdrawnText = strings.takaWhole(effectiveTotalWithdrawn)
             Text(
-              text = "৳ ${"%.2f".format(effectiveTotalWithdrawn)}",
+              text = withdrawnText,
               style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Black,
-                fontSize = 14.sp,
+                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
+                letterSpacing = 0.sp,
+                fontSize = if (withdrawnText.length > 8) 12.sp else 14.sp,
               ),
               color = Amber400,
+              maxLines = 1,
+              softWrap = false,
+              modifier = Modifier.padding(end = 4.dp)
             )
           }
         }
@@ -681,9 +721,9 @@ fun WalletScreen(
               contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
             ) {
               Text(
-                text = "${strings.viewAll} →",
+                text = strings.viewAll,
                 color = Gold400,
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp),
               )
             }
           }
@@ -692,6 +732,7 @@ fun WalletScreen(
 
           val validTxns = remember(uiState.transactions) {
             uiState.transactions.filter { it.amount != 0L }
+              .sortedByDescending { if (it.timestamp > 0L) it.timestamp else it.createdAt }
           }
           if (validTxns.isEmpty()) {
             // 7. EMPTY STATE
@@ -734,29 +775,28 @@ fun WalletScreen(
             }
           } else {
             validTxns.take(5).forEachIndexed { index, txn ->
-              val typeUpper = txn.type.uppercase()
-              val isWithdraw = typeUpper.contains("WITHDRAW")
-              val isDeposit = typeUpper.contains("DEPOSIT") && !isWithdraw
-              val isCredit = !isWithdraw && (typeUpper.contains("PRIZE") || isDeposit || typeUpper.contains("REFUND") || typeUpper.contains("CREDIT") || typeUpper.contains("WIN"))
-              val (icon, iconTint, iconBg) = when {
-                isWithdraw -> Triple(Icons.Default.ArrowUpward, Amber400, Amber400.copy(alpha = 0.15f))
-                isDeposit -> Triple(Icons.Default.AddCircleOutline, Cyan400, Cyan400.copy(alpha = 0.15f))
-                typeUpper.contains("PRIZE") || typeUpper.contains("WIN") -> Triple(Icons.Default.EmojiEvents, Gold400, Gold500.copy(alpha = 0.15f))
-                typeUpper.contains("REFUND") -> Triple(Icons.Default.RotateLeft, Emerald400, Emerald400.copy(alpha = 0.15f))
-                else -> Triple(Icons.Default.SportsEsports, Rose400, Rose400.copy(alpha = 0.15f))
+              val display = buildTxDisplay(txn, strings)
+              
+              val icon = when (display.iconKind) {
+                "withdraw" -> Icons.Default.ArrowUpward
+                "deposit" -> Icons.Default.AddCircleOutline
+                "prize" -> Icons.Default.EmojiEvents
+                "refund" -> Icons.Default.RotateLeft
+                "game" -> Icons.Default.SportsEsports
+                "admin" -> Icons.Default.Build
+                else -> Icons.Default.SportsEsports
               }
-
-              val displayTitle = when {
-                isWithdraw -> "উইথড্র"
-                isDeposit -> "ডিপোজিট"
-                typeUpper.contains("PRIZE") || typeUpper.contains("WIN") -> strings.txnPrize
-                typeUpper.contains("REFUND") -> strings.txnRefund
-                typeUpper.contains("FEE") || typeUpper.contains("ENTRY") -> strings.txnEntryFee
-                else -> txn.title.ifBlank { txn.type.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() } }
+              
+              val iconTint = when (display.iconKind) {
+                "withdraw" -> Amber400
+                "deposit" -> Cyan400
+                "prize" -> Gold400
+                "refund" -> Emerald400
+                "admin" -> Rose400
+                else -> Rose400
               }
-
-              val subText = txn.description.ifBlank { txn.referenceId.ifBlank { txn.source } }
-              val dateText = formatTransactionDate(if (txn.timestamp > 0L) txn.timestamp else txn.createdAt)
+              
+              val iconBg = iconTint.copy(alpha = 0.15f)
 
               Row(
                 modifier = Modifier
@@ -783,42 +823,47 @@ fun WalletScreen(
 
                 Column(modifier = Modifier.weight(1f)) {
                   Text(
-                    text = displayTitle,
+                    text = display.title,
                     style = MaterialTheme.typography.bodyMedium.copy(
                       fontWeight = FontWeight.Bold,
-                      fontSize = 13.sp,
+                      fontSize = 14.sp,
                     ),
                     color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                   )
-                  if (subText.isNotBlank()) {
+                  if (display.description.isNotBlank()) {
                     Text(
-                      text = subText,
-                      style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                      text = display.description,
+                      style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                       color = Slate400,
                       maxLines = 1,
+                      overflow = TextOverflow.Ellipsis
                     )
                   }
-                  Text(
-                    text = dateText,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                    color = Slate500,
-                  )
+                  if (display.dateText.isNotBlank()) {
+                    Text(
+                      text = display.dateText,
+                      style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                      color = Slate500,
+                    )
+                  }
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
 
                 Column(horizontalAlignment = Alignment.End) {
-                  val amountPrefix = if (isWithdraw) "- ৳" else if (isDeposit) "+ ৳" else if (isCredit) "+ ৳" else "- ৳"
+                  val amountPrefix = if (display.isVoid) "" else if (display.isCredit) "+ " else "- "
                   Text(
-                    text = "$amountPrefix ${"%.2f".format(txn.amount / 100.0)}",
+                    text = "$amountPrefix${strings.takaFromMinor(txn.displayMinorUnits)}",
                     style = MaterialTheme.typography.titleSmall.copy(
                       fontWeight = FontWeight.Black,
                       fontSize = 14.sp,
                     ),
-                    color = if (isCredit) Emerald400 else Rose400,
+                    color = if (display.isVoid) Slate400 else if (display.isCredit) Emerald400 else Rose400,
                   )
                   Spacer(modifier = Modifier.height(4.dp))
-                  StatusBadge(statusText = txn.status)
+                  StatusBadge(statusText = display.statusText)
                 }
               }
 
@@ -832,14 +877,3 @@ fun WalletScreen(
     }
   }
 }
-
-private fun formatTransactionDate(timestamp: Long): String {
-  if (timestamp <= 0L) return "Recently"
-  return try {
-    val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.ENGLISH)
-    sdf.format(Date(timestamp))
-  } catch (_: Exception) {
-    "Recently"
-  }
-}
-

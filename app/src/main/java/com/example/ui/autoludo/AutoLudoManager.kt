@@ -123,93 +123,81 @@ object AutoLudoManager {
     fun claimWinPrize(matchId: String, currentUid: String, onComplete: (Boolean) -> Unit = {}) {
         val db = getDb() ?: run { onComplete(false); return }
         val matchRef = db.getReference(NODE_MATCHES).child(matchId)
-        matchRef.child("prizeClaimed").runTransaction(object : Transaction.Handler {
-            override fun doTransaction(mutableData: MutableData): Transaction.Result {
-                if (mutableData.getValue(Boolean::class.java) == true) {
-                    return Transaction.abort() // Prevent double claim
-                }
-                mutableData.value = true
-                return Transaction.success(mutableData)
+        matchRef.get().addOnSuccessListener { matchSnap ->
+            val match = matchSnap.getValue(AutoLudoMatchEntity::class.java)
+            val pot = (matchSnap.child("pot").value as? Number)?.toDouble() ?: 0.0
+            // Only the real winner of a COMPLETED match, only once, only if the pot still holds the money
+            if (match == null || match.status != "COMPLETED" || match.winnerUid != currentUid || match.prizeClaimed || pot <= 0.0) {
+                onComplete(false)
+                return@addOnSuccessListener
             }
-            override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {
-                if (committed) {
-                    matchRef.get().addOnSuccessListener { matchSnap ->
-                        val match = matchSnap.getValue(AutoLudoMatchEntity::class.java)
-                        val prize = match?.prizePool ?: 0.0
-                        val entryFee = match?.entryFee ?: 0.0
-
-                        if (prize > 0) {
-                            val adminCommission = (entryFee * 2.0) * 0.10
-                            val updates = hashMapOf<String, Any>(
-                                "$NODE_GAME_WALLETS/$currentUid/balance" to ServerValue.increment(prize),
-                                "miniGames/vault/adminProfit" to ServerValue.increment(adminCommission)
-                            )
-                            db.reference.updateChildren(updates).addOnCompleteListener { task ->
-                                onComplete(task.isSuccessful)
-                            }
-                        } else {
-                            onComplete(false)
-                        }
-                    }.addOnFailureListener {
-                        onComplete(false)
-                    }
-                } else {
-                    onComplete(false)
-                }
+            val prize = match.prizePool
+            val adminCommission = pot - prize // the whole pot leaves: winner prize + platform commission
+            val updates = hashMapOf<String, Any?>(
+                "$NODE_MATCHES/$matchId/prizeClaimed" to true,
+                "$NODE_MATCHES/$matchId/pot" to 0.0,
+                "$NODE_GAME_WALLETS/$currentUid/balance" to ServerValue.increment(prize),
+                "$NODE_GAME_WALLETS/$currentUid/lastAutoLudoMatch" to matchId,
+                "miniGames/vault/adminProfit" to ServerValue.increment(adminCommission)
+            )
+            db.reference.updateChildren(updates).addOnCompleteListener { task ->
+                onComplete(task.isSuccessful)
             }
-        })
+        }.addOnFailureListener {
+            onComplete(false)
+        }
     }
+
+    private val cancelsInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val refundsInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     /**
      * Refund entry fee to current user's OWN wallet when match is CANCELLED.
      */
     fun claimRefund(matchId: String, currentUid: String, onComplete: (Boolean) -> Unit = {}) {
+        if (matchId.isBlank() || currentUid.isBlank()) {
+            onComplete(false)
+            return
+        }
+        if (cancelsInFlight.contains(matchId) || refundsInFlight.contains(matchId)) {
+            onComplete(false)
+            return
+        }
+
         val db = getDb() ?: run { onComplete(false); return }
+        refundsInFlight.add(matchId)
+
         val matchRef = db.getReference(NODE_MATCHES).child(matchId)
-        val refundFlagRef = matchRef.child("refundClaimed_$currentUid")
-        refundFlagRef.runTransaction(object : Transaction.Handler {
-            override fun doTransaction(mutableData: MutableData): Transaction.Result {
-                if (mutableData.getValue(Boolean::class.java) == true) {
-                    return Transaction.abort()
-                }
-                mutableData.value = true
-                return Transaction.success(mutableData)
-            }
-            override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {
-                if (committed) {
-                    matchRef.child("entryFee").get().addOnSuccessListener { feeSnap ->
-                        val fee = when (val v = feeSnap.value) {
-                            is Number -> v.toDouble()
-                            is String -> v.toDoubleOrNull() ?: 0.0
-                            else -> 0.0
-                        }
-                        if (fee > 0) {
-                            val walletRef = db.getReference(NODE_GAME_WALLETS).child(currentUid).child("balance")
-                            walletRef.runTransaction(object : Transaction.Handler {
-                                override fun doTransaction(walletData: MutableData): Transaction.Result {
-                                    val currentBal = when (val b = walletData.value) {
-                                        is Number -> b.toDouble()
-                                        is String -> b.toDoubleOrNull() ?: 0.0
-                                        else -> 0.0
-                                    }
-                                    walletData.value = currentBal + fee
-                                    return Transaction.success(walletData)
-                                }
-                                override fun onComplete(wErr: DatabaseError?, wCom: Boolean, wSnap: DataSnapshot?) {
-                                    onComplete(wCom)
-                                }
-                            })
-                        } else {
-                            onComplete(false)
-                        }
-                    }.addOnFailureListener {
-                        onComplete(false)
-                    }
-                } else {
+        matchRef.get().addOnSuccessListener { matchSnap ->
+            try {
+                val status = matchSnap.child("status").value?.toString() ?: ""
+                val fee = (matchSnap.child("entryFee").value as? Number)?.toDouble() ?: 0.0
+                val paid = matchSnap.child("paidPlayers").child(currentUid).value == true
+                val alreadyRefunded = matchSnap.child("refundClaimed").child(currentUid).value == true
+                // Only a CANCELLED match, only a player who actually paid, only once
+                if (status != "CANCELLED" || fee <= 0.0 || !paid || alreadyRefunded) {
+                    refundsInFlight.remove(matchId)
                     onComplete(false)
+                    return@addOnSuccessListener
                 }
+                val updates = hashMapOf<String, Any?>(
+                    "$NODE_MATCHES/$matchId/refundClaimed/$currentUid" to true,
+                    "$NODE_MATCHES/$matchId/pot" to ServerValue.increment(-fee),
+                    "$NODE_GAME_WALLETS/$currentUid/balance" to ServerValue.increment(fee),
+                    "$NODE_GAME_WALLETS/$currentUid/lastAutoLudoMatch" to matchId
+                )
+                db.reference.updateChildren(updates).addOnCompleteListener { task ->
+                    refundsInFlight.remove(matchId)
+                    onComplete(task.isSuccessful)
+                }
+            } catch (e: Exception) {
+                refundsInFlight.remove(matchId)
+                onComplete(false)
             }
-        })
+        }.addOnFailureListener {
+            refundsInFlight.remove(matchId)
+            onComplete(false)
+        }
     }
 
     /**
@@ -217,6 +205,10 @@ object AutoLudoManager {
      * and triggers refund for the creator.
      */
     fun cancelExpiredSoloMatch(match: AutoLudoMatchEntity, onComplete: ((Boolean) -> Unit)? = null) {
+        if (match.matchId.isBlank()) {
+            onComplete?.invoke(false)
+            return
+        }
         val targetEpoch = if (match.scheduledTimeMillis > 0L) match.scheduledTimeMillis else parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
         if (targetEpoch <= 0L || System.currentTimeMillis() < targetEpoch) {
             onComplete?.invoke(false)
@@ -226,15 +218,22 @@ object AutoLudoManager {
             onComplete?.invoke(false)
             return
         }
+        if (cancelsInFlight.contains(match.matchId) || refundsInFlight.contains(match.matchId)) {
+            onComplete?.invoke(false)
+            return
+        }
 
         val db = getDb() ?: run {
             onComplete?.invoke(false)
             return
         }
 
+        cancelsInFlight.add(match.matchId)
+
         val matchRef = db.getReference(NODE_MATCHES).child(match.matchId)
         matchRef.runTransaction(object : Transaction.Handler {
             override fun doTransaction(currentData: MutableData): Transaction.Result {
+                if (currentData.value == null) return Transaction.success(currentData)
                 val currentStatus = currentData.child("status").getValue(String::class.java)
                 val joinedCount = currentData.child("joinedPlayersCount").getValue(Int::class.java) ?: 1
                 if (currentStatus == "WAITING" && joinedCount < 2) {
@@ -247,11 +246,12 @@ object AutoLudoManager {
             }
 
             override fun onComplete(error: DatabaseError?, committed: Boolean, currentData: DataSnapshot?) {
+                cancelsInFlight.remove(match.matchId)
                 val targetUid = match.creatorUid.ifBlank { match.player1Uid }
                 if (committed) {
                     if (targetUid.isNotBlank()) {
-                        claimRefund(match.matchId, targetUid) {
-                            onComplete?.invoke(true)
+                        claimRefund(match.matchId, targetUid) { success ->
+                            onComplete?.invoke(success)
                         }
                     } else {
                         onComplete?.invoke(true)
@@ -259,8 +259,8 @@ object AutoLudoManager {
                 } else {
                     val status = currentData?.child("status")?.getValue(String::class.java)
                     if (status == "CANCELLED" && targetUid.isNotBlank()) {
-                        claimRefund(match.matchId, targetUid) {
-                            onComplete?.invoke(false)
+                        claimRefund(match.matchId, targetUid) { success ->
+                            onComplete?.invoke(success)
                         }
                     } else {
                         onComplete?.invoke(false)
@@ -279,7 +279,9 @@ object AutoLudoManager {
         matches.forEach { match ->
             val targetEpoch = if (match.scheduledTimeMillis > 0L) match.scheduledTimeMillis else parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
             if (match.status == "WAITING" && match.joinedPlayersCount < 2 && targetEpoch > 0L && now >= targetEpoch) {
-                cancelExpiredSoloMatch(match)
+                if (!cancelsInFlight.contains(match.matchId) && !refundsInFlight.contains(match.matchId)) {
+                    cancelExpiredSoloMatch(match)
+                }
             }
         }
         if (currentUid.isNotBlank()) {
@@ -294,7 +296,10 @@ object AutoLudoManager {
     fun autoRefundCancelledMatches(matches: List<AutoLudoMatchEntity>, currentUid: String) {
         if (currentUid.isBlank()) return
         matches.filter { match ->
-            match.status == "CANCELLED" && (match.player1Uid == currentUid || match.player2Uid == currentUid || match.creatorUid == currentUid)
+            match.status == "CANCELLED" &&
+            (match.player1Uid == currentUid || match.player2Uid == currentUid || match.creatorUid == currentUid) &&
+            !cancelsInFlight.contains(match.matchId) &&
+            !refundsInFlight.contains(match.matchId)
         }.forEach { match ->
             claimRefund(match.matchId, currentUid)
         }
@@ -356,49 +361,30 @@ object AutoLudoManager {
         scheduledTimeMillis: Long = 0L
     ): Result<String> {
         if (creatorUid.isBlank()) return Result.failure(IllegalArgumentException("User ID is required"))
-        if (entryFee < 10.0 || entryFee > 10000.0) {
-            return Result.failure(IllegalArgumentException("এন্ট্রি ফি অবশ্যই ১০ থেকে ১০,০০০ টাকার মধ্যে হতে হবে"))
+        if (entryFee < 10.0 || entryFee > 500.0) {
+            return Result.failure(IllegalArgumentException("এন্ট্রি ফি অবশ্যই ১০ থেকে ৫০০ টাকার মধ্যে হতে হবে"))
         }
 
         val db = getDb() ?: return Result.failure(IllegalStateException("Database not available"))
         val walletBalanceRef = db.getReference(NODE_GAME_WALLETS).child(creatorUid).child("balance")
 
-        // Step 1: Atomic Transaction on gameWallets/$uid/balance with proper NULL handling
-        val deductionResult = suspendCancellableCoroutine<Pair<Boolean, String?>> { cont ->
-            walletBalanceRef.runTransaction(object : Transaction.Handler {
-                override fun doTransaction(currentData: MutableData): Transaction.Result {
-                    val currentBal = when (val v = currentData.value) {
-                        is Number -> v.toDouble()
-                        is String -> v.toDoubleOrNull() ?: 0.0
-                        else -> 0.0
-                    }
-
-                    if (currentBal < entryFee) {
-                        return Transaction.abort() // Strictly abort if null or insufficient balance
-                    }
-
-                    // Deduct entry fee
-                    currentData.value = currentBal - entryFee
-                    return Transaction.success(currentData)
+        // Step 1: Balance pre-check only. The real deduction happens atomically together with the match write (Step 4).
+        val currentBalance = suspendCancellableCoroutine<Double> { cont ->
+            walletBalanceRef.get()
+                .addOnSuccessListener { snap ->
+                    val v = snap.value
+                    cont.resume(
+                        when (v) {
+                            is Number -> v.toDouble()
+                            is String -> v.toDoubleOrNull() ?: 0.0
+                            else -> 0.0
+                        }
+                    )
                 }
-
-                override fun onComplete(
-                    error: DatabaseError?,
-                    committed: Boolean,
-                    currentData: DataSnapshot?
-                ) {
-                    if (committed && error == null) {
-                        cont.resume(Pair(true, null))
-                    } else {
-                        val errMsg = error?.message ?: "অপর্যাপ্ত গেম ওয়ালেট ব্যালেন্স"
-                        cont.resume(Pair(false, errMsg))
-                    }
-                }
-            })
+                .addOnFailureListener { cont.resume(-1.0) }
         }
-
-        if (!deductionResult.first) {
-            return Result.failure(IllegalStateException(deductionResult.second ?: "ব্যালেন্স ডিডাকশন ব্যর্থ হয়েছে"))
+        if (currentBalance < entryFee) {
+            return Result.failure(IllegalStateException("অপর্যাপ্ত গেম ওয়ালেট ব্যালেন্স"))
         }
 
         // Step 2: Atomic Increment for Match Counter (#1, #2, #3, ...)
@@ -450,6 +436,8 @@ object AutoLudoManager {
             "title" to "Auto Ludo || Match No:- #$matchNumber",
             "entryFee" to entryFee,
             "prizePool" to prizePool,
+            "pot" to entryFee,
+            "paidPlayers" to mapOf(creatorUid to true),
             "creatorUid" to creatorUid,
             "creatorName" to creatorName.ifBlank { "Player" },
             "player1Uid" to creatorUid,
@@ -466,10 +454,16 @@ object AutoLudoManager {
             "readyTimerStartedAt" to 0L
         )
 
+        // Step 4: ONE atomic write: the fee leaves the wallet and enters this match's pot (database rules check the sum)
+        val updates = hashMapOf<String, Any?>(
+            "$NODE_GAME_WALLETS/$creatorUid/balance" to ServerValue.increment(-entryFee),
+            "$NODE_GAME_WALLETS/$creatorUid/lastAutoLudoMatch" to matchId,
+            "$NODE_MATCHES/$matchId" to matchData
+        )
         return try {
             var firebaseErrorMsg: String? = null
             val writeSuccess = suspendCancellableCoroutine<Boolean> { cont ->
-                matchRef.setValue(matchData) { err, _ ->
+                db.reference.updateChildren(updates) { err, _ ->
                     if (err != null) {
                         firebaseErrorMsg = "${err.message} (Code: ${err.code})"
                         android.util.Log.e("AutoLudoError", "FIREBASE WRITE REJECTED: $firebaseErrorMsg")
@@ -477,21 +471,12 @@ object AutoLudoManager {
                     cont.resume(err == null)
                 }
             }
-
             if (writeSuccess) {
                 Result.success(matchId)
             } else {
-                // Atomic refund rollback if match write fails
-                compensateRefund(walletBalanceRef, entryFee)
-                val finalError = if (firebaseErrorMsg != null) {
-                    "ম্যাচ সংরক্ষণে সমস্যা: $firebaseErrorMsg. ব্যালেন্স ফেরত দেওয়া হয়েছে।"
-                } else {
-                    "ম্যাচ তৈরিতে সমস্যা হয়েছে, ব্যালেন্স ফেরত দেওয়া হয়েছে"
-                }
-                Result.failure(IllegalStateException(finalError))
+                Result.failure(IllegalStateException("ম্যাচ তৈরিতে সমস্যা হয়েছে${firebaseErrorMsg?.let { ": $it" } ?: ""}। ব্যালেন্স কাটা হয়নি।"))
             }
         } catch (e: Exception) {
-            compensateRefund(walletBalanceRef, entryFee)
             Result.failure(e)
         }
     }
@@ -538,66 +523,63 @@ object AutoLudoManager {
         val entryFee = match.entryFee
         val walletBalanceRef = db.getReference(NODE_GAME_WALLETS).child(playerUid).child("balance")
 
-        // 2. Atomic Wallet Deduction
-        val deductionResult = suspendCancellableCoroutine<Pair<Boolean, String?>> { cont ->
-            walletBalanceRef.runTransaction(object : Transaction.Handler {
-                override fun doTransaction(currentData: MutableData): Transaction.Result {
-                    val cur = when (val rawBal = currentData.value) {
-                        is Number -> rawBal.toDouble()
-                        is String -> rawBal.toDoubleOrNull() ?: 0.0
-                        else -> 0.0
-                    }
-                    if (cur < entryFee) return Transaction.abort()
-                    currentData.value = cur - entryFee
-                    return Transaction.success(currentData)
+        // 2. Balance pre-check only. The real deduction happens atomically with the join write (step 3).
+        val currentBalance = suspendCancellableCoroutine<Double> { cont ->
+            walletBalanceRef.get()
+                .addOnSuccessListener { snap ->
+                    val v = snap.value
+                    cont.resume(
+                        when (v) {
+                            is Number -> v.toDouble()
+                            is String -> v.toDoubleOrNull() ?: 0.0
+                            else -> 0.0
+                        }
+                    )
                 }
-                override fun onComplete(err: DatabaseError?, committed: Boolean, d: DataSnapshot?) {
-                    if (committed && err == null) cont.resume(Pair(true, null))
-                    else cont.resume(Pair(false, err?.message ?: "অপর্যাপ্ত গেম ওয়ালেট ব্যালেন্স"))
-                }
-            })
+                .addOnFailureListener { cont.resume(-1.0) }
+        }
+        if (currentBalance < entryFee) {
+            return Result.failure(IllegalStateException("অপর্যাপ্ত গেম ওয়ালেট ব্যালেন্স"))
         }
 
-        if (!deductionResult.first) {
-            return Result.failure(IllegalStateException(deductionResult.second ?: "ব্যালেন্স ডিডাকশন ব্যর্থ"))
-        }
-
-        // 3. Slot Allocation & Status Transition
+        // 3. ONE atomic write: fee leaves the wallet and enters this match's pot, slot + status updated together
         val isSlot1Empty = match.player1Uid.isBlank()
         val isSlot2Empty = match.player2Uid.isBlank()
         val newCount = match.joinedPlayersCount + 1
+        val base = "$NODE_MATCHES/$matchId"
 
         val updates = hashMapOf<String, Any?>(
-            "joinedPlayersCount" to newCount,
-            "updatedAt" to ServerValue.TIMESTAMP
+            "$base/joinedPlayersCount" to newCount,
+            "$base/updatedAt" to ServerValue.TIMESTAMP,
+            "$base/pot" to ServerValue.increment(entryFee),
+            "$base/paidPlayers/$playerUid" to true,
+            "$NODE_GAME_WALLETS/$playerUid/balance" to ServerValue.increment(-entryFee),
+            "$NODE_GAME_WALLETS/$playerUid/lastAutoLudoMatch" to matchId
         )
 
         if (isSlot1Empty) {
-            updates["player1Uid"] = playerUid
-            updates["player1Name"] = playerName.ifBlank { "Player 1" }
+            updates["$base/player1Uid"] = playerUid
+            updates["$base/player1Name"] = playerName.ifBlank { "Player 1" }
         } else if (isSlot2Empty) {
-            updates["player2Uid"] = playerUid
-            updates["player2Name"] = playerName.ifBlank { "Player 2" }
+            updates["$base/player2Uid"] = playerUid
+            updates["$base/player2Name"] = playerName.ifBlank { "Player 2" }
         }
 
-        // Trigger Countdown if 2/2 full
         if (newCount >= 2) {
-            updates["status"] = "READY_COUNTDOWN"
-            updates["countdownStartedAt"] = ServerValue.TIMESTAMP
+            updates["$base/status"] = "READY_COUNTDOWN"
+            updates["$base/countdownStartedAt"] = ServerValue.TIMESTAMP
         }
 
         return try {
             val updateSuccess = suspendCancellableCoroutine<Boolean> { cont ->
-                matchRef.updateChildren(updates) { err, _ -> cont.resume(err == null) }
+                db.reference.updateChildren(updates) { err, _ -> cont.resume(err == null) }
             }
             if (updateSuccess) {
                 Result.success(Unit)
             } else {
-                compensateRefund(walletBalanceRef, entryFee)
-                Result.failure(IllegalStateException("ম্যাচে যুক্ত হতে ব্যর্থ, ব্যালেন্স ফেরত দেওয়া হয়েছে"))
+                Result.failure(IllegalStateException("ম্যাচে যুক্ত হতে ব্যর্থ। ব্যালেন্স কাটা হয়নি।"))
             }
         } catch (e: Exception) {
-            compensateRefund(walletBalanceRef, entryFee)
             Result.failure(e)
         }
     }

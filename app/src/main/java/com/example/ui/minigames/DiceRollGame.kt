@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
 import com.example.core.firebase.FirebaseManager
+import com.example.core.i18n.digits
+import com.example.core.i18n.taka
 import com.example.ui.components.TournamentButton
 import com.example.ui.theme.*
 import com.example.ui.wallet.WalletViewModel
@@ -77,6 +79,11 @@ fun DiceRollGameScreen(
     var userPhone by remember(walletState.user) { mutableStateOf(walletState.user?.effectiveMobile ?: authUser?.phoneNumber ?: "") }
     var currentReservePool by remember { mutableStateOf(0.0) }
     var isTransferModalVisible by remember { mutableStateOf(false) }
+    
+    // Global Config states
+    var isMiniGamesEnabled by remember { mutableStateOf(true) }
+    var isDiceGameActive by remember { mutableStateOf(true) }
+    val isGameActive = isMiniGamesEnabled && isDiceGameActive
 
     // Observers
     DisposableEffect(uid) {
@@ -100,6 +107,16 @@ fun DiceRollGameScreen(
             override fun onCancelled(error: DatabaseError) {}
         }
         poolRef.addValueEventListener(poolListener)
+
+        val configRef = database.getReference("miniGames/globalConfig")
+        val configListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                isMiniGamesEnabled = snapshot.child("miniGamesEnabled").value?.toString()?.toBoolean() ?: true
+                isDiceGameActive = snapshot.child("diceGameActive").value?.toString()?.toBoolean() ?: true
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        configRef.addValueEventListener(configListener)
 
         val userRef = database.getReference("users").child(uid)
         val profileValueListener = object : ValueEventListener {
@@ -128,6 +145,7 @@ fun DiceRollGameScreen(
         onDispose {
             balanceRef.removeEventListener(balanceListener)
             poolRef.removeEventListener(poolListener)
+            configRef.removeEventListener(configListener)
             userRef.removeEventListener(profileValueListener)
         }
     }
@@ -150,7 +168,10 @@ fun DiceRollGameScreen(
     var selectedBetAmount by remember { mutableStateOf(1L) }
     var dice1Result by remember { mutableStateOf(5) }
     var dice2Result by remember { mutableStateOf(4) }
-    var rollResultText by remember { mutableStateOf<String?>("ভাগ্য পরীক্ষা করতে রোল করুন") }
+    
+    val strings = com.example.core.i18n.LocalAppStrings.current
+    
+    var rollResultText by remember(strings) { mutableStateOf<String?>(strings.diceInstruction) }
     var showWinDialog by remember { mutableStateOf(false) }
     var lastWinAmount by remember { mutableStateOf(0.0) }
     var isLastWin by remember { mutableStateOf(false) }
@@ -173,9 +194,9 @@ fun DiceRollGameScreen(
     )
 
     fun performRoll() {
-        if (isRolling) return
+        if (isRolling || !isGameActive) return
         if (gameBalance < selectedBetAmount) {
-            Toast.makeText(context, "গেম ব্যালেন্স অপর্যাপ্ত", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, strings.diceToastNoBalance, Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -227,7 +248,8 @@ fun DiceRollGameScreen(
 
                 val totalSum = d1 + d2
                 val isEven = (totalSum % 2 == 0)
-                rollResultText = "Roll Result: $totalSum (${if (isEven) "Even" else "Odd"})"
+                val typeStr = if (isEven) strings.diceChoiceEven else strings.diceChoiceOdd
+                rollResultText = strings.diceRollResult(strings.digits(totalSum.toString()), typeStr)
                 isRolling = false
 
                 // 4. Visual Resolution (Financials already committed by Engine)
@@ -236,7 +258,7 @@ fun DiceRollGameScreen(
                 delay(350)
                 showWinDialog = true
             }.onFailure { error ->
-                Toast.makeText(context, error.message ?: "ট্রানজেকশন ব্যর্থ হয়েছে", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, error.message ?: strings.diceToastFailed, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -294,14 +316,14 @@ fun DiceRollGameScreen(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column(verticalArrangement = Arrangement.Center) {
                                         Text(
-                                            "Main Balance",
+                                            strings.diceMainBalanceLabel,
                                             fontSize = 10.sp,
                                             color = Color.White.copy(alpha = 0.7f),
                                             fontWeight = FontWeight.Medium,
                                             maxLines = 1
                                         )
                                         Text(
-                                            "৳${"%.2f".format(userBalance)}",
+                                            strings.taka(userBalance),
                                             fontSize = 13.sp,
                                             color = Color.White,
                                             fontWeight = FontWeight.Bold,
@@ -335,17 +357,17 @@ fun DiceRollGameScreen(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column(verticalArrangement = Arrangement.Center) {
                                         Text(
-                                            "Game Wallet",
+                                            strings.diceGameWalletLabel,
                                             fontSize = 10.sp,
                                             color = MetallicGold.copy(alpha = 0.85f),
                                             fontWeight = FontWeight.SemiBold,
                                             maxLines = 1
                                         )
                                         Text(
-                                            "৳${"%.2f".format(gameBalance)}",
+                                            strings.taka(gameBalance),
                                             fontSize = 13.sp,
                                             color = MetallicGold,
-                                            fontWeight = FontWeight.Black,
+                                            fontWeight = if (com.example.core.i18n.LocalAppStrings.current == com.example.core.i18n.BengaliStrings) FontWeight.Bold else FontWeight.Black,
                                             maxLines = 1
                                         )
                                     }
@@ -358,7 +380,7 @@ fun DiceRollGameScreen(
                                         Box(contentAlignment = Alignment.Center) {
                                             Icon(
                                                 Icons.Default.Add,
-                                                contentDescription = "Add Funds",
+                                                contentDescription = strings.diceAddFunds,
                                                 tint = Color.Black,
                                                 modifier = Modifier.size(12.dp)
                                             )
@@ -394,21 +416,40 @@ fun DiceRollGameScreen(
                         
                         // --- GRAND CASINO TITLE & DYNAMIC STATUS ---
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            if (!isGameActive) {
+                                Surface(
+                                    modifier = Modifier.padding(bottom = 12.dp).fillMaxWidth().padding(horizontal = 20.dp),
+                                    color = Color.Red.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.4f))
+                                ) {
+                                    Text(
+                                        strings.diceClosedBanner,
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp),
+                                        color = Color.Red,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                            
                             Text(
-                                "EVEN & ODD",
+                                strings.diceTitle,
                                 style = MaterialTheme.typography.headlineMedium.copy(
                                     fontWeight = FontWeight.Black,
                                     fontSize = 30.sp,
-                                    letterSpacing = 2.sp,
+                                    letterSpacing = if (com.example.core.i18n.LocalAppStrings.current == com.example.core.i18n.BengaliStrings) 0.sp else 2.sp,
                                     brush = Brush.verticalGradient(listOf(DiceGoldLight, MetallicGold, AmberGlow))
                                 )
                             )
                             Text(
-                                "জোড়-বেজোড়",
+                                strings.diceSubtitle,
                                 style = MaterialTheme.typography.titleLarge.copy(
                                     fontWeight = FontWeight.ExtraBold,
                                     color = MetallicGold.copy(alpha = 0.85f),
-                                    letterSpacing = 4.sp
+                                    letterSpacing = if (com.example.core.i18n.LocalAppStrings.current == com.example.core.i18n.BengaliStrings) 0.sp else 4.sp,
+                                    fontSize = 18.sp
                                 )
                             )
                             Spacer(modifier = Modifier.height(8.dp))
@@ -427,18 +468,18 @@ fun DiceRollGameScreen(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "ডাইস ঘুরছে...",
+                                        text = strings.diceRolling,
                                         style = MaterialTheme.typography.titleMedium.copy(
                                             fontWeight = FontWeight.ExtraBold,
                                             fontSize = 16.sp,
                                             color = MetallicGold.copy(alpha = pulseAlpha),
-                                            letterSpacing = 1.sp
+                                            letterSpacing = if (com.example.core.i18n.LocalAppStrings.current == com.example.core.i18n.BengaliStrings) 0.sp else 1.sp
                                         )
                                     )
                                 }
                             } else {
                                 Text(
-                                    text = rollResultText ?: "ভাগ্য পরীক্ষা করতে রোল করুন",
+                                    text = rollResultText ?: strings.diceInstruction,
                                     style = MaterialTheme.typography.labelLarge.copy(
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 15.sp,
@@ -557,17 +598,17 @@ fun DiceRollGameScreen(
                         ) {
                             LuxuryChoiceCard(
                                 choice = DiceChoice.EVEN,
-                                label = "জোড় (EVEN)",
+                                label = strings.diceChoiceEven,
                                 isSelected = selectedChoice == DiceChoice.EVEN,
-                                enabled = !isRolling,
+                                enabled = !isRolling && isGameActive,
                                 onSelect = { selectedChoice = it },
                                 modifier = Modifier.weight(1f)
                             )
                             LuxuryChoiceCard(
                                 choice = DiceChoice.ODD,
-                                label = "বেজোড় (ODD)",
+                                label = strings.diceChoiceOdd,
                                 isSelected = selectedChoice == DiceChoice.ODD,
-                                enabled = !isRolling,
+                                enabled = !isRolling && isGameActive,
                                 onSelect = { selectedChoice = it },
                                 modifier = Modifier.weight(1f)
                             )
@@ -579,8 +620,12 @@ fun DiceRollGameScreen(
                         CasinoBettingConsole(
                             selectedBet = selectedBetAmount.toInt(),
                             onBetSelected = { selectedBetAmount = it.toLong() },
-                            actionButtonText = if (gameBalance < selectedBetAmount) "পর্যাপ্ত ব্যালেন্স নেই" else "🎲 রোল করুন (ROLL DICE)",
-                            isActionEnabled = !isRolling && gameBalance >= selectedBetAmount,
+                            actionButtonText = when {
+                                !isGameActive -> strings.diceClosedBanner
+                                gameBalance < selectedBetAmount -> strings.diceNoBalance
+                                else -> strings.diceRollButton
+                            },
+                            isActionEnabled = !isRolling && gameBalance >= selectedBetAmount && isGameActive,
                             onActionClick = { performRoll() }
                         )
                         
@@ -761,6 +806,7 @@ fun LuxuryChoiceCard(
     onSelect: (DiceChoice) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = com.example.core.i18n.LocalAppStrings.current
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
         Surface(
             modifier = Modifier
@@ -812,7 +858,7 @@ fun LuxuryChoiceCard(
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
-        Text("Payout: 1.9x", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text(strings.dicePayout, color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
 }
 
