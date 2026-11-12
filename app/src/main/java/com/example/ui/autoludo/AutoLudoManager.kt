@@ -724,7 +724,8 @@ object AutoLudoManager {
 
                     if (state.isDiceRolled) return Transaction.abort()
                     
-                    val rollValue = if (value in 1..6) value else (1..6).random()
+                    var rollValue = if (value in 1..6) value else (1..6).random()
+                    if (rollValue == 6 && state.consecutiveSixesCount >= 2) rollValue = (1..5).random()
                     var nextConsecutiveSixes = if (rollValue == 6) state.consecutiveSixesCount + 1 else 0
                     var nextTurnUid = if (isP1Turn) {
                         match.player1Uid.ifBlank { "player_1" }

@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,7 +49,8 @@ data class AdDiceArgs(
     val onRoll: (Int) -> Unit,
     val soundPool: SoundPool?,
     val diceSoundId: Int,
-    val toneGenerator: ToneGenerator?
+    val toneGenerator: ToneGenerator?,
+    val forbidSix: Boolean = false
 )
 
 @Composable
@@ -62,7 +64,8 @@ fun rememberAdDiceContent(): @Composable (AdDiceArgs) -> Unit = remember {
             onRoll = a.onRoll,
             soundPool = a.soundPool,
             diceSoundId = a.diceSoundId,
-            toneGenerator = a.toneGenerator
+            toneGenerator = a.toneGenerator,
+            forbidSix = a.forbidSix
         )
     }
 }
@@ -83,6 +86,7 @@ fun AdPlayerBattleCard(
         Row(
             modifier = Modifier
                 .widthIn(max = 340.dp)
+                .height(88.dp)
                 .shadow(
                     elevation = if (active) 18.dp else 8.dp,
                     shape = shape,
@@ -91,7 +95,7 @@ fun AdPlayerBattleCard(
                 )
                 .background(Brush.verticalGradient(listOf(Color(0xFF2B3E95), Color(0xFF18266B))), shape)
                 .border(
-                    width = if (active) 2.dp else 1.dp,
+                    width = 2.dp,
                     brush = if (active) GoldBrush else Brush.linearGradient(listOf(Color(0x8CFFD54F), Color(0x8CFFD54F))),
                     shape = shape
                 )
@@ -140,19 +144,28 @@ private fun AdAvatar(player: LudoPlayer, timerProgress: Float) {
                 .background(Brush.radialGradient(listOf(lerp(pc, Color.White, 0.45f), pc, lerp(pc, Color.Black, 0.45f)))),
             contentAlignment = Alignment.Center
         ) {
-            if (player.avatarUrl.isNotBlank()) {
-                AsyncImage(
-                    model = player.avatarUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+            val fetchedPhoto = rememberAdUserPhoto(player.userId)
+            val photo = player.avatarUrl.ifBlank { fetchedPhoto }
+            if (photo.isNotBlank()) {
+                com.example.ui.components.EsportsAvatar(
+                    photoUrl = photo,
+                    name = player.name,
+                    size = 44.dp,
+                    borderWidth = 0.dp
                 )
             } else {
+                val words = player.name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+                val initials = when {
+                    words.size >= 2 -> "${words[0].first()}${words[1].first()}"
+                    words.size == 1 -> words[0].take(2)
+                    else -> "?"
+                }.uppercase()
                 Text(
-                    text = player.name.trim().firstOrNull()?.uppercase() ?: "?",
+                    text = initials,
                     color = Color.White,
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
                 )
             }
         }
@@ -173,8 +186,7 @@ private fun AdPlayerInfo(player: LudoPlayer, isMe: Boolean, align: Alignment.Hor
             modifier = Modifier.widthIn(max = 140.dp)
         )
         Spacer(modifier = Modifier.height(4.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (player.isCurrentTurn) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 val label = if (isMe) (if (bn) "আপনার পালা" else "Your turn") else (if (bn) "প্রতিপক্ষের পালা" else "Opponent's turn")
                 Text(
                     text = label,
@@ -183,10 +195,10 @@ private fun AdPlayerInfo(player: LudoPlayer, isMe: Boolean, align: Alignment.Hor
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     modifier = Modifier
+                        .alpha(if (player.isCurrentTurn) 1f else 0f)
                         .background(Brush.verticalGradient(listOf(Color(0xFFFFE082), Color(0xFFFFB300))), RoundedCornerShape(50))
                         .padding(horizontal = 8.dp, vertical = 2.dp)
                 )
-            }
             Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                 repeat(3) { i ->
                     Box(
@@ -216,4 +228,27 @@ private fun AdDiceSlot(dice: (@Composable () -> Unit)?) {
             )
         }
     }
+}
+
+@Composable
+private fun rememberAdUserPhoto(uid: String): String {
+    val state = androidx.compose.runtime.produceState(initialValue = "", uid) {
+        if (uid.isBlank() || uid.startsWith("player_")) return@produceState
+        try {
+            val userRef = com.example.core.firebase.FirebaseManager.getDatabase()?.getReference("users")?.child(uid)
+                ?: return@produceState
+            val keys = listOf("profilePhotoUrl", "profilePhoto", "avatarUrl")
+            fun tryKey(i: Int) {
+                if (i >= keys.size) return
+                userRef.child(keys[i]).get()
+                    .addOnSuccessListener { snap ->
+                        val v = snap.getValue(String::class.java)
+                        if (!v.isNullOrBlank()) value = v else tryKey(i + 1)
+                    }
+                    .addOnFailureListener { tryKey(i + 1) }
+            }
+            tryKey(0)
+        } catch (_: Exception) { }
+    }
+    return state.value
 }

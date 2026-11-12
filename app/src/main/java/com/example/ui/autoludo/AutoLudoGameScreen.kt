@@ -836,7 +836,7 @@ fun AutoLudoBoardScreen(
                 
                 if (!isRolled) {
                     // PHASE 1 TIMEOUT: Auto-Roll
-                    val randomValue = (1..6).random()
+                    val randomValue = if (gameState.consecutiveSixesCount >= 2) (1..5).random() else (1..6).random()
                     onDiceRoll(randomValue, true)
                     actionDispatched = true
                 } else {
@@ -905,7 +905,8 @@ fun AutoLudoBoardScreen(
         onRoll = { onDiceRoll(it, false) },
         soundPool = soundPool,
         diceSoundId = diceSoundId,
-        toneGenerator = toneGenerator
+        toneGenerator = toneGenerator,
+        forbidSix = gameState.consecutiveSixesCount >= 2
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -923,29 +924,21 @@ fun AutoLudoBoardScreen(
             LudoTopBar(onBackClick = onBackClick)
 
             // Action Log Indicator (Non-blocking)
-            if (gameState.lastActionLog.isNotBlank()) {
-                Text(
-                    text = strings.displayActionLog(gameState.lastActionLog),
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            } else {
-                Spacer(modifier = Modifier.height(30.dp)) // Placeholder to avoid jump
+            Box(modifier = Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.Center) {
+                if (gameState.lastActionLog.isNotBlank()) {
+                    Text(
+                        text = strings.displayActionLog(gameState.lastActionLog),
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                    )
+                }
             }
             
-            AdPlayerBattleCard(
-                player = adOpp,
-                isMe = false,
-                timerProgress = if (adOpp.isCurrentTurn) timerProgress else 0f,
-                dice = if (adOpp.isCurrentTurn) { { adDice(adDiceArgs) } } else null,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
-            )
-
             // 2. Centered Ludo Board Container (Flex-weighted to guarantee fit)
             Box(
                 modifier = Modifier
@@ -954,136 +947,162 @@ fun AutoLudoBoardScreen(
                     .zIndex(10f),
                 contentAlignment = Alignment.Center
             ) {
-                BoxWithConstraints(
-                    modifier = Modifier
-                        .fillMaxWidth(0.94f)
-                        .aspectRatio(1f)
-                        .shadow(elevation = 22.dp, shape = RoundedCornerShape(8.dp), ambientColor = Color(0xFFFFC107), spotColor = Color(0xFFFFA000), clip = false)
-                        .border(3.dp, Brush.linearGradient(listOf(Color(0xFFFFF3B0), Color(0xFFFFC107), Color(0xFFB07A00))), RoundedCornerShape(8.dp))
-                        .background(Color.White)
-                        .graphicsLayer {
-                            rotationZ = boardRotation
-                        }
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    val boardSizePx = constraints.maxWidth.toFloat()
-                    val unit = boardSizePx / 15f
+                    AdPlayerBattleCard(
+                        player = adOpp,
+                        isMe = false,
+                        timerProgress = if (adOpp.isCurrentTurn) timerProgress else 0f,
+                        dice = if (adOpp.isCurrentTurn) { { adDice(adDiceArgs) } } else null,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
 
-                    AdLudoBoard(boardRotation = boardRotation, modifier = Modifier.fillMaxSize())
-
-                    // Render pawns as individual composables for better scaling, performance and ANIMATION
-                    val density = LocalDensity.current
-
-                    // Red Pawn Colors (Deep Royal Ruby - Saturated)
-                    val redPrimary = Color(0xFFE53935)
-                    val redDeep = Color(0xFF4A0000)
-                    val redOutline = Color(0xFF2E0000)
-
-                    // Yellow Pawn Colors (Rich Golden Amber - Saturated)
-                    val yellowPrimary = Color(0xFFFBC02D)
-                    val yellowDeep = Color(0xFF9E5B00)
-                    val yellowOutline = Color(0xFF4E2D00)
-
-                    // 1. Group all pawns on track to identify overlaps
-                    val onTrackPawns = (gameState.player1Pawns.mapIndexed { i, p -> Triple(i, p, true) } +
-                                       gameState.player2Pawns.mapIndexed { i, p -> Triple(i, p, false) })
-                                       .filter { it.second >= 0 }
-                    val clusterMap = onTrackPawns.groupBy { it.second }
-
-                    // 2. Render Player 1 Pawns
-                    gameState.player1Pawns.forEachIndexed { index, pos ->
-                        val isEligible = canControlPlayer1 && isRolled && (
-                            (pos == -1 && effectiveDiceValue == 6) ||
-                            (pos >= 0 && pos + effectiveDiceValue <= 56)
-                        )
-                        
-                        val cluster = if (pos >= 0) clusterMap[pos] ?: emptyList() else emptyList()
-                        val stackIdx = if (pos >= 0) cluster.indexOfFirst { it.first == index && it.third } else 0
-                        val total = if (pos >= 0) cluster.size else 1
-
-                        LudoPawnView(
-                            targetPos = pos,
-                            index = index,
-                            isPlayer1 = true,
-                            boardSizePx = boardSizePx,
-                            pawnColor = redPrimary,
-                            deepShadeColor = redDeep,
-                            outlineColor = redOutline,
-                            isEligibleToMove = isEligible,
-                            boardRotation = boardRotation,
-                            stackIndex = stackIdx,
-                            totalInStack = total,
-                            soundPool = soundPool,
-                            pawnSoundId = pawnSoundId,
-                            toneGenerator = toneGenerator,
-                            onClick = {
-                                val dice = effectiveDiceValue
-                                var newPos = pos
-                                if (pos == -1 && dice == 6) {
-                                    newPos = 0 
-                                } else if (pos >= 0) {
-                                    newPos = pos + dice
-                                    if (newPos > 56) return@LudoPawnView
-                                }
-                                if (newPos != pos) {
-                                    onMovePawn(index, newPos, false)
-                                }
+                    BoxWithConstraints(
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .fillMaxWidth(0.94f)
+                            .aspectRatio(1f)
+                            .graphicsLayer {
+                                rotationZ = boardRotation
                             }
+                    ) {
+                        val boardSizePx = constraints.maxWidth.toFloat()
+                        val unit = boardSizePx / 15f
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .shadow(elevation = 22.dp, shape = RoundedCornerShape(8.dp), ambientColor = Color(0xFFFFC107), spotColor = Color(0xFFFFA000), clip = false)
+                                .background(Color.White, RoundedCornerShape(8.dp))
                         )
+                        AdLudoBoard(boardRotation = boardRotation, modifier = Modifier.fillMaxSize())
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .border(3.dp, Brush.linearGradient(listOf(Color(0xFFFFF3B0), Color(0xFFFFC107), Color(0xFFB07A00))), RoundedCornerShape(8.dp))
+                        )
+
+                        // Render pawns as individual composables for better scaling, performance and ANIMATION
+                        val density = LocalDensity.current
+
+                        // Red Pawn Colors (Deep Royal Ruby - Saturated)
+                        val redPrimary = Color(0xFFE53935)
+                        val redDeep = Color(0xFF4A0000)
+                        val redOutline = Color(0xFF2E0000)
+
+                        // Yellow Pawn Colors (Rich Golden Amber - Saturated)
+                        val yellowPrimary = Color(0xFFFBC02D)
+                        val yellowDeep = Color(0xFF9E5B00)
+                        val yellowOutline = Color(0xFF4E2D00)
+
+                        // 1. Group all pawns on track to identify overlaps
+                        val onTrackPawns = (gameState.player1Pawns.mapIndexed { i, p -> Triple(i, p, true) } +
+                                           gameState.player2Pawns.mapIndexed { i, p -> Triple(i, p, false) })
+                                           .filter { it.second >= 0 }
+                        val clusterMap = onTrackPawns.groupBy { (_, p, isP1) ->
+                            if (p >= 56) "home_$isP1" else getGridPositionForPath(p, isP1).let { "${it.x}_${it.y}" }
+                        }
+
+                        // 2. Render Player 1 Pawns
+                        gameState.player1Pawns.forEachIndexed { index, pos ->
+                            val isEligible = canControlPlayer1 && isRolled && (
+                                (pos == -1 && effectiveDiceValue == 6) ||
+                                (pos >= 0 && pos + effectiveDiceValue <= 56)
+                            )
+                            
+                            val cluster = if (pos >= 0) clusterMap[if (pos >= 56) "home_true" else getGridPositionForPath(pos, true).let { "${it.x}_${it.y}" }] ?: emptyList() else emptyList()
+                            val stackIdx = if (pos >= 0) cluster.indexOfFirst { it.first == index && it.third } else 0
+                            val total = if (pos >= 0) cluster.size else 1
+
+                            LudoPawnView(
+                                targetPos = pos,
+                                index = index,
+                                isPlayer1 = true,
+                                boardSizePx = boardSizePx,
+                                pawnColor = redPrimary,
+                                deepShadeColor = redDeep,
+                                outlineColor = redOutline,
+                                isEligibleToMove = isEligible,
+                                boardRotation = boardRotation,
+                                stackIndex = stackIdx,
+                                totalInStack = total,
+                                soundPool = soundPool,
+                                pawnSoundId = pawnSoundId,
+                                toneGenerator = toneGenerator,
+                                onClick = {
+                                    val dice = effectiveDiceValue
+                                    var newPos = pos
+                                    if (pos == -1 && dice == 6) {
+                                        newPos = 0 
+                                    } else if (pos >= 0) {
+                                        newPos = pos + dice
+                                        if (newPos > 56) return@LudoPawnView
+                                    }
+                                    if (newPos != pos) {
+                                        onMovePawn(index, newPos, false)
+                                    }
+                                }
+                            )
+                        }
+
+                        // 3. Render Player 2 Pawns
+                        gameState.player2Pawns.forEachIndexed { index, pos ->
+                            val isEligible = canControlPlayer2 && isRolled && (
+                                (pos == -1 && effectiveDiceValue == 6) ||
+                                (pos >= 0 && pos + effectiveDiceValue <= 56)
+                            )
+                            
+                            val cluster = if (pos >= 0) clusterMap[if (pos >= 56) "home_false" else getGridPositionForPath(pos, false).let { "${it.x}_${it.y}" }] ?: emptyList() else emptyList()
+                            val stackIdx = if (pos >= 0) cluster.indexOfFirst { it.first == index && !it.third } else 0
+                            val total = if (pos >= 0) cluster.size else 1
+
+                            LudoPawnView(
+                                targetPos = pos,
+                                index = index,
+                                isPlayer1 = false,
+                                boardSizePx = boardSizePx,
+                                pawnColor = yellowPrimary,
+                                deepShadeColor = yellowDeep,
+                                outlineColor = yellowOutline,
+                                isEligibleToMove = isEligible,
+                                boardRotation = boardRotation,
+                                stackIndex = stackIdx,
+                                totalInStack = total,
+                                soundPool = soundPool,
+                                pawnSoundId = pawnSoundId,
+                                toneGenerator = toneGenerator,
+                                onClick = {
+                                    val dice = effectiveDiceValue
+                                    var newPos = pos
+                                    if (pos == -1 && dice == 6) {
+                                        newPos = 0 
+                                    } else if (pos >= 0) {
+                                        newPos = pos + dice
+                                        if (newPos > 56) return@LudoPawnView
+                                    }
+                                    if (newPos != pos) {
+                                        onMovePawn(index, newPos, false)
+                                    }
+                                }
+                            )
+                        }
                     }
 
-                    // 3. Render Player 2 Pawns
-                    gameState.player2Pawns.forEachIndexed { index, pos ->
-                        val isEligible = canControlPlayer2 && isRolled && (
-                            (pos == -1 && effectiveDiceValue == 6) ||
-                            (pos >= 0 && pos + effectiveDiceValue <= 56)
-                        )
-                        
-                        val cluster = if (pos >= 0) clusterMap[pos] ?: emptyList() else emptyList()
-                        val stackIdx = if (pos >= 0) cluster.indexOfFirst { it.first == index && !it.third } else 0
-                        val total = if (pos >= 0) cluster.size else 1
-
-                        LudoPawnView(
-                            targetPos = pos,
-                            index = index,
-                            isPlayer1 = false,
-                            boardSizePx = boardSizePx,
-                            pawnColor = yellowPrimary,
-                            deepShadeColor = yellowDeep,
-                            outlineColor = yellowOutline,
-                            isEligibleToMove = isEligible,
-                            boardRotation = boardRotation,
-                            stackIndex = stackIdx,
-                            totalInStack = total,
-                            soundPool = soundPool,
-                            pawnSoundId = pawnSoundId,
-                            toneGenerator = toneGenerator,
-                            onClick = {
-                                val dice = effectiveDiceValue
-                                var newPos = pos
-                                if (pos == -1 && dice == 6) {
-                                    newPos = 0 
-                                } else if (pos >= 0) {
-                                    newPos = pos + dice
-                                    if (newPos > 56) return@LudoPawnView
-                                }
-                                if (newPos != pos) {
-                                    onMovePawn(index, newPos, false)
-                                }
-                            }
-                        )
-                    }
+                    AdPlayerBattleCard(
+                        player = adMe,
+                        isMe = true,
+                        timerProgress = if (adMe.isCurrentTurn) timerProgress else 0f,
+                        dice = if (!adOpp.isCurrentTurn) { { adDice(adDiceArgs) } } else null,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).zIndex(20f)
+                    )
                 }
             }
 
             // 3. Bottom Battle Dock (Always visible)
             val canActivePlayerRoll = (isPlayer1Turn && canControlPlayer1) || (isPlayer2Turn && canControlPlayer2)
-            AdPlayerBattleCard(
-                player = adMe,
-                isMe = true,
-                timerProgress = if (adMe.isCurrentTurn) timerProgress else 0f,
-                dice = if (!adOpp.isCurrentTurn) { { adDice(adDiceArgs) } } else null,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).zIndex(20f)
-            )
         }
     }
 }
@@ -1378,6 +1397,12 @@ fun LudoPawnView(
 
     val isRotated180 = boardRotation == 180f
 
+    val stackScale = when {
+        targetPos >= 56 -> 0.72f
+        totalInStack > 1 -> 0.82f
+        else -> 1f
+    }
+
     Box(
         modifier = Modifier
             .zIndex(if (isEligibleToMove) 100f else (stackIndex.toFloat() + 1f))
@@ -1399,8 +1424,8 @@ fun LudoPawnView(
                 } else {
                     androidx.compose.ui.graphics.TransformOrigin(0.5f, 1.0f)
                 }
-                scaleX = eligibleScale
-                scaleY = eligibleScale
+                scaleX = eligibleScale * stackScale
+                scaleY = eligibleScale * stackScale
             }
             .size(width = pawnWidth, height = pawnHeight)
             .clickable(
@@ -1746,12 +1771,17 @@ private fun getPawnOffset(
     } else {
         // Real path mapping logic
         val unit = boardSize / 15f
+        if (pos >= 56) {
+            val footY = if (isPlayer1) 8.55f else 6.45f
+            val x = 7.5f + (stackIndex - (totalInStack - 1) / 2f) * 0.42f
+            return Offset(x * unit, footY * unit)
+        }
         val gridPos = getGridPositionForPath(pos, isPlayer1)
         var baseOffset = Offset(gridPos.x * unit + unit / 2f, gridPos.y * unit + unit / 2f)
 
         // Apply micro-offset clustering if multiple pawns are in the same cell
         if (totalInStack > 1) {
-            val shift = unit * 0.18f // Fan-out distance within the cell
+            val shift = unit * 0.22f // Fan-out distance within the cell
             val angle = (stackIndex * 360f / totalInStack).toDouble()
             val rad = Math.toRadians(angle)
             baseOffset = Offset(
@@ -1830,7 +1860,8 @@ fun Luxury3DCubeDice(
     onRoll: (Int) -> Unit,
     soundPool: SoundPool? = null,
     diceSoundId: Int = 0,
-    toneGenerator: android.media.ToneGenerator? = null
+    toneGenerator: android.media.ToneGenerator? = null,
+    forbidSix: Boolean = false
 ) {
     val coroutineScope = rememberCoroutineScope()
     val localDensity = LocalDensity.current
@@ -1995,7 +2026,7 @@ fun Luxury3DCubeDice(
                 ) {
                     if (!isRolling) {
                         isLocalRollInitiated = true
-                        val localRoll = (1..6).random()
+                        val localRoll = if (forbidSix) (1..5).random() else (1..6).random()
                         lastSettledValue = localRoll
                         triggerRollAnimation(targetValue = localRoll, isLocal = true)
                     }

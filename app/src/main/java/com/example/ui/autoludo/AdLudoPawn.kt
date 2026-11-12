@@ -35,26 +35,26 @@ private fun DrawScope.drawAdPawn(color: Color, eligible: Boolean) {
     fun oval(cx: Float, cy: Float, rx: Float, ry: Float) = Rect(cx - rx, cy - ry, cx + rx, cy + ry)
 
     if (eligible) {
-        val g = oval(x, footY, 12.5f * s, 5.2f * s)
+        val g = oval(x, footY, 11.5f * s, 4.8f * s)
         drawOval(
-            Brush.radialGradient(listOf(Color(0xBFFFD740), Color(0x00FFAA00)), center = g.center, radius = 12.5f * s),
+            Brush.radialGradient(listOf(Color(0xBFFFD740), Color(0x00FFAA00)), center = g.center, radius = 11.5f * s),
             g.topLeft, g.size
         )
-        val ring = oval(x, footY, 10.6f * s, 4.4f * s)
+        val ring = oval(x, footY, 9.8f * s, 4.1f * s)
         drawOval(Color(0xFFFFC107), ring.topLeft, ring.size, style = Stroke(width = 1.4f * s))
     }
-    val sh = oval(x, y + 10.5f * s, 10.5f * s, 4f * s)
+    val sh = oval(x, y + 10.5f * s, 9.6f * s, 3.7f * s)
     drawOval(
-        Brush.radialGradient(listOf(Color(0x73000000), Color(0x00000000)), center = sh.center, radius = 10.5f * s),
+        Brush.radialGradient(listOf(Color(0x73000000), Color(0x00000000)), center = sh.center, radius = 9.6f * s),
         sh.topLeft, sh.size
     )
-    val b1 = oval(x, y + 8.6f * s, 9.6f * s, 4.4f * s)
+    val b1 = oval(x, y + 8.6f * s, 8.8f * s, 4.1f * s)
     drawOval(ballBrush(x - 3f * s, y + 6f * s, 11f * s), b1.topLeft, b1.size)
     drawOval(Color(0x73000000), b1.topLeft, b1.size, style = Stroke(width = 0.7f * s))
-    val b2 = oval(x, y + 7.6f * s, 9.6f * s, 4.2f * s)
+    val b2 = oval(x, y + 7.6f * s, 8.8f * s, 3.9f * s)
     drawOval(ballBrush(x - 3f * s, y + 5f * s, 11f * s), b2.topLeft, b2.size)
     drawOval(Color(0x59000000), b2.topLeft, b2.size, style = Stroke(width = 0.6f * s))
-    val dash = oval(x, y + 7.6f * s, 7.4f * s, 3.1f * s)
+    val dash = oval(x, y + 7.6f * s, 6.8f * s, 2.85f * s)
     drawOval(
         Color.White, dash.topLeft, dash.size,
         style = Stroke(width = 1.3f * s, pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.2f * s, 1.6f * s)))

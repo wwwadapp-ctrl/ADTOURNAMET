@@ -1673,6 +1673,10 @@ object BengaliStrings : AppStrings {
       "player surrendered. opponent declared winner." -> "প্লেয়ার সারেন্ডার করেছেন! প্রতিপক্ষ জয়ী।"
       "rolled 6! bonus turn" -> "৬ উঠেছে! বোনাস চাল"
       "opponent absent. walkover victory declared." -> "প্রতিপক্ষ অনুপস্থিত। ওয়াকওভার জয়!"
+      "3 sixes! turn passed" -> "পরপর তিনটা ৬! পালা বদল"
+      "victory!" -> "খেলা শেষ!"
+      "exited yard!" -> "গুটি ঘর থেকে বের হলো!"
+      "opponent not found in time. cancelled." -> "সময়মতো প্রতিপক্ষ পাওয়া যায়নি। ম্যাচ বাতিল।"
       else -> raw
   }
 
@@ -2516,7 +2520,7 @@ object EnglishStrings : AppStrings {
 
   // AutoLudo Logs
   override fun autoLudoLog(raw: String) = raw
-  override fun displayActionLog(raw: String) = raw
+  override fun displayActionLog(raw: String) = if (raw.equals("Victory!", ignoreCase = true)) "Game over!" else raw
   
   // AutoLudo Result Dialog
   override val autoLudoResultWinTitle = "Congratulations! You won! 🏆"
