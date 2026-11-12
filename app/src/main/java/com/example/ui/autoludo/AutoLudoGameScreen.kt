@@ -153,7 +153,7 @@ fun AutoLudoGameScreen(
     }
 
     if (!showBoard) {
-        AutoLudoGameSplashScreen(onFinished = { showBoard = true })
+        AdLudoSplashScreen(onFinished = { showBoard = true })
     } else {
         // Derive effective game state for the board
         val boardGameState = currentMatch.gameState.copy(
@@ -186,13 +186,13 @@ fun AutoLudoGameScreen(
                 val isP1 = currentTurnUid == activeMatch.player1Uid || currentTurnUid == "player_1"
                 
                 var localCapture = false
-                if (newPos in 0..51) {
+                if (newPos in 0..50) {
                     val isSafe = AutoLudoManager.isSafeCell(newPos, isP1)
                     if (!isSafe) {
                         val myGlobal = AutoLudoManager.getGlobalTrackPos(newPos, isP1)
                         val oppPawns = if (isP1) boardGameState.player2Pawns else boardGameState.player1Pawns
                         oppPawns.forEach { oppPos ->
-                            if (oppPos in 0..51) {
+                            if (oppPos in 0..50) {
                                 val oppGlobal = AutoLudoManager.getGlobalTrackPos(oppPos, !isP1)
                                 if (myGlobal == oppGlobal) {
                                     localCapture = true
@@ -223,7 +223,7 @@ fun AutoLudoGameScreen(
                         if (localCapture) {
                             val myGlobal = AutoLudoManager.getGlobalTrackPos(newPos, true)
                             p2Pawns.forEachIndexed { idx, oppPos ->
-                                if (oppPos in 0..51 && AutoLudoManager.getGlobalTrackPos(oppPos, false) == myGlobal) {
+                                if (oppPos in 0..50 && AutoLudoManager.getGlobalTrackPos(oppPos, false) == myGlobal) {
                                     p2Pawns[idx] = -1
                                 }
                             }
@@ -233,7 +233,7 @@ fun AutoLudoGameScreen(
                         if (localCapture) {
                             val myGlobal = AutoLudoManager.getGlobalTrackPos(newPos, false)
                             p1Pawns.forEachIndexed { idx, oppPos ->
-                                if (oppPos in 0..51 && AutoLudoManager.getGlobalTrackPos(oppPos, true) == myGlobal) {
+                                if (oppPos in 0..50 && AutoLudoManager.getGlobalTrackPos(oppPos, true) == myGlobal) {
                                     p1Pawns[idx] = -1
                                 }
                             }
@@ -351,6 +351,10 @@ fun AutoLudoGameScreen(
                 currentMatch.gameState.player2Strikes >= 3 || 
                 currentMatch.gameState.lastActionLog.contains("Disqualified")
             val winnerName = if (winnerUid == currentMatch.player1Uid) currentMatch.player1Name else if (winnerUid == currentMatch.player2Uid) currentMatch.player2Name else "বিজয়ী"
+            
+            LaunchedEffect(currentMatch.matchId, isMe) {
+                AdGameSfx.play(if (isMe) AdGameSfx.Sfx.WIN else AdGameSfx.Sfx.LOSS)
+            }
 
             AutoLudoResultDialog(
                 isWin = isMe,
@@ -757,6 +761,7 @@ fun AutoLudoBoardScreen(
             try {
                 diceSoundId = pool.load(context, R.raw.dice_roll, 1)
                 pawnSoundId = pool.load(context, R.raw.pawn_step, 1)
+                AdGameSfx.prepare(context)
             } catch (e: Exception) {
                 android.util.Log.e("AutoLudoAudio", "Failed to load audio assets: ${e.message}")
             }
@@ -825,7 +830,9 @@ fun AutoLudoBoardScreen(
             val remainingSec = ceil((totalTime - elapsed) / 1000f).toInt()
             if (isMyTurn && remainingSec in 1..5 && remainingSec != lastBeepSec) {
                 lastBeepSec = remainingSec
-                toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
+                if (!AdGameSfx.muted) {
+                    toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
+                }
             }
             
             if (timerProgress >= 1f) {
@@ -1005,6 +1012,24 @@ fun AutoLudoBoardScreen(
                         val clusterMap = onTrackPawns.groupBy { (_, p, isP1) ->
                             if (p >= 56) "home_$isP1" else getGridPositionForPath(p, isP1).let { "${it.x}_${it.y}" }
                         }
+                        
+                        val lastP1Pawns = remember { mutableStateOf(gameState.player1Pawns) }
+                        val lastP2Pawns = remember { mutableStateOf(gameState.player2Pawns) }
+                        fun attackerHops(old: List<Int>, new: List<Int>): Int {
+                            var best = 0
+                            for (i in new.indices) {
+                                val o = old.getOrNull(i) ?: continue
+                                val n = new[i]
+                                if (n > o) best = maxOf(best, if (o < 0) 1 else n - o)
+                            }
+                            return best
+                        }
+                        val p1CaptureDelay = attackerHops(lastP2Pawns.value, gameState.player2Pawns) * 300L + 150L
+                        val p2CaptureDelay = attackerHops(lastP1Pawns.value, gameState.player1Pawns) * 300L + 150L
+                        SideEffect {
+                            lastP1Pawns.value = gameState.player1Pawns
+                            lastP2Pawns.value = gameState.player2Pawns
+                        }
 
                         // 2. Render Player 1 Pawns
                         gameState.player1Pawns.forEachIndexed { index, pos ->
@@ -1032,6 +1057,7 @@ fun AutoLudoBoardScreen(
                                 soundPool = soundPool,
                                 pawnSoundId = pawnSoundId,
                                 toneGenerator = toneGenerator,
+                                captureDelayMs = p1CaptureDelay,
                                 onClick = {
                                     val dice = effectiveDiceValue
                                     var newPos = pos
@@ -1074,6 +1100,7 @@ fun AutoLudoBoardScreen(
                                 soundPool = soundPool,
                                 pawnSoundId = pawnSoundId,
                                 toneGenerator = toneGenerator,
+                                captureDelayMs = p2CaptureDelay,
                                 onClick = {
                                     val dice = effectiveDiceValue
                                     var newPos = pos
@@ -1235,7 +1262,7 @@ fun PlayerAvatarCard(player: LudoPlayer, isLeft: Boolean, timerProgress: Float =
 
 @Composable
 fun LudoTopBar(onBackClick: () -> Unit) {
-    var isMuted by remember { mutableStateOf(false) }
+    var isMuted by remember { mutableStateOf(AdGameSfx.muted) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1251,7 +1278,7 @@ fun LudoTopBar(onBackClick: () -> Unit) {
         }
 
         IconButton(
-            onClick = { isMuted = !isMuted },
+            onClick = { isMuted = !isMuted; AdGameSfx.muted = isMuted },
             modifier = Modifier.background(Color(0xFF1565C0).copy(alpha = 0.6f), CircleShape)
         ) {
             Icon(
@@ -1279,6 +1306,7 @@ fun LudoPawnView(
     soundPool: SoundPool? = null,
     pawnSoundId: Int = 0,
     toneGenerator: android.media.ToneGenerator? = null,
+    captureDelayMs: Long = 0L,
     onClick: () -> Unit
 ) {
     val density = LocalDensity.current
@@ -1308,14 +1336,16 @@ fun LudoPawnView(
             }
             animOffset.animateTo(startOffset, tween(360))
             visualPos = 0
-            try {
-                val streamId = if (soundPool != null && pawnSoundId > 0) {
-                    soundPool.play(pawnSoundId, 1f, 1f, 1, 0, 1f)
-                } else 0
-                if (streamId == 0) {
-                    toneGenerator?.startTone(android.media.ToneGenerator.TONE_DTMF_1, 60)
-                }
-            } catch (e: Exception) { }
+            if (!AdGameSfx.muted) {
+                try {
+                    val streamId = if (soundPool != null && pawnSoundId > 0) {
+                        soundPool.play(pawnSoundId, 1f, 1f, 1, 0, 1f)
+                    } else 0
+                    if (streamId == 0) {
+                        toneGenerator?.startTone(android.media.ToneGenerator.TONE_DTMF_1, 60)
+                    }
+                } catch (e: Exception) { }
+            }
         }
         
         if (targetPos > visualPos && visualPos >= 0) {
@@ -1332,27 +1362,23 @@ fun LudoPawnView(
                 }
                 animOffset.animateTo(stepOffset, tween(300, easing = LinearEasing))
                 visualPos = step
-                try {
-                    val streamId = if (soundPool != null && pawnSoundId > 0) {
-                        soundPool.play(pawnSoundId, 1f, 1f, 1, 0, 1f)
-                    } else 0
-                    if (streamId == 0) {
-                        toneGenerator?.startTone(android.media.ToneGenerator.TONE_DTMF_1, 60)
-                    }
-                } catch (e: Exception) { }
+                if (!AdGameSfx.muted) {
+                    try {
+                        val streamId = if (soundPool != null && pawnSoundId > 0) {
+                            soundPool.play(pawnSoundId, 1f, 1f, 1, 0, 1f)
+                        } else 0
+                        if (streamId == 0) {
+                            toneGenerator?.startTone(android.media.ToneGenerator.TONE_DTMF_1, 60)
+                        }
+                    } catch (e: Exception) { }
+                }
             }
+            if (targetPos == 56) AdGameSfx.play(AdGameSfx.Sfx.GOAL)
         } else if (targetPos < visualPos) {
             // Captured (Cut) or sent back to yard
             if (targetPos == -1 && visualPos >= 0) {
-                // Play authentic pawn capture (cut) sound effect
-                try {
-                    val streamId = if (soundPool != null && pawnSoundId > 0) {
-                        soundPool.play(pawnSoundId, 1f, 1f, 1, 0, 1.6f) // High-pitch whip/cut sound
-                    } else 0
-                    if (streamId == 0) {
-                        toneGenerator?.startTone(android.media.ToneGenerator.TONE_DTMF_D, 180)
-                    }
-                } catch (e: Exception) { }
+                if (captureDelayMs > 0L) kotlinx.coroutines.delay(captureDelayMs)
+                AdGameSfx.play(AdGameSfx.Sfx.CAPTURE)
 
                 // High-speed reverse slide along the exact traveled track down to track coordinate 0 (40ms per step)
                 val startTrackPos = visualPos.coerceAtMost(56)
@@ -1399,6 +1425,8 @@ fun LudoPawnView(
 
     val stackScale = when {
         targetPos >= 56 -> 0.72f
+        totalInStack >= 5 -> 0.58f
+        totalInStack >= 3 -> 0.70f
         totalInStack > 1 -> 0.82f
         else -> 1f
     }
@@ -1781,7 +1809,7 @@ private fun getPawnOffset(
 
         // Apply micro-offset clustering if multiple pawns are in the same cell
         if (totalInStack > 1) {
-            val shift = unit * 0.22f // Fan-out distance within the cell
+            val shift = unit * (when { totalInStack >= 5 -> 0.34f; totalInStack >= 3 -> 0.28f; else -> 0.22f }) // Fan-out distance within the cell
             val angle = (stackIndex * 360f / totalInStack).toDouble()
             val rad = Math.toRadians(angle)
             baseOffset = Offset(
@@ -1885,14 +1913,16 @@ fun Luxury3DCubeDice(
     fun triggerRollAnimation(targetValue: Int, isLocal: Boolean) {
         if (isRolling) return
         isRolling = true
-        try {
-            val streamId = if (soundPool != null && diceSoundId > 0) {
-                soundPool.play(diceSoundId, 1f, 1f, 1, 0, 1f)
-            } else 0
-            if (streamId == 0) {
-                toneGenerator?.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 120)
-            }
-        } catch (_: Exception) { }
+        if (!AdGameSfx.muted) {
+            try {
+                val streamId = if (soundPool != null && diceSoundId > 0) {
+                    soundPool.play(diceSoundId, 1f, 1f, 1, 0, 1f)
+                } else 0
+                if (streamId == 0) {
+                    toneGenerator?.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 120)
+                }
+            } catch (_: Exception) { }
+        }
 
         coroutineScope.launch {
             val jumpTarget = -localDensity.run { 65.dp.toPx() }

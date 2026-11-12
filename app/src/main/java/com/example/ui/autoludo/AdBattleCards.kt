@@ -83,34 +83,37 @@ fun AdPlayerBattleCard(
     val active = player.isCurrentTurn
     val shape = RoundedCornerShape(18.dp)
     Box(modifier = modifier, contentAlignment = if (isMe) Alignment.CenterStart else Alignment.CenterEnd) {
-        Row(
-            modifier = Modifier
-                .widthIn(max = 340.dp)
-                .height(88.dp)
-                .shadow(
-                    elevation = if (active) 18.dp else 8.dp,
-                    shape = shape,
-                    ambientColor = if (active) Color(0xFFFFB300) else Color.Black,
-                    spotColor = if (active) Color(0xFFFFA000) else Color.Black
-                )
-                .background(Brush.verticalGradient(listOf(Color(0xFF2B3E95), Color(0xFF18266B))), shape)
-                .border(
-                    width = 2.dp,
-                    brush = if (active) GoldBrush else Brush.linearGradient(listOf(Color(0x8CFFD54F), Color(0x8CFFD54F))),
-                    shape = shape
-                )
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            if (isMe) {
-                AdAvatar(player, timerProgress)
-                AdPlayerInfo(player, isMe, Alignment.Start)
-                AdDiceSlot(dice)
-            } else {
-                AdDiceSlot(dice)
-                AdPlayerInfo(player, isMe, Alignment.End)
-                AdAvatar(player, timerProgress)
+        Box(modifier = Modifier.widthIn(max = 340.dp).height(88.dp)) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .shadow(
+                        elevation = if (active) 18.dp else 8.dp,
+                        shape = shape,
+                        ambientColor = if (active) Color(0xFFFFB300) else Color.Black,
+                        spotColor = if (active) Color(0xFFFFA000) else Color.Black
+                    )
+                    .background(Brush.verticalGradient(listOf(Color(0xFF2B3E95), Color(0xFF18266B))), shape)
+                    .border(
+                        width = 2.dp,
+                        brush = if (active) GoldBrush else Brush.linearGradient(listOf(Color(0x8CFFD54F), Color(0x8CFFD54F))),
+                        shape = shape
+                    )
+            )
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (isMe) {
+                    AdAvatar(player, timerProgress)
+                    AdPlayerInfo(player, isMe, Alignment.Start)
+                    AdDiceSlot(dice)
+                } else {
+                    AdDiceSlot(dice)
+                    AdPlayerInfo(player, isMe, Alignment.End)
+                    AdAvatar(player, timerProgress)
+                }
             }
         }
     }

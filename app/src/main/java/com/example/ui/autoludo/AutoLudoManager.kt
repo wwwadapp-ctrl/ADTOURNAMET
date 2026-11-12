@@ -854,15 +854,15 @@ object AutoLudoManager {
                     var bonusRoll = (rolledValue == 6) || (newPos == 56) // Bonus for rolling 6 or reaching goal
 
                     // 2. Collision & Capture (Cutting) Engine
-                    // Check only if newPos is on the track (0-51) and NOT a safe zone
-                    if (newPos in 0..51) {
+                    // Check only if newPos is on the track (0-50) and NOT a safe zone
+                    if (newPos in 0..50) {
                         val isSafe = isSafeCell(newPos, isPlayer1)
                         if (!isSafe) {
                             // Map my track position to global track position to compare with opponent
                             val myGlobalPos = getGlobalTrackPos(newPos, isPlayer1)
                             
                             oppPawns.forEachIndexed { idx, oppPos ->
-                                if (oppPos in 0..51) {
+                                if (oppPos in 0..50) {
                                     val oppGlobalPos = getGlobalTrackPos(oppPos, !isPlayer1)
                                     if (myGlobalPos == oppGlobalPos) {
                                         // CAPTURE! Opponent pawn sent back to yard (-1)
