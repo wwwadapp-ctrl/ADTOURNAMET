@@ -337,6 +337,9 @@ fun AutoLudoScreen(
                         onEnterClick = {
                             activeReadyRoomMatchId = match.matchId
                         },
+                        onResumeClick = {
+                            onPlayMatch(match.matchId)
+                        },
                         onTutorialClick = {
                             Toast.makeText(context, strings.autoLudoTutorialSoonToast, Toast.LENGTH_SHORT).show()
                         }
@@ -720,6 +723,7 @@ private fun AutoLudoMatchCard(
     currentUid: String,
     onJoinClick: () -> Unit,
     onEnterClick: () -> Unit,
+    onResumeClick: () -> Unit = {},
     onTutorialClick: () -> Unit
 ) {
     val strings = LocalAppStrings.current
@@ -929,7 +933,7 @@ private fun AutoLudoMatchCard(
                         isMissingOpponent -> strings.autoLudoStatusOpponentMissing
                         isInactivityCancelled -> strings.autoLudoStatusPlayerAbsent
                         match.status == "READY_COUNTDOWN" -> strings.autoLudoStatusStarting
-                        match.status == "PLAYING" -> strings.autoLudoStatusPlaying
+                        match.status == "PLAYING" || match.status == "IN_GAME" -> strings.autoLudoStatusPlaying
                         isFull && !isJoined -> strings.autoLudoStatusFull
                         isJoined && match.status == "WAITING" -> strings.autoLudoStatusWaitingOpponent
                         else -> strings.autoLudoStatusWaitingTwo
@@ -1023,6 +1027,13 @@ private fun AutoLudoMatchCard(
                         buttonIcon = null
                         buttonColor = Slate800
                         isEnabled = false
+                    }
+                    isJoined && (match.status == "IN_GAME" || match.status == "PLAYING") -> {
+                        buttonText = strings.autoLudoResumeGameButton
+                        buttonIcon = Icons.Default.Games
+                        buttonColor = Emerald600
+                        isEnabled = true
+                        onClickAction = onResumeClick
                     }
                     isJoined && match.status == "WAITING" && match.joinedPlayersCount < match.maxPlayers -> {
                         buttonText = strings.autoLudoWaitingStatus

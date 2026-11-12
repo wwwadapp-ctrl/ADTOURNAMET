@@ -30,9 +30,9 @@ private val AdBlue = Color(0xFF29A9F0)
 private val AdGrid = Color(0xFF9E9E9E)
 
 @Composable
-fun AdLudoBoard(boardRotation: Float, modifier: Modifier = Modifier) {
+fun AdLudoBoard(boardRotation: Float, modifier: Modifier = Modifier, palette: AdPalette = AdDefaultPalette) {
     Box(modifier = modifier) {
-        Canvas(modifier = Modifier.fillMaxSize()) { drawAdLudoBoard() }
+        Canvas(modifier = Modifier.fillMaxSize()) { drawAdLudoBoard(palette) }
         AdLudoCenterLogo(
             modifier = Modifier
                 .align(Alignment.Center)
@@ -42,7 +42,7 @@ fun AdLudoBoard(boardRotation: Float, modifier: Modifier = Modifier) {
     }
 }
 
-private fun DrawScope.drawAdLudoBoard() {
+private fun DrawScope.drawAdLudoBoard(p: AdPalette) {
     val u = size.width / 15f
     drawRect(Color.White)
     fun cell(r: Int, c: Int, color: Color = Color.White) {
@@ -56,9 +56,9 @@ private fun DrawScope.drawAdLudoBoard() {
         if (arm && !center) cell(r, c)
     }
     for (i in 1..5) {
-        cell(i, 7, AdYellow); cell(7, i, AdGreen); cell(14 - i, 7, AdRed); cell(7, 14 - i, AdBlue)
+        cell(i, 7, p.tr); cell(7, i, p.tl); cell(14 - i, 7, p.bl); cell(7, 14 - i, p.br)
     }
-    cell(6, 1, AdGreen); cell(1, 8, AdYellow); cell(8, 13, AdBlue); cell(13, 6, AdRed)
+    cell(6, 1, p.tl); cell(1, 8, p.tr); cell(8, 13, p.br); cell(13, 6, p.bl)
     fun home(r: Int, c: Int, color: Color) {
         drawRect(color, Offset(c * u, r * u), Size(6 * u, 6 * u))
         drawRect(Color.White, Offset((c + 1) * u, (r + 1) * u), Size(4 * u, 4 * u))
@@ -67,15 +67,15 @@ private fun DrawScope.drawAdLudoBoard() {
             drawCircle(color, radius = 0.5f * u, center = Offset((c + dx) * u, (r + dy) * u))
         }
     }
-    home(0, 0, AdGreen); home(0, 9, AdYellow); home(9, 0, AdRed); home(9, 9, AdBlue)
+    home(0, 0, p.tl); home(0, 9, p.tr); home(9, 0, p.bl); home(9, 9, p.br)
     val a = 6 * u; val b = 9 * u; val m = 7.5f * u
     fun tri(p1: Offset, p2: Offset, color: Color) {
         drawPath(Path().apply { moveTo(p1.x, p1.y); lineTo(p2.x, p2.y); lineTo(m, m); close() }, color)
     }
-    tri(Offset(a, a), Offset(b, a), AdYellow)
-    tri(Offset(a, a), Offset(a, b), AdGreen)
-    tri(Offset(a, b), Offset(b, b), AdRed)
-    tri(Offset(b, a), Offset(b, b), AdBlue)
+    tri(Offset(a, a), Offset(b, a), p.tr)
+    tri(Offset(a, a), Offset(a, b), p.tl)
+    tri(Offset(a, b), Offset(b, b), p.bl)
+    tri(Offset(b, a), Offset(b, b), p.br)
     fun star(r: Int, c: Int) {
         val cx = c * u + u / 2f; val cy = r * u + u / 2f
         val p = Path()
@@ -98,10 +98,10 @@ private fun DrawScope.drawAdLudoBoard() {
         drawLine(color, tip, Offset(tip.x - dx * h - dy * h, tip.y - dy * h - dx * h), w, StrokeCap.Round)
         drawLine(color, tip, Offset(tip.x - dx * h + dy * h, tip.y - dy * h + dx * h), w, StrokeCap.Round)
     }
-    arrow(0, 7, 0f, 1f, Color(0xFFC9A800))
-    arrow(7, 0, 1f, 0f, AdGreen)
-    arrow(14, 7, 0f, -1f, AdRed)
-    arrow(7, 14, -1f, 0f, AdBlue)
+    arrow(0, 7, 0f, 1f, androidx.compose.ui.graphics.lerp(p.tr, Color.Black, 0.2f))
+    arrow(7, 0, 1f, 0f, p.tl)
+    arrow(14, 7, 0f, -1f, p.bl)
+    arrow(7, 14, -1f, 0f, p.br)
 }
 
 @Composable

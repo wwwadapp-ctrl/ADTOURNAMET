@@ -16,7 +16,7 @@ import kotlin.math.pow
 import kotlin.math.sin
 
 object AdGameSfx {
-    enum class Sfx { CAPTURE, GOAL, WIN, LOSS }
+    enum class Sfx { CAPTURE, GOAL, WIN, LOSS, ALERT, TAP }
 
     @Volatile var muted: Boolean = false
 
@@ -66,6 +66,8 @@ object AdGameSfx {
         Sfx.GOAL -> goal()
         Sfx.WIN -> win()
         Sfx.LOSS -> loss()
+        Sfx.ALERT -> alert()
+        Sfx.TAP -> tap()
     }
 
     private fun n(sec: Double) = (sec * SR).toInt()
@@ -209,6 +211,29 @@ object AdGameSfx {
             add(x, 0.84, FloatArray(n(1.4)) { i -> val t = i.toDouble() / SR; (sin(2 * PI * f * t) * min(1.0, t / 0.25) * exp(-t / 0.7)).toFloat() }, 0.16)
         }
         return reverb(x, 0.32, 1.3, 1.5)
+    }
+
+    private fun alert(): FloatArray {
+        val x = FloatArray(n(0.9))
+        add(x, 0.0, fmBell(987.77, 0.7, 1.3, 2.0, 0.32), 0.9)
+        add(x, 0.16, fmBell(739.99, 0.75, 1.3, 2.0, 0.38), 0.9)
+        add(x, 0.0, FloatArray(n(0.6)) { i ->
+            val t = i.toDouble() / SR
+            (sin(2 * PI * 246.94 * t) * min(1.0, t / 0.02) * exp(-t / 0.25)).toFloat()
+        }, 0.18)
+        return reverb(x, 0.25, 0.9, 0.8)
+    }
+
+    private fun tap(): FloatArray {
+        val x = FloatArray(n(0.25))
+        var ph = 0.0
+        add(x, 0.0, FloatArray(n(0.08)) { i ->
+            val t = i.toDouble() / SR
+            ph += 2 * PI * (520 * exp(-t * 18) + 260) / SR
+            (sin(ph) * exp(-t / 0.025)).toFloat()
+        }, 1.0)
+        add(x, 0.005, fmBell(2637.0, 0.18, 0.5, 1.5, 0.05), 0.25)
+        return reverb(x, 0.12, 0.6, 0.3)
     }
 
     private fun writeWav(file: File, data: FloatArray) {

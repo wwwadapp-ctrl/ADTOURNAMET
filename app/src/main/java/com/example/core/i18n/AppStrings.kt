@@ -751,6 +751,7 @@ interface AppStrings {
   val autoLudoStatusPlayerAbsent: String
   val autoLudoStatusStarting: String
   val autoLudoStatusPlaying: String
+  val autoLudoResumeGameButton: String
   val autoLudoStatusFull: String
   val autoLudoStatusWaitingOpponent: String
   val autoLudoStatusWaitingTwo: String
@@ -1591,7 +1592,8 @@ object BengaliStrings : AppStrings {
   override val autoLudoStatusOpponentMissing = "❌ প্রতিপক্ষ আসেনি"
   override val autoLudoStatusPlayerAbsent = "❌ প্লেয়ার অনুপস্থিত"
   override val autoLudoStatusStarting = "ম্যাচ শুরু হচ্ছে..."
-  override val autoLudoStatusPlaying = "ম্যাচ চলছে"
+  override val autoLudoStatusPlaying = "খেলা চলছে"
+  override val autoLudoResumeGameButton = "খেলায় ফিরে যান"
   override val autoLudoStatusFull = "ম্যাচ পূর্ণ হয়েছে"
   override val autoLudoStatusWaitingOpponent = "প্রতিপক্ষের জন্য অপেক্ষা"
   override val autoLudoStatusWaitingTwo = "২ জন হলেই ম্যাচ শুরু হবে"
@@ -2453,7 +2455,8 @@ object EnglishStrings : AppStrings {
   override val autoLudoStatusOpponentMissing = "❌ Opponent not arrived"
   override val autoLudoStatusPlayerAbsent = "❌ Player absent"
   override val autoLudoStatusStarting = "Match starting..."
-  override val autoLudoStatusPlaying = "Match running"
+  override val autoLudoStatusPlaying = "Game in progress"
+  override val autoLudoResumeGameButton = "Return to game"
   override val autoLudoStatusFull = "Match full"
   override val autoLudoStatusWaitingOpponent = "Waiting for opponent"
   override val autoLudoStatusWaitingTwo = "Waiting for 2 players"

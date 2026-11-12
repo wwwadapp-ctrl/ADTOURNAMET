@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.geometry.*
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -85,6 +86,7 @@ fun AutoLudoGameScreen(
     var match by remember { mutableStateOf<AutoLudoMatchEntity?>(null) }
     var showBoard by remember { mutableStateOf(isPreviewMode) } 
     var showExitConfirmDialog by remember { mutableStateOf(false) }
+    val serverConnectedOuter by rememberServerConnected()
 
     // Observe real-time match state from Firebase with safety
     LaunchedEffect(matchId) {
@@ -356,10 +358,11 @@ fun AutoLudoGameScreen(
                 AdGameSfx.play(if (isMe) AdGameSfx.Sfx.WIN else AdGameSfx.Sfx.LOSS)
             }
 
-            AutoLudoResultDialog(
+            AdResultDialog(
                 isWin = isMe,
                 prizePool = currentMatch.prizePool,
                 winnerName = winnerName,
+                opponentName = if (currentUid == currentMatch.player1Uid) currentMatch.player2Name.ifBlank { "প্লেয়ার ২" } else currentMatch.player1Name.ifBlank { "প্লেয়ার ১" },
                 isOpponentForfeit = isOpponentForfeit,
                 isOpponentDisqualified = isOpponentDisqualified,
                 onDismiss = onBackClick
@@ -374,12 +377,16 @@ fun AutoLudoGameScreen(
                 currentMatch.player1Name.ifBlank { "প্লেয়ার ১" }
             }
 
-            AutoLudoExitDialog(
+            AdExitDialog(
                 opponentName = opponentName,
                 entryFee = currentMatch.entryFee,
                 onConfirm = {
                     showExitConfirmDialog = false
-                    AutoLudoManager.forfeitMatch(currentMatch.matchId, currentUid) { _, _ -> onBackClick() }
+                    if (serverConnectedOuter) {
+                        AutoLudoManager.forfeitMatch(currentMatch.matchId, currentUid) { _, _ -> onBackClick() }
+                    } else {
+                        onBackClick()
+                    }
                 },
                 onDismiss = { showExitConfirmDialog = false }
             )
@@ -812,6 +819,7 @@ fun AutoLudoBoardScreen(
     )
 
     val isMyTurn = if (isPlayer1Turn) canControlPlayer1 else canControlPlayer2
+    val serverConnected by rememberServerConnected()
 
     // DETERMINISTIC 15-SECOND PHASE TIMER (Keyed on turn, roll state, actionStartedAt, status)
     LaunchedEffect(gameState.currentTurnUid, isRolled, gameState.actionStartedAt, match.status) {
@@ -836,6 +844,7 @@ fun AutoLudoBoardScreen(
             }
             
             if (timerProgress >= 1f) {
+                if (!serverConnected) { delay(500L); continue }
                 // If local user is observer, wait 800ms grace period so active player has first chance
                 if (!isMyTurn) {
                     delay(800L)
@@ -870,6 +879,7 @@ fun AutoLudoBoardScreen(
     
     // PHASE 2: Immediate auto-pass after 1200ms if dice rolled and NO legal moves exist
     LaunchedEffect(isRolled, effectiveDiceValue, isPlayer1Turn, isPlayer2Turn) {
+        if (!serverConnected) return@LaunchedEffect
         if (isRolled && effectiveDiceValue in 1..6) {
             val pawns = if (isPlayer1Turn) gameState.player1Pawns else gameState.player2Pawns
             val hasLegalMove = (effectiveDiceValue == 6 && pawns.any { it == -1 }) ||
@@ -883,12 +893,13 @@ fun AutoLudoBoardScreen(
         }
     }
     
+    val adPalette = remember(match.matchNumber, match.matchId) { adMatchPalette(match.matchNumber, match.matchId) }
     val player1 = LudoPlayer(
         userId = match.player1Uid.ifBlank { "player_1" },
         name = match.player1Name.ifBlank { "Player 1" },
         avatarUrl = match.player1Avatar,
         isCurrentTurn = isPlayer1Turn,
-        pawnColor = 0xFFC62828,
+        pawnColor = (adPalette.p1Pawn.toArgb().toLong() and 0xFFFFFFFFL),
         strikes = gameState.player1Strikes
     )
     val player2 = LudoPlayer(
@@ -896,7 +907,7 @@ fun AutoLudoBoardScreen(
         name = match.player2Name.ifBlank { "Player 2" },
         avatarUrl = match.player2Avatar,
         isCurrentTurn = isPlayer2Turn,
-        pawnColor = 0xFFFFA000,
+        pawnColor = (adPalette.p2Pawn.toArgb().toLong() and 0xFFFFFFFFL),
         strikes = gameState.player2Strikes
     )
 
@@ -906,7 +917,7 @@ fun AutoLudoBoardScreen(
     val adDice = rememberAdDiceContent()
     val adDiceArgs = AdDiceArgs(
         value = effectiveDiceValue,
-        enabled = adCanRoll && !isRolled,
+        enabled = adCanRoll && !isRolled && serverConnected,
         isPlayer1Turn = adMe.isCurrentTurn,
         color = Color(if (adOpp.isCurrentTurn) adOpp.pawnColor else adMe.pawnColor),
         onRoll = { onDiceRoll(it, false) },
@@ -932,7 +943,24 @@ fun AutoLudoBoardScreen(
 
             // Action Log Indicator (Non-blocking)
             Box(modifier = Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.Center) {
-                if (gameState.lastActionLog.isNotBlank()) {
+                if (!serverConnected) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .background(Color(0xE6B71C1C), RoundedCornerShape(16.dp))
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Color.White, strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (strings === com.example.core.i18n.BengaliStrings) "⚠️ সংযোগ বিচ্ছিন্ন, আবার যুক্ত হওয়ার চেষ্টা চলছে..." else "⚠️ Connection lost, reconnecting...",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+                } else if (gameState.lastActionLog.isNotBlank()) {
                     Text(
                         text = strings.displayActionLog(gameState.lastActionLog),
                         color = Color.White,
@@ -985,7 +1013,7 @@ fun AutoLudoBoardScreen(
                                 .shadow(elevation = 22.dp, shape = RoundedCornerShape(8.dp), ambientColor = Color(0xFFFFC107), spotColor = Color(0xFFFFA000), clip = false)
                                 .background(Color.White, RoundedCornerShape(8.dp))
                         )
-                        AdLudoBoard(boardRotation = boardRotation, modifier = Modifier.fillMaxSize())
+                        AdLudoBoard(boardRotation = boardRotation, modifier = Modifier.fillMaxSize(), palette = adPalette)
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -996,12 +1024,12 @@ fun AutoLudoBoardScreen(
                         val density = LocalDensity.current
 
                         // Red Pawn Colors (Deep Royal Ruby - Saturated)
-                        val redPrimary = Color(0xFFE53935)
+                        val redPrimary = adPalette.p1Pawn
                         val redDeep = Color(0xFF4A0000)
                         val redOutline = Color(0xFF2E0000)
 
                         // Yellow Pawn Colors (Rich Golden Amber - Saturated)
-                        val yellowPrimary = Color(0xFFFBC02D)
+                        val yellowPrimary = adPalette.p2Pawn
                         val yellowDeep = Color(0xFF9E5B00)
                         val yellowOutline = Color(0xFF4E2D00)
 
@@ -1033,7 +1061,7 @@ fun AutoLudoBoardScreen(
 
                         // 2. Render Player 1 Pawns
                         gameState.player1Pawns.forEachIndexed { index, pos ->
-                            val isEligible = canControlPlayer1 && isRolled && (
+                            val isEligible = serverConnected && canControlPlayer1 && isRolled && (
                                 (pos == -1 && effectiveDiceValue == 6) ||
                                 (pos >= 0 && pos + effectiveDiceValue <= 56)
                             )
@@ -1076,7 +1104,7 @@ fun AutoLudoBoardScreen(
 
                         // 3. Render Player 2 Pawns
                         gameState.player2Pawns.forEachIndexed { index, pos ->
-                            val isEligible = canControlPlayer2 && isRolled && (
+                            val isEligible = serverConnected && canControlPlayer2 && isRolled && (
                                 (pos == -1 && effectiveDiceValue == 6) ||
                                 (pos >= 0 && pos + effectiveDiceValue <= 56)
                             )
@@ -1895,6 +1923,7 @@ fun Luxury3DCubeDice(
     val localDensity = LocalDensity.current
     var isRolling by remember { mutableStateOf(false) }
     var displayValue by remember { mutableStateOf(if (diceValue in 1..6) diceValue else 1) }
+    var faceValue by remember { mutableIntStateOf(if (diceValue in 1..6) diceValue else 1) }
     var lastSettledValue by remember { mutableIntStateOf(diceValue) }
     var isLocalRollInitiated by remember { mutableStateOf(false) }
     
@@ -1913,6 +1942,7 @@ fun Luxury3DCubeDice(
     fun triggerRollAnimation(targetValue: Int, isLocal: Boolean) {
         if (isRolling) return
         isRolling = true
+        faceValue = targetValue
         if (!AdGameSfx.muted) {
             try {
                 val streamId = if (soundPool != null && diceSoundId > 0) {
@@ -1962,10 +1992,10 @@ fun Luxury3DCubeDice(
             launch {
                 squashY.animateTo(1f, tween(100))
                 squashX.animateTo(1f, tween(100))
-                rotX.animateTo(rotX.value + 720f, tween(500, easing = LinearEasing))
             }
-            launch { rotY.animateTo(rotY.value + 1080f, tween(500, easing = LinearEasing)) }
-            launch { rotZ.animateTo(rotZ.value + 180f, tween(500, easing = LinearEasing)) }
+            launch { rotX.animateTo(rotX.value + 720f, tween(500, easing = FastOutSlowInEasing)) }
+            launch { rotY.animateTo(rotY.value + 1080f, tween(500, easing = FastOutSlowInEasing)) }
+            launch { rotZ.animateTo(rotZ.value + 360f, tween(500, easing = FastOutSlowInEasing)) }
 
             // Rapid Number Shuffling
             val tumbleJob = launch {
@@ -1982,9 +2012,9 @@ fun Luxury3DCubeDice(
             displayValue = targetValue
             
             // Snap tilt to neutral
-            launch { rotX.animateTo(0f, spring()) }
-            launch { rotY.animateTo(0f, spring()) }
-            launch { rotZ.animateTo(0f, spring()) }
+            rotX.snapTo(0f)
+            rotY.snapTo(0f)
+            rotZ.snapTo(0f)
             
             delay(200)
             if (isLocal) {
@@ -2042,8 +2072,6 @@ fun Luxury3DCubeDice(
                 .size(54.dp)
                 .graphicsLayer {
                     translationY = jumpY.value
-                    rotationX = rotX.value
-                    rotationY = rotY.value
                     rotationZ = rotZ.value
                     scaleX = squashX.value
                     scaleY = squashY.value
@@ -2063,10 +2091,11 @@ fun Luxury3DCubeDice(
                 },
             contentAlignment = Alignment.Center
         ) {
-            LudoVibrantDiceFace(
-                value = displayValue, 
-                isPlayer1 = isPlayer1Turn,
-                diceColor = diceColor,
+            AdDice3D(
+                value = if (isRolling) faceValue else displayValue,
+                spinX = rotX.value,
+                spinY = rotY.value,
+                color = diceColor,
                 modifier = Modifier.size(54.dp)
             )
         }
