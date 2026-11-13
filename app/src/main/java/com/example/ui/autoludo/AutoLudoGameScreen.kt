@@ -1014,6 +1014,7 @@ fun AutoLudoBoardScreen(
                                 .background(Color.White, RoundedCornerShape(8.dp))
                         )
                         AdLudoBoard(boardRotation = boardRotation, modifier = Modifier.fillMaxSize(), palette = adPalette)
+                        AdTurnGlow(isPlayer1Turn = isPlayer1Turn, palette = adPalette, modifier = Modifier.fillMaxSize())
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -1401,7 +1402,11 @@ fun LudoPawnView(
                     } catch (e: Exception) { }
                 }
             }
-            if (targetPos == 56) AdGameSfx.play(AdGameSfx.Sfx.GOAL)
+            if (targetPos == 56) {
+                AdGameSfx.play(AdGameSfx.Sfx.GOAL)
+            } else if (targetPos in 0..50 && AutoLudoManager.isSafeCell(targetPos, isPlayer1)) {
+                AdGameSfx.play(AdGameSfx.Sfx.STAR)
+            }
         } else if (targetPos < visualPos) {
             // Captured (Cut) or sent back to yard
             if (targetPos == -1 && visualPos >= 0) {

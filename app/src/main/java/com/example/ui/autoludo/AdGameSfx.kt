@@ -16,7 +16,7 @@ import kotlin.math.pow
 import kotlin.math.sin
 
 object AdGameSfx {
-    enum class Sfx { CAPTURE, GOAL, WIN, LOSS, ALERT, TAP }
+    enum class Sfx { CAPTURE, GOAL, WIN, LOSS, ALERT, TAP, STAR }
 
     @Volatile var muted: Boolean = false
 
@@ -68,6 +68,7 @@ object AdGameSfx {
         Sfx.LOSS -> loss()
         Sfx.ALERT -> alert()
         Sfx.TAP -> tap()
+        Sfx.STAR -> star()
     }
 
     private fun n(sec: Double) = (sec * SR).toInt()
@@ -234,6 +235,28 @@ object AdGameSfx {
         }, 1.0)
         add(x, 0.005, fmBell(2637.0, 0.18, 0.5, 1.5, 0.05), 0.25)
         return reverb(x, 0.12, 0.6, 0.3)
+    }
+
+    private fun star(): FloatArray {
+        val rng = Random(3)
+        val x = FloatArray(n(0.45))
+        val count = 18
+        val dur = 0.20
+        for (i in 0 until count) {
+            val st = dur * Math.pow(i.toDouble() / count, 0.9)
+            val f = 900.0 - 300.0 * i / count
+            add(x, st, FloatArray(n(0.012)) { k ->
+                val t = k.toDouble() / SR
+                (sin(2 * PI * f * t) * exp(-t / 0.003) + 0.4 * rng.nextGaussian() * exp(-t / 0.0015)).toFloat()
+            }, 0.55 + 0.3 * i / count)
+        }
+        var ph = 0.0
+        add(x, dur, FloatArray(n(0.12)) { k ->
+            val t = k.toDouble() / SR
+            ph += 2 * PI * (260 * exp(-t * 20) + 140) / SR
+            (sin(ph) * exp(-t / 0.04)).toFloat()
+        }, 1.0)
+        return x
     }
 
     private fun writeWav(file: File, data: FloatArray) {
