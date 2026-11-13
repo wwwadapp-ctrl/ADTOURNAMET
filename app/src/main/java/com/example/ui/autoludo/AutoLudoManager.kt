@@ -147,7 +147,13 @@ object AutoLudoManager {
                 "$NODE_MATCHES/$matchId/pot" to 0.0,
                 "$NODE_GAME_WALLETS/$currentUid/balance" to ServerValue.increment(prize),
                 "$NODE_GAME_WALLETS/$currentUid/lastAutoLudoMatch" to matchId,
-                "miniGames/vault/adminProfit" to ServerValue.increment(adminCommission)
+                "miniGames/vault/adminProfit" to ServerValue.increment(adminCommission),
+                "userNotifications/$currentUid/${AdLudoNotices.prizeId(matchId, currentUid)}" to AdLudoNotices.prizeRecord(
+                    matchId,
+                    match.matchNumber.ifBlank { matchId.takeLast(6).uppercase() },
+                    currentUid,
+                    prize
+                )
             )
             db.reference.updateChildren(updates).addOnCompleteListener { task ->
                 claimsInFlight.remove(matchId)
@@ -195,7 +201,13 @@ object AutoLudoManager {
                     "$NODE_MATCHES/$matchId/refundClaimed/$currentUid" to true,
                     "$NODE_MATCHES/$matchId/pot" to ServerValue.increment(-fee),
                     "$NODE_GAME_WALLETS/$currentUid/balance" to ServerValue.increment(fee),
-                    "$NODE_GAME_WALLETS/$currentUid/lastAutoLudoMatch" to matchId
+                    "$NODE_GAME_WALLETS/$currentUid/lastAutoLudoMatch" to matchId,
+                    "userNotifications/$currentUid/${AdLudoNotices.refundId(matchId, currentUid)}" to AdLudoNotices.refundRecord(
+                        matchId,
+                        matchSnap.child("matchNumber").value?.toString()?.ifBlank { null } ?: matchId.takeLast(6).uppercase(),
+                        currentUid,
+                        fee
+                    )
                 )
                 db.reference.updateChildren(updates).addOnCompleteListener { task ->
                     refundsInFlight.remove(matchId)
@@ -294,11 +306,72 @@ object AutoLudoManager {
                     cancelExpiredSoloMatch(match)
                 }
             }
+            if ((match.status == "WAITING" || match.status == "READY_COUNTDOWN") && match.joinedPlayersCount >= 2) {
+                adjudicateExpiredFullMatch(match, currentUid)
+            }
         }
         if (currentUid.isNotBlank()) {
             autoRefundCancelledMatches(matches, currentUid)
             autoClaimWonMatches(matches, currentUid)
         }
+    }
+
+    private val graceInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * 10-minute rule for FULL matches, run from the lobby (not only from the ready room).
+     * 10 minutes after the start time, if the game never began:
+     *  - nobody pressed ready -> CANCELLED (each player then gets the normal automatic refund)
+     *  - exactly one pressed ready -> that player wins (walkover; prize is then auto-claimed normally)
+     * Only a player of that match runs it, inside a transaction. Firebase rules allow exactly these two moves.
+     * This function never moves money.
+     */
+    fun adjudicateExpiredFullMatch(match: AutoLudoMatchEntity, currentUid: String) {
+        if (match.matchId.isBlank() || currentUid.isBlank()) return
+        if (match.player1Uid != currentUid && match.player2Uid != currentUid) return
+        if (match.status != "WAITING" && match.status != "READY_COUNTDOWN") return
+        if (match.joinedPlayersCount < 2) return
+        val start = if (match.scheduledTimeMillis > 0L) match.scheduledTimeMillis
+            else parseScheduledEpoch(match.scheduledTimeFormatted, match.createdAt)
+        if (start <= 0L || System.currentTimeMillis() < start + 10 * 60 * 1000L) return
+        if (!graceInFlight.add(match.matchId)) return
+
+        val db = getDb() ?: run { graceInFlight.remove(match.matchId); return }
+        db.getReference(NODE_MATCHES).child(match.matchId).runTransaction(object : Transaction.Handler {
+            override fun doTransaction(currentData: MutableData): Transaction.Result {
+                if (currentData.value == null) return Transaction.success(currentData)
+                val status = currentData.child("status").getValue(String::class.java) ?: ""
+                val joined = currentData.child("joinedPlayersCount").getValue(Int::class.java) ?: 0
+                if ((status != "WAITING" && status != "READY_COUNTDOWN") || joined < 2) return Transaction.abort()
+                val p1 = currentData.child("player1Uid").getValue(String::class.java) ?: ""
+                val p2 = currentData.child("player2Uid").getValue(String::class.java) ?: ""
+                val p1Ready = currentData.child("player1Ready").getValue(Boolean::class.java) == true
+                val p2Ready = currentData.child("player2Ready").getValue(Boolean::class.java) == true
+                when {
+                    !p1Ready && !p2Ready -> {
+                        currentData.child("status").value = "CANCELLED"
+                        currentData.child("gameState").child("lastActionLog").value = "Both players absent. Match cancelled."
+                    }
+                    p1Ready && !p2Ready && p1.isNotBlank() -> {
+                        currentData.child("status").value = "COMPLETED"
+                        currentData.child("winnerUid").value = p1
+                        currentData.child("gameState").child("lastActionLog").value = "Opponent absent. Walkover victory declared."
+                    }
+                    p2Ready && !p1Ready && p2.isNotBlank() -> {
+                        currentData.child("status").value = "COMPLETED"
+                        currentData.child("winnerUid").value = p2
+                        currentData.child("gameState").child("lastActionLog").value = "Opponent absent. Walkover victory declared."
+                    }
+                    else -> return Transaction.abort()
+                }
+                currentData.child("updatedAt").value = System.currentTimeMillis()
+                return Transaction.success(currentData)
+            }
+
+            override fun onComplete(error: DatabaseError?, committed: Boolean, currentData: DataSnapshot?) {
+                graceInFlight.remove(match.matchId)
+            }
+        })
     }
 
     /**

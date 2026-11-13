@@ -26,6 +26,10 @@
             </intent-filter>
         </service>
 
+        <receiver
+            android:name=".ui.autoludo.AdLudoReminderReceiver"
+            android:exported="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

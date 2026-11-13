@@ -211,6 +211,7 @@ fun AppNavigation(
           authViewModel.clearSuccessFlags()
           LocalDataStore.clearUserData()
           UserNotificationManager.stopListening()
+          com.example.ui.autoludo.AdLudoMatchWatcher.stop()
 
           // Force immediate navigation to Login and clear backstack
           try {
@@ -253,6 +254,16 @@ fun AppNavigation(
         com.example.core.logging.AppLogger.e("AppNavigation", "Failed to start UserNotificationManager: ${e.message}")
       }
 
+      runCatching {
+        com.example.ui.autoludo.AdLudoMatchWatcher.start(
+          context = context.applicationContext,
+          uid = activeUserId,
+          scope = this
+        )
+      }.onFailure { e ->
+        com.example.core.logging.AppLogger.e("AppNavigation", "Failed to start AdLudoMatchWatcher: ${e.message}")
+      }
+
       container.matchRepository.getMyJoinedMatches(activeUserId)
         .collect { res ->
           if (res is Resource.Success) {
@@ -284,6 +295,7 @@ fun AppNavigation(
     } else {
       // User logged out or session invalid - stop listeners
       UserNotificationManager.stopListening()
+      com.example.ui.autoludo.AdLudoMatchWatcher.stop()
     }
   }
 

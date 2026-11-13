@@ -737,6 +737,7 @@ interface AppStrings {
   // Auto Ludo Lobby
   val autoLudoHeaderTitle: String
   val autoLudoCreateBannerText: String
+  val autoLudoCreateBannerTitle: String
   val autoLudoCreateButton: String
   val autoLudoFilterAll: String
   val autoLudoFilterRecent: String
@@ -755,6 +756,37 @@ interface AppStrings {
   val autoLudoStatusFull: String
   val autoLudoStatusWaitingOpponent: String
   val autoLudoStatusWaitingTwo: String
+  val autoLudoStatusRoomOpen: String
+  val autoLudoStatusTimeUp: String
+  fun autoLudoStatusSpotsLeft(count: Int): String
+  val autoLudoBtnTutorialSub: String
+  val autoLudoBtnJoin: String
+  fun autoLudoBtnJoinSub(entry: String, prize: String): String
+  val autoLudoBtnWaitOpp: String
+  val autoLudoBtnWaitOppSub: String
+  fun autoLudoBtnCountdown(time: String): String
+  val autoLudoBtnCountdownSub: String
+  val autoLudoBtnEnter: String
+  val autoLudoBtnEnterSub: String
+  val autoLudoBtnFull: String
+  val autoLudoBtnFullSub: String
+  val autoLudoBtnResume: String
+  val autoLudoBtnResumeSub: String
+  val autoLudoBtnWon: String
+  fun autoLudoBtnWonSub(prize: String): String
+  val autoLudoBtnWonPendingSub: String
+  val autoLudoBtnLost: String
+  val autoLudoBtnLostSub: String
+  val autoLudoBtnCancelled: String
+  fun autoLudoBtnRefundedSub(amount: String): String
+  val autoLudoBtnRefundPendingSub: String
+  val autoLudoBtnTimeUp: String
+  val autoLudoBtnTimeUpSub: String
+  val autoLudoHintJoin: String
+  val autoLudoHintCreatorWaiting: String
+  val autoLudoHintCountdown: String
+  val autoLudoHintFull: String
+  val autoLudoHintRefunded: String
   fun autoLudoPlayersCount(current: Int, max: Int): String
   fun autoLudoCardTitle(number: String): String
   val autoLudoTutorialButton: String
@@ -1578,26 +1610,58 @@ object BengaliStrings : AppStrings {
 
   // Auto Ludo Lobby
   override val autoLudoHeaderTitle = "ম্যাচ লিস্ট"
-  override val autoLudoCreateBannerText = "আপনি নিজের মন মত ম্যাচ তৈরি করতে চাইলে নিচের বাটনে ক্লিক করে তৈরি করুন।"
+  override val autoLudoCreateBannerText = "পছন্দের এন্ট্রি আর সময় বেছে নিন, ম্যাচ বানান, প্রতিপক্ষকে হারিয়ে জিতে নিন পুরস্কার। আপনার জয়ের গল্প শুরু হোক এখান থেকেই 💛"
+  override val autoLudoCreateBannerTitle = "নিজের ম্যাচ, নিজের নিয়ম! 🎲"
   override val autoLudoCreateButton = "ম্যাচ তৈরি করুন"
   override val autoLudoFilterAll = "সব ম্যাচ"
   override val autoLudoFilterRecent = "সাম্প্রতিক ম্যাচ"
   override val autoLudoFilterMy = "আমার ম্যাচ"
   override val autoLudoFilterFree = "ফ্রি ম্যাচ"
   override val autoLudoNoMatches = "কোন ম্যাচ পাওয়া যায়নি"
-  override val autoLudoAutoMatchBadge = "🤖 এটা সম্পূর্ণ অটো ম্যাচ"
+  override val autoLudoAutoMatchBadge = "⚡ সম্পূর্ণ অটো ম্যাচ · কোড লাগবে না"
   override val autoLudoMyMatchBadge = "আপনার ম্যাচ"
   override val autoLudoPrizeLabel = "প্রাইজ"
   override val autoLudoEntryLabel = "এন্ট্রি"
-  override val autoLudoStatusOpponentMissing = "❌ প্রতিপক্ষ আসেনি"
-  override val autoLudoStatusPlayerAbsent = "❌ প্লেয়ার অনুপস্থিত"
-  override val autoLudoStatusStarting = "ম্যাচ শুরু হচ্ছে..."
+  override val autoLudoStatusOpponentMissing = "প্রতিপক্ষ আসেনি"
+  override val autoLudoStatusPlayerAbsent = "প্লেয়ার অনুপস্থিত"
+  override val autoLudoStatusStarting = "২ জন রেডি! ম্যাচ শুরু হচ্ছে"
   override val autoLudoStatusPlaying = "খেলা চলছে"
   override val autoLudoResumeGameButton = "খেলায় ফিরে যান"
-  override val autoLudoStatusFull = "ম্যাচ পূর্ণ হয়েছে"
-  override val autoLudoStatusWaitingOpponent = "প্রতিপক্ষের জন্য অপেক্ষা"
+  override val autoLudoStatusFull = "ম্যাচ পূর্ণ"
+  override val autoLudoStatusWaitingOpponent = "প্রতিপক্ষ খোঁজা হচ্ছে..."
   override val autoLudoStatusWaitingTwo = "২ জন হলেই ম্যাচ শুরু হবে"
-  override fun autoLudoPlayersCount(current: Int, max: Int) = "প্লেয়ার: ${number(current)}/${number(max)}"
+  override val autoLudoStatusRoomOpen = "ব্যাটল রুম খুলে গেছে!"
+  override val autoLudoStatusTimeUp = "সময় শেষ"
+  override fun autoLudoStatusSpotsLeft(count: Int) = "আপনার অপেক্ষায়! আর ${number(count)} জন"
+  override val autoLudoBtnTutorialSub = "কীভাবে খেলবেন"
+  override val autoLudoBtnJoin = "🎮 জয়েন করুন"
+  override fun autoLudoBtnJoinSub(entry: String, prize: String) = "এন্ট্রি $entry · জিতলে $prize"
+  override val autoLudoBtnWaitOpp = "⏳ প্রতিপক্ষের অপেক্ষায়"
+  override val autoLudoBtnWaitOppSub = "কেউ জয়েন করলেই শুরু হবে"
+  override fun autoLudoBtnCountdown(time: String) = "⏰ শুরু বাকি $time"
+  override val autoLudoBtnCountdownSub = "প্রস্তুত থাকুন"
+  override val autoLudoBtnEnter = "🎮 খেলায় প্রবেশ করুন"
+  override val autoLudoBtnEnterSub = "এখনই ঢুকে পড়ুন"
+  override val autoLudoBtnFull = "🔒 ম্যাচ পূর্ণ"
+  override val autoLudoBtnFullSub = "নতুন ম্যাচ বেছে নিন"
+  override val autoLudoBtnResume = "▶ খেলায় ফিরে যান"
+  override val autoLudoBtnResumeSub = "আপনার খেলা চলছে"
+  override val autoLudoBtnWon = "🏆 আপনি জিতেছেন!"
+  override fun autoLudoBtnWonSub(prize: String) = "$prize পুরস্কার পেয়েছেন"
+  override val autoLudoBtnWonPendingSub = "পুরস্কার যোগ হচ্ছে..."
+  override val autoLudoBtnLost = "এবার হয়নি"
+  override val autoLudoBtnLostSub = "পরের ম্যাচে জয় আপনার 💪"
+  override val autoLudoBtnCancelled = "↩️ ম্যাচ বাতিল"
+  override fun autoLudoBtnRefundedSub(amount: String) = "$amount ফেরত দেওয়া হয়েছে"
+  override val autoLudoBtnRefundPendingSub = "ফেরত দেওয়া হচ্ছে..."
+  override val autoLudoBtnTimeUp = "⌛ সময় শেষ"
+  override val autoLudoBtnTimeUpSub = "পরের ম্যাচে দেখা হবে"
+  override val autoLudoHintJoin = "✨ আপনি জয়েন করলেই ম্যাচ পূর্ণ, সময় হলেই খেলা শুরু!"
+  override val autoLudoHintCreatorWaiting = "💛 আপনার ম্যাচ তৈরি! একটু অপেক্ষা করুন, প্রতিপক্ষ আসছে।"
+  override val autoLudoHintCountdown = "🔥 লড়াই প্রায় শুরু! সময় হলে এখানেই \"খেলায় প্রবেশ\" আসবে।"
+  override val autoLudoHintFull = "🎲 এই ম্যাচ জমে গেছে! আরেকটায় জয়েন করুন বা নিজেই বানান।"
+  override val autoLudoHintRefunded = "💛 চিন্তা নেই, আপনার পুরো এন্ট্রি ফি ওয়ালেটে ফেরত গেছে।"
+  override fun autoLudoPlayersCount(current: Int, max: Int) = "👥 প্লেয়ার ${number(current)}/${number(max)}"
   override fun autoLudoCardTitle(number: String) = "অটো লুডু · ম্যাচ নং #$number"
   override val autoLudoTutorialButton = "টিউটোরিয়াল"
   override val autoLudoRefundCancelled = "বাতিল (টাকা ফেরত)"
@@ -2441,26 +2505,58 @@ object EnglishStrings : AppStrings {
 
   // Auto Ludo Lobby
   override val autoLudoHeaderTitle = "Match List"
-  override val autoLudoCreateBannerText = "If you want to create a match of your choice, click the button below."
+  override val autoLudoCreateBannerText = "Pick your entry and time, create a match, beat your opponent and win the prize. Your winning story starts right here 💛"
+  override val autoLudoCreateBannerTitle = "Your match, your rules! 🎲"
   override val autoLudoCreateButton = "Create Match"
   override val autoLudoFilterAll = "All Matches"
   override val autoLudoFilterRecent = "Recent Matches"
   override val autoLudoFilterMy = "My Matches"
   override val autoLudoFilterFree = "Free Matches"
   override val autoLudoNoMatches = "No matches found"
-  override val autoLudoAutoMatchBadge = "🤖 Fully Automated Match"
+  override val autoLudoAutoMatchBadge = "⚡ Fully auto match · No code needed"
   override val autoLudoMyMatchBadge = "My Match"
   override val autoLudoPrizeLabel = "Prize"
   override val autoLudoEntryLabel = "Entry"
-  override val autoLudoStatusOpponentMissing = "❌ Opponent not arrived"
-  override val autoLudoStatusPlayerAbsent = "❌ Player absent"
-  override val autoLudoStatusStarting = "Match starting..."
+  override val autoLudoStatusOpponentMissing = "Opponent didn't show"
+  override val autoLudoStatusPlayerAbsent = "Player absent"
+  override val autoLudoStatusStarting = "2 ready! Match starting"
   override val autoLudoStatusPlaying = "Game in progress"
   override val autoLudoResumeGameButton = "Return to game"
   override val autoLudoStatusFull = "Match full"
-  override val autoLudoStatusWaitingOpponent = "Waiting for opponent"
+  override val autoLudoStatusWaitingOpponent = "Finding an opponent..."
   override val autoLudoStatusWaitingTwo = "Waiting for 2 players"
-  override fun autoLudoPlayersCount(current: Int, max: Int) = "Players: $current/$max"
+  override val autoLudoStatusRoomOpen = "Battle room is open!"
+  override val autoLudoStatusTimeUp = "Time's up"
+  override fun autoLudoStatusSpotsLeft(count: Int) = "Waiting for you! $count more"
+  override val autoLudoBtnTutorialSub = "How to play"
+  override val autoLudoBtnJoin = "🎮 Join"
+  override fun autoLudoBtnJoinSub(entry: String, prize: String) = "Entry $entry · Win $prize"
+  override val autoLudoBtnWaitOpp = "⏳ Waiting for opponent"
+  override val autoLudoBtnWaitOppSub = "Starts once someone joins"
+  override fun autoLudoBtnCountdown(time: String) = "⏰ Starts in $time"
+  override val autoLudoBtnCountdownSub = "Get ready"
+  override val autoLudoBtnEnter = "🎮 Enter game"
+  override val autoLudoBtnEnterSub = "Jump in now"
+  override val autoLudoBtnFull = "🔒 Match full"
+  override val autoLudoBtnFullSub = "Pick another match"
+  override val autoLudoBtnResume = "▶ Return to game"
+  override val autoLudoBtnResumeSub = "Your game is on"
+  override val autoLudoBtnWon = "🏆 You won!"
+  override fun autoLudoBtnWonSub(prize: String) = "$prize prize received"
+  override val autoLudoBtnWonPendingSub = "Adding your prize..."
+  override val autoLudoBtnLost = "Not this time"
+  override val autoLudoBtnLostSub = "The next win is yours 💪"
+  override val autoLudoBtnCancelled = "↩️ Match cancelled"
+  override fun autoLudoBtnRefundedSub(amount: String) = "$amount refunded"
+  override val autoLudoBtnRefundPendingSub = "Refund in progress..."
+  override val autoLudoBtnTimeUp = "⌛ Time's up"
+  override val autoLudoBtnTimeUpSub = "See you next match"
+  override val autoLudoHintJoin = "✨ Join now to fill the match, it starts on time!"
+  override val autoLudoHintCreatorWaiting = "💛 Your match is ready! Hang on, an opponent is coming."
+  override val autoLudoHintCountdown = "🔥 The battle is almost here! \"Enter game\" will appear here on time."
+  override val autoLudoHintFull = "🎲 This match is full! Join another one or create your own."
+  override val autoLudoHintRefunded = "💛 Don't worry, your full entry fee is back in your wallet."
+  override fun autoLudoPlayersCount(current: Int, max: Int) = "👥 Players $current/$max"
   override fun autoLudoCardTitle(number: String) = "Auto Ludo · Match No. #$number"
   override val autoLudoTutorialButton = "Tutorial"
   override val autoLudoRefundCancelled = "Cancelled (Refunded)"
