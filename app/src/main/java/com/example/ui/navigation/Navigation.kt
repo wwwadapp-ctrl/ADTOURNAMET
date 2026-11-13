@@ -100,6 +100,7 @@ object Destinations {
   const val HISTORY = "history"
   const val SUPPORT = "support"
   const val RULES = "rules"
+  const val FAIR_PLAY_RULES = "fair_play_rules"
   const val REFER_EARN = "refer_earn"
   const val AI_SUPPORT = "ai_support"
   const val SPIN_WHEEL = "spin_wheel"
@@ -424,6 +425,16 @@ fun AppNavigation(
             }
           },
           onNavigateToLogin = { navController.popBackStack() },
+          onOpenRules = { navController.navigate(Destinations.FAIR_PLAY_RULES) },
+        )
+      }
+
+      // REGISTER -> FAIR PLAY RULES (read-only, works before login)
+      composable(Destinations.FAIR_PLAY_RULES) {
+        com.example.ui.rules.FairPlayRulesScreen(
+          minDepositTaka = currentSettings?.minDepositTaka ?: 50.0,
+          minWithdrawTaka = currentSettings?.minWithdrawalTaka ?: 200.0,
+          onNavigateBack = { navController.popBackStack() },
         )
       }
 
@@ -973,6 +984,8 @@ fun AppNavigation(
               restoreState = false
             }
           },
+          minDepositTaka = currentSettings?.minDepositTaka ?: 50.0,
+          minWithdrawTaka = currentSettings?.minWithdrawalTaka ?: 200.0,
           onNavigateBack = { navController.popBackStack() },
         )
       }

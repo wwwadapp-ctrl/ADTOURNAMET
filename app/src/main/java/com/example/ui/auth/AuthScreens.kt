@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.core.i18n.BengaliStrings
 import com.example.core.i18n.LocalAppStrings
 import com.example.core.security.AuthValidator
 import com.example.domain.model.AppSettingsEntity
@@ -71,206 +72,154 @@ fun LoginScreen(
     }
   }
 
-  Column(
-    modifier = Modifier
-      .fillMaxSize()
-      .background(DeepNavyBg)
-      .verticalScroll(rememberScrollState())
-      .padding(horizontal = 24.dp, vertical = 32.dp),
-    horizontalAlignment = Alignment.CenterHorizontally,
-    verticalArrangement = Arrangement.Center,
-  ) {
-    Spacer(modifier = Modifier.height(24.dp))
+  Box(modifier = Modifier.fillMaxSize()) {
+    AdAuthBackground(modifier = Modifier.fillMaxSize())
 
-    Surface(
-      color = Gold500.copy(alpha = 0.15f),
-      shape = RoundedCornerShape(20.dp),
-      modifier = Modifier.size(72.dp),
+    Column(
+      modifier = Modifier
+        .fillMaxSize()
+        .verticalScroll(rememberScrollState())
+        .imePadding()
+        .systemBarsPadding()
+        .padding(horizontal = 24.dp, vertical = 24.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.Center,
     ) {
-      Box(contentAlignment = Alignment.Center) {
-        Icon(
-          imageVector = Icons.Default.EmojiEvents,
-          contentDescription = "Tournament Logo",
-          tint = Gold400,
-          modifier = Modifier.size(42.dp),
+      AdAuthLogo()
+
+      Spacer(modifier = Modifier.height(4.dp))
+
+      AdAuthTitle(tagline = strings.appTagline)
+
+      Spacer(modifier = Modifier.height(22.dp))
+
+      AdAuthCard(modifier = Modifier.fillMaxWidth()) {
+        AdAuthCardHeader(
+          title = strings.playerSignIn,
+          subtitle = strings.playerSignInSubtitle,
         )
-      }
-    }
 
-    Spacer(modifier = Modifier.height(16.dp))
-
-    Text(
-      text = "AD TOURNAMENT",
-      style = MaterialTheme.typography.headlineLarge.copy(
-        fontWeight = FontWeight.Black,
-        letterSpacing = 2.sp,
-      ),
-      color = Color.White,
-    )
-    Text(
-      text = strings.appTagline,
-      style = MaterialTheme.typography.bodySmall,
-      color = Gold400,
-    )
-
-    Spacer(modifier = Modifier.height(28.dp))
-
-    TournamentCard(
-      modifier = Modifier.fillMaxWidth(),
-      backgroundColor = NavyCard,
-      borderColor = NavyCardBorder,
-    ) {
-      Text(
-        text = strings.playerSignIn,
-        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-        color = Color.White,
-      )
-      Text(
-        text = strings.playerSignInSubtitle,
-        style = MaterialTheme.typography.bodySmall,
-        color = Slate400,
-        modifier = Modifier.padding(bottom = 16.dp),
-      )
-
-      val displayError = clientError ?: uiState.errorMessage?.let { rawError ->
-        when {
-          rawError.contains("Invalid mobile number or password", ignoreCase = true) ||
-          rawError.contains("Invalid password", ignoreCase = true) ||
-          rawError.contains("No account registered", ignoreCase = true) ||
-          rawError.contains("User account not found", ignoreCase = true) ||
-          rawError.contains("User profile not found", ignoreCase = true) -> strings.invalidCredentialsError
-          rawError.contains("Mobile number cannot be empty", ignoreCase = true) -> strings.phoneEmptyError
-          rawError.contains("valid 11-digit", ignoreCase = true) || rawError.contains("Invalid mobile number", ignoreCase = true) -> strings.invalidPhoneError
-          rawError.contains("Password cannot be empty", ignoreCase = true) -> strings.passwordEmptyError
-          rawError.contains("at least 6 characters", ignoreCase = true) -> strings.passwordMinLengthError
-          rawError.contains("Too many failed attempts", ignoreCase = true) || rawError.contains("Too many attempts", ignoreCase = true) -> strings.tooManyAttemptsError
-          rawError.contains("banned", ignoreCase = true) || rawError.contains("suspended", ignoreCase = true) -> strings.accountSuspendedError
-          rawError.contains("Network", ignoreCase = true) || rawError.contains("timed out", ignoreCase = true) -> strings.offlineMode
-          else -> rawError
+        val displayError = clientError ?: uiState.errorMessage?.let { rawError ->
+          when {
+            rawError.contains("Invalid mobile number or password", ignoreCase = true) ||
+            rawError.contains("Invalid password", ignoreCase = true) ||
+            rawError.contains("No account registered", ignoreCase = true) ||
+            rawError.contains("User account not found", ignoreCase = true) ||
+            rawError.contains("User profile not found", ignoreCase = true) -> strings.invalidCredentialsError
+            rawError.contains("Mobile number cannot be empty", ignoreCase = true) -> strings.phoneEmptyError
+            rawError.contains("valid 11-digit", ignoreCase = true) || rawError.contains("Invalid mobile number", ignoreCase = true) -> strings.invalidPhoneError
+            rawError.contains("Password cannot be empty", ignoreCase = true) -> strings.passwordEmptyError
+            rawError.contains("at least 6 characters", ignoreCase = true) -> strings.passwordMinLengthError
+            rawError.contains("Too many failed attempts", ignoreCase = true) || rawError.contains("Too many attempts", ignoreCase = true) -> strings.tooManyAttemptsError
+            rawError.contains("banned", ignoreCase = true) || rawError.contains("suspended", ignoreCase = true) -> strings.accountSuspendedError
+            rawError.contains("Network", ignoreCase = true) || rawError.contains("timed out", ignoreCase = true) -> strings.offlineMode
+            else -> rawError
+          }
         }
-      }
 
-      if (displayError != null) {
-        Surface(
-          color = Rose900.copy(alpha = 0.4f),
-          shape = RoundedCornerShape(8.dp),
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 14.dp),
-        ) {
-          Text(
-            text = displayError,
-            color = Rose400,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(10.dp),
-          )
+        if (displayError != null) {
+          AdAuthErrorBox(text = displayError)
         }
-      }
 
-      TournamentTextField(
-        value = mobileNumber,
-        onValueChange = {
-          val cleaned = convertBengaliDigitsToEnglish(it)
-          if (cleaned.length <= 11) {
-            mobileNumber = cleaned
+        AdAuthTextField(
+          value = mobileNumber,
+          onValueChange = {
+            val cleaned = convertBengaliDigitsToEnglish(it)
+            if (cleaned.length <= 11) {
+              mobileNumber = cleaned
+              clientError = null
+              viewModel.clearMessages()
+            }
+          },
+          placeholder = strings.phoneNumber,
+          leadingIcon = Icons.Default.Phone,
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+          testTag = "login_mobile_input",
+        )
+
+        AdAuthTextField(
+          value = password,
+          onValueChange = {
+            password = it
             clientError = null
             viewModel.clearMessages()
-          }
-        },
-        label = strings.phoneNumber,
-        placeholder = "01XXXXXXXXX",
-        leadingIcon = Icons.Default.Phone,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-        testTag = "login_mobile_input",
-      )
+          },
+          placeholder = strings.enterPassword,
+          leadingIcon = Icons.Default.Lock,
+          visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+          trailing = {
+            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+              Icon(
+                imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                contentDescription = strings.togglePassword,
+                tint = Color(0xFFFFC94A),
+              )
+            }
+          },
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+          testTag = "login_password_input",
+        )
 
-      Spacer(modifier = Modifier.height(14.dp))
-
-      TournamentTextField(
-        value = password,
-        onValueChange = {
-          password = it
-          clientError = null
-          viewModel.clearMessages()
-        },
-        label = strings.password,
-        placeholder = strings.enterPassword,
-        leadingIcon = Icons.Default.Lock,
-        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-        trailingIcon = {
-          IconButton(onClick = { passwordVisible = !passwordVisible }) {
-            Icon(
-              imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-              contentDescription = strings.togglePassword,
-              tint = Slate400,
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.End,
+        ) {
+          TextButton(onClick = onNavigateToForgotPassword) {
+            Text(
+              text = strings.forgotPasswordLink,
+              style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+              color = Color(0xFFFFD27A),
             )
           }
-        },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-        testTag = "login_password_input",
-      )
-
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End,
-      ) {
-        TextButton(onClick = onNavigateToForgotPassword) {
-          Text(
-            text = strings.forgotPasswordLink,
-            style = MaterialTheme.typography.labelSmall,
-            color = Gold400,
-          )
         }
+
+        AdAuthGoldButton(
+          text = strings.signInButton,
+          loadingText = strings.authPleaseWait,
+          isLoading = uiState.isLoading,
+          onClick = {
+            clientError = null
+            val phoneVal = AuthValidator.validateMobileNumber(mobileNumber)
+            if (!phoneVal.isValid) {
+              clientError = when (phoneVal.errorMessage) {
+                "Mobile number cannot be empty" -> strings.phoneEmptyError
+                else -> strings.invalidPhoneError
+              }
+              return@AdAuthGoldButton
+            }
+            val passVal = AuthValidator.validatePassword(password)
+            if (!passVal.isValid) {
+              clientError = when (passVal.errorMessage) {
+                "Password cannot be empty" -> strings.passwordEmptyError
+                else -> strings.passwordMinLengthError
+              }
+              return@AdAuthGoldButton
+            }
+            viewModel.login(mobileNumber, password)
+          },
+          testTag = "login_button",
+        )
       }
 
-      Spacer(modifier = Modifier.height(10.dp))
+      Spacer(modifier = Modifier.height(18.dp))
 
-      TournamentButton(
-        text = strings.signInButton,
-        onClick = {
-          clientError = null
-          val phoneVal = AuthValidator.validateMobileNumber(mobileNumber)
-          if (!phoneVal.isValid) {
-            clientError = when (phoneVal.errorMessage) {
-              "Mobile number cannot be empty" -> strings.phoneEmptyError
-              else -> strings.invalidPhoneError
-            }
-            return@TournamentButton
-          }
-          val passVal = AuthValidator.validatePassword(password)
-          if (!passVal.isValid) {
-            clientError = when (passVal.errorMessage) {
-              "Password cannot be empty" -> strings.passwordEmptyError
-              else -> strings.passwordMinLengthError
-            }
-            return@TournamentButton
-          }
-          viewModel.login(mobileNumber, password)
-        },
-        isLoading = uiState.isLoading,
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
         modifier = Modifier.fillMaxWidth(),
-        testTag = "login_button",
-      )
-    }
-
-    Spacer(modifier = Modifier.height(20.dp))
-
-    Row(
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.Center,
-      modifier = Modifier.fillMaxWidth(),
-    ) {
-      Text(
-        text = strings.noAccountPrompt,
-        style = MaterialTheme.typography.bodyMedium,
-        color = Slate400,
-      )
-      TextButton(onClick = onNavigateToRegister) {
+      ) {
         Text(
-          text = strings.createAccountAction,
-          style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-          color = Gold400,
+          text = strings.noAccountPrompt,
+          style = MaterialTheme.typography.bodyMedium,
+          color = Color(0xFFE8D7A8),
         )
+        TextButton(onClick = onNavigateToRegister) {
+          Text(
+            text = strings.createAccountAction,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+            color = Color(0xFFFFD45A),
+          )
+        }
       }
     }
   }
@@ -281,6 +230,7 @@ fun RegisterScreen(
   viewModel: AuthViewModel,
   onRegisterSuccess: () -> Unit,
   onNavigateToLogin: () -> Unit,
+  onOpenRules: () -> Unit = {},
 ) {
   val strings = LocalAppStrings.current
   val uiState by viewModel.uiState.collectAsState()
@@ -302,255 +252,187 @@ fun RegisterScreen(
     }
   }
 
-  Column(
-    modifier = Modifier
-      .fillMaxSize()
-      .background(DeepNavyBg)
-      .verticalScroll(rememberScrollState())
-      .padding(horizontal = 24.dp, vertical = 32.dp),
-    horizontalAlignment = Alignment.CenterHorizontally,
-  ) {
-    Spacer(modifier = Modifier.height(16.dp))
+  Box(modifier = Modifier.fillMaxSize()) {
+    AdAuthBackground(modifier = Modifier.fillMaxSize())
 
-    Surface(
-      color = Gold500.copy(alpha = 0.15f),
-      shape = RoundedCornerShape(20.dp),
-      modifier = Modifier.size(64.dp),
+    Column(
+      modifier = Modifier
+        .fillMaxSize()
+        .verticalScroll(rememberScrollState())
+        .imePadding()
+        .systemBarsPadding()
+        .padding(horizontal = 22.dp, vertical = 24.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-      Box(contentAlignment = Alignment.Center) {
-        Icon(
-          imageVector = Icons.Default.PersonAdd,
-          contentDescription = "Register",
-          tint = Gold400,
-          modifier = Modifier.size(36.dp),
+      AdAuthRegisterHeader(title = strings.authRegisterTitle, subtitle = strings.authRegisterSubtitle)
+
+      Spacer(modifier = Modifier.height(20.dp))
+
+      AdAuthCard {
+        val displayError = (clientError ?: uiState.errorMessage)?.let { adRegisterErrorText(it, strings) }
+        if (displayError != null) {
+          AdAuthErrorBox(text = displayError)
+        }
+
+        AdAuthTextField(
+          value = name,
+          onValueChange = {
+            name = it
+            clientError = null
+            viewModel.clearMessages()
+          },
+          placeholder = strings.authFullNameLabel,
+          leadingIcon = Icons.Default.Person,
+          testTag = "register_name_input",
+        )
+
+        Column {
+          AdAuthTextField(
+            value = mobileNumber,
+            onValueChange = {
+              val cleaned = convertBengaliDigitsToEnglish(it)
+              if (cleaned.length <= 11) {
+                mobileNumber = cleaned
+                clientError = null
+                viewModel.clearMessages()
+              }
+            },
+            placeholder = strings.authMobileNumberLabel,
+            leadingIcon = Icons.Default.Phone,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            testTag = "register_mobile_input",
+          )
+          Spacer(modifier = Modifier.height(7.dp))
+          AdAuthHelperText(text = strings.authMobileNumberHelperText)
+        }
+
+        AdAuthTextField(
+          value = password,
+          onValueChange = {
+            password = it
+            clientError = null
+            viewModel.clearMessages()
+          },
+          placeholder = strings.password,
+          leadingIcon = Icons.Default.Lock,
+          visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+          trailing = {
+            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+              Icon(
+                imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                contentDescription = strings.togglePassword,
+                tint = Color(0xFFE8C88A),
+              )
+            }
+          },
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+          testTag = "register_password_input",
+        )
+
+        AdAuthTextField(
+          value = confirmPassword,
+          onValueChange = {
+            confirmPassword = it
+            clientError = null
+            viewModel.clearMessages()
+          },
+          placeholder = strings.authConfirmPasswordLabel,
+          leadingIcon = Icons.Default.LockReset,
+          visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+          trailing = {
+            IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+              Icon(
+                imageVector = if (confirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                contentDescription = strings.authToggleConfirmPassword,
+                tint = Color(0xFFE8C88A),
+              )
+            }
+          },
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+          testTag = "register_confirm_password_input",
+        )
+
+        AdAuthTextField(
+          value = referralCode,
+          onValueChange = {
+            if (it.length <= 10) {
+              referralCode = it.uppercase()
+              clientError = null
+              viewModel.clearMessages()
+            }
+          },
+          placeholder = strings.authReferralCodeLabel,
+          leadingIcon = Icons.Default.CardGiftcard,
+          testTag = "register_referral_input",
+        )
+
+        AdAuthTermsCheck(
+          checked = agreedToTerms,
+          onCheckedChange = { agreedToTerms = it },
+          text = strings.authFairPlayTermsText,
+          highlight = if (strings === BengaliStrings) "ফেয়ার-প্লে শর্তাবলীতে" else "fair-play terms",
+          onHighlightClick = onOpenRules,
+        )
+
+        AdAuthGoldButton(
+          text = strings.registerButton,
+          loadingText = strings.authPleaseWait,
+          onClick = {
+            clientError = null
+            val nameVal = AuthValidator.validateFullName(name)
+            if (!nameVal.isValid) {
+              clientError = nameVal.errorMessage
+              return@AdAuthGoldButton
+            }
+            val phoneVal = AuthValidator.validateMobileNumber(mobileNumber)
+            if (!phoneVal.isValid) {
+              clientError = phoneVal.errorMessage
+              return@AdAuthGoldButton
+            }
+            val passVal = AuthValidator.validatePassword(password)
+            if (!passVal.isValid) {
+              clientError = passVal.errorMessage
+              return@AdAuthGoldButton
+            }
+            if (password != confirmPassword) {
+              clientError = strings.authPasswordsMismatchError
+              return@AdAuthGoldButton
+            }
+            if (!agreedToTerms) {
+              clientError = strings.authAgreeToTermsError
+              return@AdAuthGoldButton
+            }
+            viewModel.register(
+              name = name, 
+              mobileNumber = mobileNumber, 
+              password = password, 
+              referralCode = referralCode
+            )
+          },
+          isLoading = uiState.isLoading,
+          testTag = "register_button",
         )
       }
-    }
 
-    Spacer(modifier = Modifier.height(14.dp))
-
-    Text(
-      text = strings.authRegisterTitle,
-      style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-      color = Color.White,
-      textAlign = TextAlign.Center,
-    )
-    Text(
-      text = strings.authRegisterSubtitle,
-      style = MaterialTheme.typography.bodySmall,
-      color = Slate400,
-      textAlign = TextAlign.Center,
-    )
-
-    Spacer(modifier = Modifier.height(24.dp))
-
-    TournamentCard(
-      modifier = Modifier.fillMaxWidth(),
-      backgroundColor = NavyCard,
-      borderColor = NavyCardBorder,
-    ) {
-      val displayError = clientError ?: uiState.errorMessage
-      if (displayError != null) {
-        Surface(
-          color = Rose900.copy(alpha = 0.4f),
-          shape = RoundedCornerShape(8.dp),
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 14.dp),
-        ) {
-          Text(
-            text = displayError,
-            color = Rose400,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(10.dp),
-          )
-        }
-      }
-
-      TournamentTextField(
-        value = name,
-        onValueChange = {
-          name = it
-          clientError = null
-          viewModel.clearMessages()
-        },
-        label = strings.authFullNameLabel,
-        placeholder = strings.authFullNamePlaceholder,
-        leadingIcon = Icons.Default.Person,
-        testTag = "register_name_input",
-      )
-
-      Spacer(modifier = Modifier.height(14.dp))
-
-      TournamentTextField(
-        value = mobileNumber,
-        onValueChange = {
-          val cleaned = convertBengaliDigitsToEnglish(it)
-          if (cleaned.length <= 11) {
-            mobileNumber = cleaned
-            clientError = null
-            viewModel.clearMessages()
-          }
-        },
-        label = strings.authMobileNumberLabel,
-        placeholder = strings.authMobileNumberPlaceholder,
-        helperText = strings.authMobileNumberHelperText,
-        leadingIcon = Icons.Default.Phone,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-        testTag = "register_mobile_input",
-      )
-
-      Spacer(modifier = Modifier.height(14.dp))
-
-      TournamentTextField(
-        value = password,
-        onValueChange = {
-          password = it
-          clientError = null
-          viewModel.clearMessages()
-        },
-        label = strings.password,
-        placeholder = strings.authPasswordPlaceholder,
-        leadingIcon = Icons.Default.Lock,
-        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-        trailingIcon = {
-          IconButton(onClick = { passwordVisible = !passwordVisible }) {
-            Icon(
-              imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-              contentDescription = strings.togglePassword,
-              tint = Slate400,
-            )
-          }
-        },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-        testTag = "register_password_input",
-      )
-
-      Spacer(modifier = Modifier.height(14.dp))
-
-      TournamentTextField(
-        value = confirmPassword,
-        onValueChange = {
-          confirmPassword = it
-          clientError = null
-          viewModel.clearMessages()
-        },
-        label = strings.authConfirmPasswordLabel,
-        placeholder = strings.authConfirmPasswordPlaceholder,
-        leadingIcon = Icons.Default.LockReset,
-        visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-        trailingIcon = {
-          IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
-            Icon(
-              imageVector = if (confirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-              contentDescription = strings.authToggleConfirmPassword,
-              tint = Slate400,
-            )
-          }
-        },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-        testTag = "register_confirm_password_input",
-      )
-
-      Spacer(modifier = Modifier.height(14.dp))
-
-      TournamentTextField(
-        value = referralCode,
-        onValueChange = {
-          if (it.length <= 10) {
-            referralCode = it.uppercase()
-            clientError = null
-            viewModel.clearMessages()
-          }
-        },
-        label = strings.authReferralCodeLabel,
-        placeholder = "e.g. ABC123",
-        leadingIcon = Icons.Default.CardGiftcard,
-        testTag = "register_referral_input",
-      )
-
-      Spacer(modifier = Modifier.height(14.dp))
+      Spacer(modifier = Modifier.height(18.dp))
 
       Row(
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
         modifier = Modifier.fillMaxWidth(),
       ) {
-        Checkbox(
-          checked = agreedToTerms,
-          onCheckedChange = { agreedToTerms = it },
-          colors = CheckboxDefaults.colors(
-            checkedColor = Gold500,
-            checkmarkColor = Slate950,
-            uncheckedColor = Slate600,
-          ),
-        )
         Text(
-          text = strings.authFairPlayTermsText,
-          style = MaterialTheme.typography.bodySmall,
-          color = Slate300,
+          text = strings.authAlreadyHaveAccountPrompt,
+          style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+          color = Color(0xFFC9D3FF),
         )
-      }
-
-      Spacer(modifier = Modifier.height(16.dp))
-
-      TournamentButton(
-        text = strings.registerButton,
-        onClick = {
-          clientError = null
-          val nameVal = AuthValidator.validateFullName(name)
-          if (!nameVal.isValid) {
-            clientError = nameVal.errorMessage
-            return@TournamentButton
-          }
-          val phoneVal = AuthValidator.validateMobileNumber(mobileNumber)
-          if (!phoneVal.isValid) {
-            clientError = phoneVal.errorMessage
-            return@TournamentButton
-          }
-          val passVal = AuthValidator.validatePassword(password)
-          if (!passVal.isValid) {
-            clientError = passVal.errorMessage
-            return@TournamentButton
-          }
-          if (password != confirmPassword) {
-            clientError = strings.authPasswordsMismatchError
-            return@TournamentButton
-          }
-          if (!agreedToTerms) {
-            clientError = strings.authAgreeToTermsError
-            return@TournamentButton
-          }
-          viewModel.register(
-            name = name, 
-            mobileNumber = mobileNumber, 
-            password = password, 
-            referralCode = referralCode
+        TextButton(onClick = onNavigateToLogin) {
+          Text(
+            text = strings.authSignInAction,
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold, fontSize = 16.sp),
+            color = Color(0xFFFFC94A),
           )
-        },
-        isLoading = uiState.isLoading,
-        modifier = Modifier.fillMaxWidth(),
-        testTag = "register_button",
-      )
-    }
-
-    Spacer(modifier = Modifier.height(20.dp))
-
-    Row(
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.Center,
-      modifier = Modifier.fillMaxWidth(),
-    ) {
-      Text(
-        text = strings.authAlreadyHaveAccountPrompt,
-        style = MaterialTheme.typography.bodyMedium,
-        color = Slate400,
-      )
-      TextButton(onClick = onNavigateToLogin) {
-        Text(
-          text = strings.authSignInAction,
-          style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-          color = Gold400,
-        )
+        }
       }
     }
   }

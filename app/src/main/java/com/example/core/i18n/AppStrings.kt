@@ -61,6 +61,7 @@ interface AppStrings {
   val playerSignIn: String
   val playerSignInSubtitle: String
   val signInButton: String
+  val authPleaseWait: String
   val noAccountPrompt: String
   val createAccountAction: String
   val togglePassword: String
@@ -93,6 +94,13 @@ interface AppStrings {
   val authSignInAction: String
   val authPasswordsMismatchError: String
   val authAgreeToTermsError: String
+  val authNameTooShortError: String
+  val authNameTooLongError: String
+  val authNameInvalidError: String
+  val authPasswordTooLongError: String
+  val authPasswordWhitespaceError: String
+  val authPhoneAlreadyRegisteredError: String
+  val authRegisterFailedError: String
   val authAccountCreatedSuccess: String
 
   // Auth - Forgot Password & Support
@@ -925,6 +933,7 @@ object BengaliStrings : AppStrings {
   override val playerSignIn = "প্লেয়ার সাইন ইন"
   override val playerSignInSubtitle = "আপনার ১১-সংখ্যার মোবাইল নম্বর ও পাসওয়ার্ড দিন"
   override val signInButton = "সাইন ইন"
+  override val authPleaseWait = "অপেক্ষা করুন..."
   override val noAccountPrompt = "অ্যাকাউন্ট নেই?"
   override val createAccountAction = "অ্যাকাউন্ট তৈরি করুন"
   override val togglePassword = "পাসওয়ার্ড দেখুন বা লুকান"
@@ -957,6 +966,13 @@ object BengaliStrings : AppStrings {
   override val authSignInAction = "সাইন ইন"
   override val authPasswordsMismatchError = "পাসওয়ার্ড দুটি মিলছে না। পুনরায় টাইপ করুন।"
   override val authAgreeToTermsError = "অনুগ্রহ করে টুর্নামেন্টের ফেয়ার-প্লে শর্তাবলীতে সম্মতি দিন।"
+  override val authNameTooShortError = "নাম কমপক্ষে ২ অক্ষরের হতে হবে।"
+  override val authNameTooLongError = "নাম সর্বোচ্চ ৫০ অক্ষরের হতে পারে।"
+  override val authNameInvalidError = "নামে শুধু অক্ষর, স্পেস, ডট বা হাইফেন ব্যবহার করুন।"
+  override val authPasswordTooLongError = "পাসওয়ার্ড সর্বোচ্চ ৬৪ অক্ষরের হতে পারে।"
+  override val authPasswordWhitespaceError = "পাসওয়ার্ড শুধু ফাঁকা জায়গা দিয়ে হতে পারে না।"
+  override val authPhoneAlreadyRegisteredError = "এই নম্বরে আগেই অ্যাকাউন্ট খোলা আছে। অনুগ্রহ করে সাইন ইন করুন।"
+  override val authRegisterFailedError = "অ্যাকাউন্ট তৈরি করা যায়নি। অনুগ্রহ করে আবার চেষ্টা করুন।"
   override val authAccountCreatedSuccess = "সফলভাবে অ্যাকাউন্ট তৈরি হয়েছে! AD Tournament-এ স্বাগতম।"
 
   // Auth - Forgot Password & Support
@@ -1819,6 +1835,7 @@ object EnglishStrings : AppStrings {
   override val playerSignIn = "Player Sign In"
   override val playerSignInSubtitle = "Enter your 11-digit mobile number and password"
   override val signInButton = "SIGN IN"
+  override val authPleaseWait = "Please wait..."
   override val noAccountPrompt = "Don't have an account?"
   override val createAccountAction = "Create Account"
   override val togglePassword = "Toggle password"
@@ -1851,6 +1868,13 @@ object EnglishStrings : AppStrings {
   override val authSignInAction = "Sign In"
   override val authPasswordsMismatchError = "Passwords do not match. Please re-enter."
   override val authAgreeToTermsError = "Please agree to the tournament fair-play terms."
+  override val authNameTooShortError = "Name must be at least 2 characters."
+  override val authNameTooLongError = "Name can be at most 50 characters."
+  override val authNameInvalidError = "Name can only contain letters, spaces, dots or hyphens."
+  override val authPasswordTooLongError = "Password can be at most 64 characters."
+  override val authPasswordWhitespaceError = "Password cannot be only spaces."
+  override val authPhoneAlreadyRegisteredError = "This number already has an account. Please sign in."
+  override val authRegisterFailedError = "Could not create the account. Please try again."
   override val authAccountCreatedSuccess = "Account created successfully! Welcome to AD Tournament."
 
   // Auth - Forgot Password & Support
