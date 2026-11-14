@@ -8,6 +8,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -107,6 +109,7 @@ fun AdSplashContent(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .systemBarsPadding()
                 .padding(top = if (compact) 10.dp else 22.dp, bottom = if (compact) 14.dp else 26.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -117,18 +120,7 @@ fun AdSplashContent(
                     .testTag("splash_ad_logo")
             )
 
-            Text(
-                text = "AD TOURNAMENT",
-                style = TextStyle(
-                    brush = SpTextGold,
-                    fontSize = titleSize.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.sp,
-                    shadow = Shadow(color = Color(0xFF3A2600), offset = Offset(0f, 6f), blurRadius = 0f)
-                ),
-                maxLines = 1,
-                softWrap = false
-            )
+            AdTournamentTitle(fontSize = titleSize)
 
             Spacer(modifier = Modifier.height(10.dp * k))
             AdSplashRibbon(textSize = 15f * k)
@@ -195,6 +187,57 @@ fun AdSplashContent(
                 glow = true
             )
         }
+    }
+}
+
+/** The gold "AD TOURNAMENT" title, shared by the Splash and Login pages so they always look the same. */
+@Composable
+fun AdTournamentTitle(fontSize: Float) {
+    Box(contentAlignment = Alignment.Center) {
+        // 1) dark gold-brown outline with a soft shadow underneath
+        Text(
+            text = "AD TOURNAMENT",
+            style = TextStyle(
+                color = Color(0xFF4A2E00),
+                fontSize = fontSize.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.5.sp,
+                drawStyle = Stroke(width = 7f, join = StrokeJoin.Round),
+                shadow = Shadow(color = Color(0x99000000), offset = Offset(0f, 5f), blurRadius = 10f)
+            ),
+            maxLines = 1,
+            softWrap = false
+        )
+        // 2) clean gold fill
+        Text(
+            text = "AD TOURNAMENT",
+            style = TextStyle(
+                brush = Brush.verticalGradient(
+                    listOf(Color(0xFFFFF8D8), Color(0xFFFFE07A), Color(0xFFF2B21E), Color(0xFFB9780C))
+                ),
+                fontSize = fontSize.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.5.sp
+            ),
+            maxLines = 1,
+            softWrap = false
+        )
+        // 3) light shine on the upper half
+        Text(
+            text = "AD TOURNAMENT",
+            style = TextStyle(
+                brush = Brush.verticalGradient(
+                    0f to Color.White.copy(alpha = 0.55f),
+                    0.45f to Color.White.copy(alpha = 0f),
+                    1f to Color.White.copy(alpha = 0f)
+                ),
+                fontSize = fontSize.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.5.sp
+            ),
+            maxLines = 1,
+            softWrap = false
+        )
     }
 }
 
@@ -284,7 +327,7 @@ private fun DrawScope.drawSparkle(c: Offset, s: Float, color: Color) {
 // ---------------------------------------------------------------- emblem: crown + laurel + the app's real logo
 
 @Composable
-private fun AdSplashEmblem(modifier: Modifier) {
+fun AdSplashEmblem(modifier: Modifier) {
     val logo = painterResource(id = R.drawable.ic_launcher_foreground)
     Canvas(modifier = modifier) {
         val k = size.width / 230f
@@ -447,7 +490,7 @@ private fun AdSplashRibbon(textSize: Float) {
 private class SpPiece(val y: Float, val content: @Composable () -> Unit)
 
 @Composable
-private fun AdSplashBoard(boardSize: Dp, dicePhase: Float, pulse: Float) {
+internal fun AdSplashBoard(boardSize: Dp, dicePhase: Float, pulse: Float, pawnHop: Float = -1f, imageDice: Boolean = false) {
     val density = LocalDensity.current
     val bd = boardSize
     val f = bd * 0.04f                       // frame width
@@ -536,7 +579,7 @@ private fun AdSplashBoard(boardSize: Dp, dicePhase: Float, pulse: Float) {
 
         // pawns (real AdLudoPawnToken) and the rolling dice, drawn back to front
         val pieces = ArrayList<SpPiece>()
-        fun addPawn(fx: Float, fy: Float, color: Color, scale: Float) {
+        fun addPawn(fx: Float, fy: Float, color: Color, scale: Float, liftPx: Float = 0f) {
             val p = iso(fx, fy)
             val w = pwPx * scale; val h = phPx * scale
             pieces.add(SpPiece(p.y) {
@@ -544,7 +587,7 @@ private fun AdSplashBoard(boardSize: Dp, dicePhase: Float, pulse: Float) {
                     pawnColor = color,
                     isEligible = false,
                     modifier = Modifier
-                        .offset { IntOffset((p.x - w / 2f).roundToInt(), (p.y - h).roundToInt()) }
+                        .offset { IntOffset((p.x - w / 2f).roundToInt(), (p.y - h - liftPx).roundToInt()) }
                         .size(pw * scale, ph * scale)
                 )
             })
@@ -561,7 +604,14 @@ private fun AdSplashBoard(boardSize: Dp, dicePhase: Float, pulse: Float) {
         listOf(
             Triple(3, 6, Color(0xFF2EAD4B)), Triple(8, 3, Color(0xFFFBC02D)),
             Triple(11, 8, Color(0xFF1E88E5)), Triple(6, 11, Color(0xFFE53935))
-        ).forEach { (c, r, col) -> addPawn((c + 0.5f) * u, (r + 0.5f) * u, col, 0.82f) }
+        ).forEachIndexed { i, (c, r, col) ->
+            // pawnHop < 0 (the splash page): pawns stand still, exactly as before
+            val liftPx = if (pawnHop < 0f) 0f else {
+                val ph = (pawnHop + i * 0.25f) % 1f
+                (if (ph < 0.5f) sin(ph * 2f * 3.14159265f) else 0f) * 10f * (bd.value / 240f) * density.density
+            }
+            addPawn((c + 0.5f) * u, (r + 0.5f) * u, col, 0.82f, liftPx)
+        }
 
         // dice: rolls with a bounce for the first half of each cycle, then rests showing 6
         val rolling = dicePhase < 0.5f
@@ -587,15 +637,27 @@ private fun AdSplashBoard(boardSize: Dp, dicePhase: Float, pulse: Float) {
                     size = Size(48f * kb * s * density.density, 18f * kb * s * density.density)
                 )
             }
-            AdDice3D(
-                value = 6,
-                spinX = 360f * q,
-                spinY = 720f * q,
-                color = Color(0xFFE53935),
-                modifier = Modifier
-                    .offset { IntOffset((diceCx - dsPx / 2f).roundToInt(), (diceCy - dsPx / 2f).roundToInt()) }
-                    .size(ds)
-            )
+            if (imageDice) {
+                // the red dice picture (res/drawable-nodpi/mg_dice.webp), rolling
+                Image(
+                    painter = painterResource(id = R.drawable.mg_dice),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .offset { IntOffset((diceCx - dsPx * 0.6f).roundToInt(), (diceCy - dsPx * 0.6f).roundToInt()) }
+                        .size(ds * 1.2f)
+                        .graphicsLayer { rotationZ = 360f * q }
+                )
+            } else {
+                AdDice3D(
+                    value = 6,
+                    spinX = 360f * q,
+                    spinY = 720f * q,
+                    color = Color(0xFFE53935),
+                    modifier = Modifier
+                        .offset { IntOffset((diceCx - dsPx / 2f).roundToInt(), (diceCy - dsPx / 2f).roundToInt()) }
+                        .size(ds)
+                )
+            }
         })
 
         pieces.sortedBy { it.y }.forEach { it.content() }

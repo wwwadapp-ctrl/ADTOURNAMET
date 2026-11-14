@@ -18,12 +18,14 @@ import kotlinx.coroutines.launch
  * While the app is alive, watches the player's OWN full Auto Ludo matches:
  *  - first player (creator / first joiner) gets "your opponent is here" once, in their OWN userNotifications
  *  - both players get a phone alarm at the start time (shown even if the app is closed)
- * Writes only to the player's own userNotifications. Never touches money or matches.
+ * Also takes the player's OWN refund / prize through AutoLudoManager.claimRefund / claimWinPrize
+ * (the Firebase rules check those). Otherwise writes only to the player's own userNotifications.
  */
 object AdLudoMatchWatcher {
     private var job: Job? = null
     private val scheduledStarts = mutableMapOf<String, Long>()
     private val joinedNoticeDone = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val lastClaimTry = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     fun start(context: Context, uid: String, scope: CoroutineScope) {
         if (uid.isBlank()) return
@@ -51,6 +53,7 @@ object AdLudoMatchWatcher {
 
     private fun handle(context: Context, uid: String, matches: List<AutoLudoMatchEntity>) {
         val now = System.currentTimeMillis()
+        claimOwnMoney(uid, matches, now)
         val stillUpcoming = mutableSetOf<String>()
         for (m in matches) {
             val isP1 = m.player1Uid == uid
@@ -79,6 +82,33 @@ object AdLudoMatchWatcher {
             scheduledStarts.remove(id)
         }
         scheduledStarts.entries.removeAll { it.value <= now }
+    }
+
+    /**
+     * Takes only this player's own money: refund of a CANCELLED match they paid for,
+     * prize of a COMPLETED match they won. Each match is tried at most once a minute.
+     * The claim functions re-check everything and the Firebase rules reject anything wrong,
+     * so a double try can never pay twice.
+     */
+    private fun claimOwnMoney(uid: String, matches: List<AutoLudoMatchEntity>, now: Long) {
+        for (m in matches) {
+            if (m.matchId.isBlank()) continue
+            val mine = m.player1Uid == uid || m.player2Uid == uid || m.creatorUid == uid
+            if (!mine) continue
+            val wantsRefund = m.status == "CANCELLED" && m.entryFee > 0.0 && m.refundClaimed[uid] != true
+            val wantsPrize = m.status == "COMPLETED" && m.winnerUid == uid && !m.prizeClaimed
+            if (!wantsRefund && !wantsPrize) continue
+            val key = (if (wantsRefund) "r_" else "p_") + m.matchId
+            val last = lastClaimTry[key] ?: 0L
+            if (now - last < 60_000L) continue
+            lastClaimTry[key] = now
+            try {
+                if (wantsRefund) AutoLudoManager.claimRefund(m.matchId, uid)
+                else AutoLudoManager.claimWinPrize(m.matchId, uid)
+            } catch (e: Throwable) {
+                android.util.Log.w("AdLudoMatchWatcher", "claim failed for ${m.matchId}: ${e.message}")
+            }
+        }
     }
 
     private fun writeJoinedNoticeOnce(uid: String, matchId: String, matchNumber: String, opponentName: String, start: Long) {

@@ -207,13 +207,17 @@ fun HomeScreen(
         onAdminClick = if (isAdmin) onAdminClick else null,
       )
     },
-    containerColor = DeepNavyBg,
+    containerColor = Color(0xFF121A5C),
     modifier = modifier.fillMaxSize(),
   ) { innerPadding ->
     LazyColumn(
       modifier = Modifier
         .fillMaxSize()
-        .background(MidnightBackgroundGradient)
+        .background(
+          Brush.verticalGradient(
+            listOf(Color(0xFF1D2B93), Color(0xFF1A2685), Color(0xFF161F72), Color(0xFF121A5C))
+          )
+        )
         .padding(innerPadding),
       contentPadding = PaddingValues(bottom = 24.dp),
     ) {
@@ -427,81 +431,19 @@ fun HomeReferralBanner(
   modifier: Modifier = Modifier
 ) {
   val strings = LocalAppStrings.current
-  Surface(
-    modifier = modifier
-      .fillMaxWidth()
-      .padding(horizontal = 16.dp, vertical = 8.dp)
-      .clip(RoundedCornerShape(12.dp))
-      .clickable { onClick() }
-      .testTag("home_referral_banner"),
-    color = Slate900,
-    border = BorderStroke(1.dp, Gold400.copy(alpha = 0.5f))
-  ) {
-    Row(
-      modifier = Modifier
-        .background(
-          Brush.horizontalGradient(
-            colors = listOf(Gold400.copy(alpha = 0.15f), Color.Transparent)
-          )
-        )
-        .padding(12.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-      Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-        Surface(
-          shape = CircleShape,
-          color = Gold400.copy(alpha = 0.2f),
-          modifier = Modifier.size(40.dp)
-        ) {
-          Box(contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.CardGiftcard, contentDescription = null, tint = Gold400, modifier = Modifier.size(24.dp))
-          }
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
-          Text(
-            text = strings.homeReferTitle(strings.taka(40.0)),
-            style = MaterialTheme.typography.labelLarge.copy(
-              fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
-              fontSize = 14.sp,
-              letterSpacing = 0.sp
-            ),
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-          )
-          Spacer(modifier = Modifier.height(2.dp))
-          Text(
-            text = strings.homeReferSubtitle,
-            style = MaterialTheme.typography.labelSmall.copy(
-              fontSize = 12.sp
-            ),
-            color = Gold400,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-          )
-        }
-      }
-      Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = Gold400,
-        modifier = Modifier.padding(start = 8.dp)
-      ) {
-        Text(
-          text = strings.homeReferCta,
-          style = MaterialTheme.typography.labelSmall.copy(
-            fontWeight = FontWeight.Bold,
-            fontSize = 12.sp
-          ),
-          color = Slate950,
-          modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis
-        )
-      }
-    }
-  }
+  val amount = strings.taka(40.0)
+  val title = strings.homeReferTitle(amount)
+  val hasAmount = title.contains(amount)
+  AdReferCardArt(
+    titleBefore = if (hasAmount) title.substringBefore(amount).trim() else title,
+    amountText = if (hasAmount) amount else "",
+    titleAfter = if (hasAmount) title.substringAfter(amount).trim() else "",
+    subtitle = strings.homeReferSubtitle,
+    ctaText = strings.homeReferCta.removeSuffix(">").trim(),
+    tagText = if (strings === BengaliStrings) "রেফার বোনাস" else "REFER BONUS",
+    onClick = onClick,
+    modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+  )
 }
 
 // -----------------------------------------------------------------------
@@ -519,146 +461,25 @@ fun HomeQuickActions(
     modifier = modifier
       .fillMaxWidth()
       .padding(horizontal = 16.dp, vertical = 8.dp),
-    horizontalArrangement = Arrangement.spacedBy(12.dp),
+    horizontalArrangement = Arrangement.spacedBy(10.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    // Left: ADD MONEY / DEPOSIT
-    Surface(
-      shape = RoundedCornerShape(12.dp),
-      color = MidnightNavyCard,
-      border = BorderStroke(0.8.dp, NeonCyan.copy(alpha = 0.5f)),
-      modifier = Modifier
-        .weight(1f)
-        .height(56.dp)
-        .clickable(onClick = onDepositClick)
-        .testTag("home_quick_deposit_btn"),
-    ) {
-      Row(
-        modifier = Modifier
-          .fillMaxSize()
-          .background(
-            Brush.horizontalGradient(
-              colors = listOf(
-                NeonCyan.copy(alpha = 0.12f),
-                Color.Transparent,
-              )
-            )
-          )
-          .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-      ) {
-        Surface(
-          shape = CircleShape,
-          color = NeonCyan.copy(alpha = 0.18f),
-          border = BorderStroke(0.8.dp, NeonCyan.copy(alpha = 0.6f)),
-          modifier = Modifier.size(34.dp),
-        ) {
-          Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-          ) {
-            Icon(
-              imageVector = Icons.Default.AddCircle,
-              contentDescription = strings.addMoneyTitle,
-              tint = NeonCyan,
-              modifier = Modifier.size(20.dp),
-            )
-          }
-        }
-        Spacer(modifier = Modifier.width(10.dp))
-        Column(verticalArrangement = Arrangement.Center) {
-          Text(
-            text = strings.addMoneyTitle,
-            style = MaterialTheme.typography.labelLarge.copy(
-              fontWeight = FontWeight.Bold,
-              letterSpacing = 0.5.sp,
-            ),
-            color = Color.White,
-            maxLines = 1,
-          )
-          Text(
-            text = strings.homeQuickDepositSub,
-            style = MaterialTheme.typography.labelSmall.copy(
-              fontSize = 12.sp
-            ),
-            color = NeonCyan,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-          )
-        }
-      }
-    }
-
-    // Right: WITHDRAW
-    Surface(
-      shape = RoundedCornerShape(12.dp),
-      color = MidnightNavyCard,
-      border = BorderStroke(0.8.dp, Gold400.copy(alpha = 0.5f)),
-      modifier = Modifier
-        .weight(1f)
-        .height(56.dp)
-        .clickable(onClick = onWithdrawClick)
-        .testTag("home_quick_withdraw_btn"),
-    ) {
-      Row(
-        modifier = Modifier
-          .fillMaxSize()
-          .background(
-            Brush.horizontalGradient(
-              colors = listOf(
-                Gold400.copy(alpha = 0.12f),
-                Color.Transparent,
-              )
-            )
-          )
-          .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-      ) {
-        Surface(
-          shape = CircleShape,
-          color = Gold400.copy(alpha = 0.18f),
-          border = BorderStroke(0.8.dp, Gold400.copy(alpha = 0.6f)),
-          modifier = Modifier.size(34.dp),
-        ) {
-          Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-          ) {
-            Icon(
-              imageVector = Icons.Default.ArrowUpward,
-              contentDescription = strings.withdrawAction,
-              tint = Gold400,
-              modifier = Modifier.size(20.dp),
-            )
-          }
-        }
-        Spacer(modifier = Modifier.width(10.dp))
-        Column(verticalArrangement = Arrangement.Center) {
-          Text(
-            text = strings.withdrawAction.uppercase(),
-            style = MaterialTheme.typography.labelLarge.copy(
-              fontWeight = FontWeight.Bold,
-              letterSpacing = 0.5.sp,
-              fontSize = 14.sp
-            ),
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-          )
-          Text(
-            text = strings.homeQuickWithdrawSub,
-            style = MaterialTheme.typography.labelSmall.copy(
-              fontSize = 12.sp
-            ),
-            color = Gold400,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-          )
-        }
-      }
-    }
+    AdQuickActionCardArt(
+      title = strings.addMoneyTitle,
+      subtitle = strings.homeQuickDepositSub,
+      isDeposit = true,
+      onClick = onDepositClick,
+      tag = "home_quick_deposit_btn",
+      modifier = Modifier.weight(1f)
+    )
+    AdQuickActionCardArt(
+      title = strings.withdrawAction.uppercase(),
+      subtitle = strings.homeQuickWithdrawSub,
+      isDeposit = false,
+      onClick = onWithdrawClick,
+      tag = "home_quick_withdraw_btn",
+      modifier = Modifier.weight(1f)
+    )
   }
 }
 
@@ -694,69 +515,71 @@ private fun HomeGuideCarousel(
     }
   }
 
-  Column(
+  // Visual only: the current dot fills up like a timer while its banner is shown
+  val dotProgress = remember { Animatable(0f) }
+  LaunchedEffect(pagerState.currentPage, isDragged) {
+    dotProgress.snapTo(0f)
+    if (!isDragged && banners.size > 1) {
+      dotProgress.animateTo(1f, tween(durationMillis = 4000, easing = LinearEasing))
+    }
+  }
+
+  BoxWithConstraints(
     modifier = modifier
       .fillMaxWidth()
-      .padding(top = 10.dp, bottom = 4.dp),
+      .padding(top = 6.dp, bottom = 4.dp),
   ) {
-    HorizontalPager(
-      state = pagerState,
-      contentPadding = PaddingValues(horizontal = 16.dp),
-      pageSpacing = 12.dp,
-      modifier = Modifier
-        .fillMaxWidth()
-        .height(190.dp)
-        .testTag("home_guide_carousel"),
-    ) { page ->
-      val banner = banners[page]
-      GuideBannerCard(
-        banner = banner,
-        appSettings = appSettings,
-        onClick = {
-          val videoUrl = when (banner.guideType) {
-            GuideType.DEPOSIT -> appSettings.howToDepositVideoUrl
-            GuideType.MATCH_JOIN -> appSettings.howToJoinVideoUrl
-            GuideType.RESULT_SUBMIT -> appSettings.howToSubmitResultVideoUrl
-            GuideType.RULES -> appSettings.tournamentRulesVideoUrl
-          }.trim()
+    // 2:1 banner, so the Admin's picture is shown whole
+    val cardWidth = maxWidth - 32.dp
+    Column(modifier = Modifier.fillMaxWidth()) {
+      HorizontalPager(
+        state = pagerState,
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        pageSpacing = 12.dp,
+        modifier = Modifier
+          .fillMaxWidth()
+          .height(cardWidth / 2 + 18.dp)
+          .testTag("home_guide_carousel"),
+      ) { page ->
+        val banner = banners[page]
+        val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+        Box(modifier = Modifier.fillMaxSize().adBannerPageTransform(pageOffset)) {
+          GuideBannerCard(
+            banner = banner,
+            appSettings = appSettings,
+            onClick = {
+              val videoUrl = when (banner.guideType) {
+                GuideType.DEPOSIT -> appSettings.howToDepositVideoUrl
+                GuideType.MATCH_JOIN -> appSettings.howToJoinVideoUrl
+                GuideType.RESULT_SUBMIT -> appSettings.howToSubmitResultVideoUrl
+                GuideType.RULES -> appSettings.tournamentRulesVideoUrl
+              }.trim()
 
-          if (videoUrl.isNotBlank()) {
-            try {
-              val intent = Intent(Intent.ACTION_VIEW, Uri.parse(videoUrl)).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+              if (videoUrl.isNotBlank()) {
+                try {
+                  val intent = Intent(Intent.ACTION_VIEW, Uri.parse(videoUrl)).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                  }
+                  context.startActivity(intent)
+                } catch (_: Exception) {
+                  onBannerClick(banner)
+                }
+              } else {
+                onBannerClick(banner)
               }
-              context.startActivity(intent)
-            } catch (_: Exception) {
-              onBannerClick(banner)
-            }
-          } else {
-            onBannerClick(banner)
-          }
-        },
-      )
-    }
-
-    Spacer(modifier = Modifier.height(8.dp))
-
-    // Dot indicators
-    Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .testTag("home_guide_indicator_dots"),
-      horizontalArrangement = Arrangement.Center,
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      banners.indices.forEach { index ->
-        val isSelected = pagerState.currentPage == index
-        Box(
-          modifier = Modifier
-            .padding(horizontal = 3.dp)
-            .height(5.dp)
-            .width(if (isSelected) 20.dp else 5.dp)
-            .clip(CircleShape)
-            .background(if (isSelected) Gold400 else Slate700),
-        )
+            },
+          )
+        }
       }
+
+      Spacer(modifier = Modifier.height(4.dp))
+
+      AdBannerDots(
+        count = banners.size,
+        current = pagerState.currentPage,
+        progress = dotProgress.value,
+        modifier = Modifier.testTag("home_guide_indicator_dots"),
+      )
     }
   }
 }
@@ -790,43 +613,22 @@ private fun GuideBannerCard(
 
   val hasCustomBanner = decodedImageBitmap != null || (bannerUrl.isNotBlank() && (bannerUrl.startsWith("http://") || bannerUrl.startsWith("https://")))
 
-  Surface(
-    shape = RoundedCornerShape(16.dp),
-    color = Color.Transparent,
-    border = BorderStroke(
-      1.dp,
-      Brush.horizontalGradient(
-        listOf(
-          banner.accentColor.copy(alpha = 0.55f),
-          banner.secondaryColor.copy(alpha = 0.35f),
-        )
-      )
-    ),
+  AdBannerFrame(
+    badgeText = banner.badgeText,
+    onClick = onClick,
+    tag = "guide_banner_${banner.id}",
     modifier = Modifier
       .fillMaxWidth()
-      .fillMaxHeight()
-      .clip(RoundedCornerShape(16.dp))
-      .clickable { onClick() }
-      .testTag("guide_banner_${banner.id}"),
+      .fillMaxHeight(),
   ) {
     Box(modifier = Modifier.fillMaxSize()) {
       if (hasCustomBanner) {
-        // FULL-BLEED CUSTOM BANNER BACKGROUND (CLEAN - NO OVERLAYS)
-        if (decodedImageBitmap != null) {
-          Image(
-            bitmap = decodedImageBitmap,
-            contentDescription = banner.title,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-          )
-        } else {
-          AsyncImage(
-            model = bannerUrl,
-            contentDescription = banner.title,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-          )
-        }
+        // The Admin's picture, shown whole (never cut)
+        AdBannerPicture(
+          bitmap = decodedImageBitmap,
+          url = bannerUrl,
+          contentDescription = banner.title,
+        )
       } else {
         // ORIGINAL SPLIT LAYOUT FALLBACK
         Box(
@@ -973,51 +775,7 @@ private fun GuideBannerCard(
 @Composable
 private fun AutoGamesSectionHeading(modifier: Modifier = Modifier) {
   val strings = LocalAppStrings.current
-  Row(
-    modifier = modifier
-      .fillMaxWidth()
-      .padding(horizontal = 16.dp, vertical = 8.dp),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    HorizontalDivider(
-      modifier = Modifier.weight(1f),
-      color = Slate800,
-      thickness = 1.dp
-    )
-    Row(
-      verticalAlignment = Alignment.CenterVertically,
-      modifier = Modifier.padding(horizontal = 12.dp)
-    ) {
-      Icon(
-        imageVector = Icons.Default.Star,
-        contentDescription = null,
-        tint = Gold400,
-        modifier = Modifier.size(16.dp)
-      )
-      Spacer(modifier = Modifier.width(6.dp))
-      Text(
-        text = strings.homeAutoGamesHeading,
-        style = MaterialTheme.typography.titleMedium.copy(
-          fontWeight = FontWeight.Bold,
-          fontSize = 16.sp,
-          letterSpacing = 1.sp
-        ),
-        color = Gold400
-      )
-      Spacer(modifier = Modifier.width(6.dp))
-      Icon(
-        imageVector = Icons.Default.Star,
-        contentDescription = null,
-        tint = Gold400,
-        modifier = Modifier.size(16.dp)
-      )
-    }
-    HorizontalDivider(
-      modifier = Modifier.weight(1f),
-      color = Slate800,
-      thickness = 1.dp
-    )
-  }
+  AdAutoGamesHeading(text = strings.homeAutoGamesHeading, modifier = modifier.padding(horizontal = 6.dp))
 }
 
 // -----------------------------------------------------------------------
@@ -1027,51 +785,7 @@ private fun AutoGamesSectionHeading(modifier: Modifier = Modifier) {
 @Composable
 private fun TournamentSectionHeading(modifier: Modifier = Modifier) {
   val strings = LocalAppStrings.current
-  Row(
-    modifier = modifier
-      .fillMaxWidth()
-      .padding(horizontal = 16.dp, vertical = 8.dp),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    HorizontalDivider(
-      modifier = Modifier.weight(1f),
-      color = Slate800,
-      thickness = 1.dp,
-    )
-    Row(
-      verticalAlignment = Alignment.CenterVertically,
-      modifier = Modifier.padding(horizontal = 12.dp),
-    ) {
-      Icon(
-        imageVector = Icons.Default.Star,
-        contentDescription = null,
-        tint = Gold400,
-        modifier = Modifier.size(16.dp),
-      )
-      Spacer(modifier = Modifier.width(6.dp))
-      Text(
-        text = strings.tournamentsHeading,
-        style = MaterialTheme.typography.titleMedium.copy(
-          fontWeight = FontWeight.Bold,
-          letterSpacing = 1.sp,
-          fontSize = 16.sp,
-        ),
-        color = Gold400,
-      )
-      Spacer(modifier = Modifier.width(6.dp))
-      Icon(
-        imageVector = Icons.Default.Star,
-        contentDescription = null,
-        tint = Gold400,
-        modifier = Modifier.size(16.dp),
-      )
-    }
-    HorizontalDivider(
-      modifier = Modifier.weight(1f),
-      color = Slate800,
-      thickness = 1.dp,
-    )
-  }
+  AdAutoGamesHeading(text = strings.tournamentsHeading, modifier = modifier.padding(horizontal = 6.dp))
 }
 
 // -----------------------------------------------------------------------
@@ -1084,92 +798,12 @@ private fun AllMatchesQuickCard(
   modifier: Modifier = Modifier,
 ) {
   val strings = LocalAppStrings.current
-  Surface(
-    shape = RoundedCornerShape(14.dp),
-    color = Slate900,
-    border = BorderStroke(1.dp, Gold400.copy(alpha = 0.45f)),
-    modifier = modifier
-      .fillMaxWidth()
-      .padding(horizontal = 16.dp, vertical = 4.dp)
-      .clip(RoundedCornerShape(14.dp))
-      .clickable { onAllMatchesClick() }
-      .testTag("home_all_matches_quick_card"),
-  ) {
-    Box(
-      modifier = Modifier
-        .fillMaxWidth()
-        .background(
-          Brush.horizontalGradient(
-            listOf(
-              Color(0xFF161D32),
-              Color(0xFF1E2744),
-              Color(0xFF161D32),
-            )
-          )
-        )
-        .padding(horizontal = 14.dp, vertical = 12.dp),
-    ) {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-      ) {
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
-          modifier = Modifier.weight(1f),
-        ) {
-          Box(
-            modifier = Modifier
-              .size(42.dp)
-              .clip(RoundedCornerShape(10.dp))
-              .background(
-                Brush.linearGradient(
-                  listOf(Amber700.copy(alpha = 0.35f), Gold500.copy(alpha = 0.15f))
-                )
-              )
-              .border(1.dp, Gold400.copy(alpha = 0.5f), RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center,
-          ) {
-            Icon(
-              imageVector = Icons.Default.Star,
-              contentDescription = strings.allMatchesQuickTitle,
-              tint = Gold400,
-              modifier = Modifier.size(24.dp),
-            )
-          }
-
-          Spacer(modifier = Modifier.width(12.dp))
-
-          Column {
-            Text(
-              text = strings.allMatchesQuickTitle,
-              style = MaterialTheme.typography.titleSmall.copy(
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.5.sp,
-                fontSize = 14.sp,
-              ),
-              color = Color.White,
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-              text = strings.allMatchesQuickSubtitle,
-              style = MaterialTheme.typography.bodySmall.copy(
-                fontSize = 11.sp,
-              ),
-              color = Slate300,
-            )
-          }
-        }
-
-        Icon(
-          imageVector = Icons.Default.ChevronRight,
-          contentDescription = strings.allMatchesQuickTitle,
-          tint = Gold400,
-          modifier = Modifier.size(24.dp),
-        )
-      }
-    }
-  }
+  AdAllMatchesCard(
+    title = strings.allMatchesQuickTitle,
+    subtitle = strings.allMatchesQuickSubtitle,
+    onClick = onAllMatchesClick,
+    modifier = modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+  )
 }
 
 // -----------------------------------------------------------------------
@@ -1187,100 +821,22 @@ private fun GameFilterSection(
     modifier = modifier
       .fillMaxWidth()
       .padding(horizontal = 16.dp, vertical = 8.dp),
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    horizontalArrangement = Arrangement.spacedBy(10.dp),
   ) {
     val filterItems = listOf(
-      Triple(null, strings.filterAllGames, Icons.Default.List),
-      Triple(GameType.LUDO, strings.filterLudo, Icons.Default.Build),
-      Triple(GameType.CARROM, strings.filterCarrom, Icons.Default.CheckCircle),
+      Triple(null, strings.filterAllGames, 0),
+      Triple(GameType.LUDO, strings.filterLudo, 1),
+      Triple(GameType.CARROM, strings.filterCarrom, 2),
     )
-
-    filterItems.forEach { (type, label, icon) ->
-      val isSelected = selectedFilter == type
-      val accentColor = when (type) {
-        GameType.LUDO -> Gold400
-        GameType.CARROM -> NeonCyan
-        null -> Indigo400
-      }
-
-      Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = if (isSelected) Color.Transparent else MidnightNavyCard,
-        border = BorderStroke(
-          0.8.dp,
-          if (isSelected) Gold400 else MidnightNavyBorder,
-        ),
-        shadowElevation = if (isSelected) 4.dp else 2.dp,
-        modifier = Modifier
-          .weight(1f)
-          .height(44.dp)
-          .clip(RoundedCornerShape(14.dp))
-          .then(
-            if (isSelected) {
-              Modifier.background(ElectricAmberGradient)
-            } else {
-              Modifier
-            }
-          )
-          .clickable { onFilterSelect(type) }
-          .testTag("filter_chip_${type?.name ?: "ALL"}"),
-      ) {
-        Row(
-          modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 6.dp),
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.Center,
-        ) {
-          // 3D Isometric Tactile Icon Container with Radial Glow
-          Box(
-            modifier = Modifier
-              .size(24.dp)
-              .clip(RoundedCornerShape(6.dp))
-              .then(
-                if (isSelected) {
-                  Modifier.background(Slate950.copy(alpha = 0.25f))
-                } else {
-                  Modifier.background(
-                    Brush.radialGradient(
-                      colors = listOf(
-                        accentColor.copy(alpha = 0.3f),
-                        Color.Transparent,
-                      )
-                    )
-                  )
-                }
-              )
-              .border(
-                0.8.dp,
-                if (isSelected) Slate950.copy(alpha = 0.35f) else accentColor.copy(alpha = 0.5f),
-                RoundedCornerShape(6.dp),
-              ),
-            contentAlignment = Alignment.Center,
-          ) {
-            Icon(
-              imageVector = icon,
-              contentDescription = null,
-              tint = if (isSelected) Slate950 else accentColor,
-              modifier = Modifier.size(15.dp),
-            )
-          }
-
-          Spacer(modifier = Modifier.width(6.dp))
-
-          Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall.copy(
-              fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
-              fontSize = 11.5.sp,
-              letterSpacing = 0.3.sp,
-            ),
-            color = if (isSelected) Slate950 else Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-          )
-        }
-      }
+    filterItems.forEach { (type, label, iconKind) ->
+      AdGameFilterChip(
+        label = label,
+        selected = selectedFilter == type,
+        iconKind = iconKind,
+        onClick = { onFilterSelect(type) },
+        tag = "filter_chip_${type?.name ?: "ALL"}",
+        modifier = Modifier.weight(1f)
+      )
     }
   }
 }
@@ -1295,34 +851,12 @@ private fun AvailableMatchesHeader(
   modifier: Modifier = Modifier,
 ) {
   val strings = LocalAppStrings.current
-  Row(
-    modifier = modifier
-      .fillMaxWidth()
-      .padding(horizontal = 16.dp, vertical = 6.dp),
-    horizontalArrangement = Arrangement.SpaceBetween,
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    Text(
-      text = strings.availableMatchesTitle,
-      style = MaterialTheme.typography.titleSmall.copy(
-        fontWeight = FontWeight.Bold,
-        letterSpacing = 0.5.sp,
-      ),
-      color = Color.White,
-    )
-
-    Text(
-      text = strings.viewAll,
-      style = MaterialTheme.typography.labelMedium.copy(
-        fontWeight = FontWeight.Bold,
-      ),
-      color = Gold400,
-      modifier = Modifier
-        .clickable { onSeeAllClick() }
-        .padding(vertical = 4.dp, horizontal = 4.dp)
-        .testTag("home_see_all_matches"),
-    )
-  }
+  AdLiveMatchesHeader(
+    title = strings.availableMatchesTitle,
+    viewAllText = strings.viewAll,
+    onViewAllClick = onSeeAllClick,
+    modifier = modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+  )
 }
 
 // -----------------------------------------------------------------------
@@ -1530,46 +1064,16 @@ fun AnnouncementBar(
 ) {
   if (message.isBlank()) return
 
+  val strings = LocalAppStrings.current
   var showNoticeDialog by remember { mutableStateOf(false) }
 
-  Surface(
-    modifier = modifier
-      .fillMaxWidth()
-      .padding(horizontal = 16.dp, vertical = 6.dp)
-      .clip(RoundedCornerShape(10.dp))
-      .clickable { showNoticeDialog = true },
-    shape = RoundedCornerShape(10.dp),
-    color = NavyCard,
-    border = BorderStroke(1.dp, Gold400.copy(alpha = 0.6f)),
-  ) {
-    Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(horizontal = 12.dp, vertical = 8.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-      Icon(
-        imageVector = Icons.Default.Notifications,
-        contentDescription = "Announcement",
-        tint = Gold400,
-        modifier = Modifier.size(20.dp),
-      )
-      Text(
-        text = "📢  $message",
-        style = MaterialTheme.typography.bodySmall.copy(
-          fontWeight = FontWeight.Bold,
-          fontSize = 13.sp,
-        ),
-        color = Color.White,
-        maxLines = 1,
-        softWrap = false,
-        modifier = Modifier
-          .weight(1f)
-          .basicMarquee(iterations = Int.MAX_VALUE)
-      )
-    }
-  }
+  // The admin's notice text is shown exactly as written (with any emoji the admin types)
+  AdNoticeBarArt(
+    message = message,
+    tagText = if (strings === BengaliStrings) "নোটিশ" else "NOTICE",
+    onClick = { showNoticeDialog = true },
+    modifier = modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+  )
 
   if (showNoticeDialog) {
     NoticeDialog(
@@ -1650,204 +1154,41 @@ private fun LobbyBoardGamesSection(
   modifier: Modifier = Modifier
 ) {
   val strings = LocalAppStrings.current
+  val bn = strings === BengaliStrings
   Row(
     modifier = modifier
       .fillMaxWidth()
       .padding(horizontal = 16.dp, vertical = 8.dp),
-    horizontalArrangement = Arrangement.spacedBy(12.dp),
-    verticalAlignment = Alignment.CenterVertically
+    horizontalArrangement = Arrangement.spacedBy(14.dp),
+    verticalAlignment = Alignment.Top
   ) {
-    BoardGameCard(
+    AdAutoGameCard(
       title = strings.homeAutoLudoTitle,
       subtitle = strings.homeAutoLudoSub,
-      badge = strings.homeAutoLudoBadge,
-      badgeColor = Emerald400,
-      iconType = 0, // Dice
-      modifier = Modifier.weight(1f),
-      onClick = onLudoClick
-    )
-    BoardGameCard(
+      ribbonText = strings.homeAutoLudoBadge,
+      ribbonColors = listOf(Color(0xFF3EE0A0), Color(0xFF08865A)),
+      ribbonTextColor = Color(0xFFFFF3C4),
+      buttonText = if (bn) "এখনই খেলুন" else "PLAY NOW",
+      goldButton = false,
+      onClick = onLudoClick,
+      tag = "home_auto_ludo_card",
+      modifier = Modifier.weight(1f)
+    ) {
+      AdAutoLudoArt()
+    }
+    AdAutoGameCard(
       title = strings.homeCarromTitle,
       subtitle = strings.homeCarromSub,
-      badge = strings.homeNewBadge,
-      badgeColor = Gold400,
-      iconType = 1, // Striker/Coin
-      modifier = Modifier.weight(1f),
-      onClick = onCarromClick
-    )
-  }
-}
-
-@Composable
-private fun BoardGameCard(
-  title: String,
-  subtitle: String,
-  badge: String,
-  badgeColor: Color,
-  iconType: Int, // 0: Ludo Dice, 1: Carrom Striker
-  modifier: Modifier = Modifier,
-  onClick: () -> Unit
-) {
-  val infiniteTransition = rememberInfiniteTransition(label = "BoardGame")
-  
-  // Animation for Dice (Rotation) or Striker (Pulse/Glow)
-  val rotation by infiniteTransition.animateFloat(
-    initialValue = 0f,
-    targetValue = 360f,
-    animationSpec = infiniteRepeatable(
-      animation = tween(10000, easing = LinearEasing),
-      repeatMode = RepeatMode.Restart
-    ),
-    label = "rotation"
-  )
-  
-  val pulse by infiniteTransition.animateFloat(
-    initialValue = 0.95f,
-    targetValue = 1.05f,
-    animationSpec = infiniteRepeatable(
-      animation = tween(1500, easing = FastOutSlowInEasing),
-      repeatMode = RepeatMode.Reverse
-    ),
-    label = "pulse"
-  )
-
-  Surface(
-    modifier = modifier
-      .height(126.dp)
-      .clip(RoundedCornerShape(16.dp))
-      .clickable { onClick() },
-    shape = RoundedCornerShape(16.dp),
-    color = Color.Transparent,
-    border = BorderStroke(1.2.dp, Gold400.copy(alpha = 0.45f))
-  ) {
-    Box(
-      modifier = Modifier
-        .fillMaxSize()
-        .background(
-          Brush.horizontalGradient(
-            listOf(Color(0xFF0F172A), Color(0xFF1E1B4B))
-          )
-        )
+      ribbonText = strings.homeNewBadge,
+      ribbonColors = listOf(Color(0xFFFFE98A), Color(0xFFE0A82A)),
+      ribbonTextColor = Color(0xFF3A2200),
+      buttonText = if (bn) "শীঘ্রই আসছে" else "COMING SOON",
+      goldButton = true,
+      onClick = onCarromClick,
+      tag = "home_carrom_card",
+      modifier = Modifier.weight(1f)
     ) {
-      // Content Row
-      Row(
-        modifier = Modifier
-          .fillMaxSize()
-          .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        Column(
-          modifier = Modifier.weight(1f),
-          verticalArrangement = Arrangement.SpaceBetween
-        ) {
-          // Badge
-          Surface(
-            shape = RoundedCornerShape(4.dp),
-            color = badgeColor.copy(alpha = 0.2f),
-            border = BorderStroke(0.5.dp, badgeColor.copy(alpha = 0.5f))
-          ) {
-            Text(
-              text = badge,
-              modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-              style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Black
-              ),
-              color = badgeColor
-            )
-          }
-          
-          Spacer(modifier = Modifier.height(12.dp))
-          
-          Column {
-            Text(
-              text = title,
-              style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Black,
-                fontSize = 15.sp
-              ),
-              color = Color.White,
-              maxLines = 1,
-              overflow = TextOverflow.Ellipsis
-            )
-            Text(
-              text = subtitle,
-              style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 12.sp,
-                color = Slate400
-              ),
-              maxLines = 2,
-              overflow = TextOverflow.Ellipsis
-            )
-          }
-        }
-        
-        // Graphic Section
-        Box(
-          modifier = Modifier
-            .size(70.dp)
-            .padding(4.dp),
-          contentAlignment = Alignment.Center
-        ) {
-          if (iconType == 0) {
-            // Ludo Dice Graphic
-            Box(
-              modifier = Modifier
-                .size(48.dp)
-                .rotate(rotation)
-                .background(
-                  Brush.radialGradient(
-                    listOf(Color(0xFFEF4444), Color(0xFF991B1B))
-                  ),
-                  RoundedCornerShape(10.dp)
-                )
-                .border(1.2.dp, Gold400.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
-                .padding(8.dp)
-            ) {
-              // Dice Dots (Simplified 5)
-              Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(Gold400).align(Alignment.TopStart))
-              Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(Gold400).align(Alignment.TopEnd))
-              Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(Gold400).align(Alignment.Center))
-              Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(Gold400).align(Alignment.BottomStart))
-              Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(Gold400).align(Alignment.BottomEnd))
-            }
-          } else {
-            // Carrom Striker/Coin Graphic
-            Box(contentAlignment = Alignment.Center) {
-               // Ambient Glow
-               Canvas(modifier = Modifier.size(60.dp)) {
-                 drawCircle(
-                   brush = Brush.radialGradient(
-                     listOf(Gold400.copy(alpha = 0.15f), Color.Transparent)
-                   )
-                 )
-               }
-               // Striker
-               Surface(
-                 modifier = Modifier.size(44.dp * pulse),
-                 shape = CircleShape,
-                 color = Color(0xFF1E293B),
-                 border = BorderStroke(2.5.dp, Gold400),
-                 shadowElevation = 4.dp
-               ) {
-                 Box(contentAlignment = Alignment.Center) {
-                   Box(
-                     modifier = Modifier
-                       .size(24.dp)
-                       .border(1.dp, Gold400.copy(alpha = 0.4f), CircleShape)
-                   )
-                   Icon(
-                     Icons.Default.Adjust,
-                     contentDescription = null,
-                     tint = Gold400,
-                     modifier = Modifier.size(16.dp)
-                   )
-                 }
-               }
-            }
-          }
-        }
-      }
+      AdCarromArt()
     }
   }
 }

@@ -1,18 +1,12 @@
 package com.example.ui.components
 
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,30 +14,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
 import com.example.core.i18n.*
 import com.example.domain.model.UserEntity
 import com.example.domain.model.WalletEntity
-import com.example.ui.theme.*
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
+
+// Royal blue + gold glass top bar (artwork in AdTopBarArt.kt).
+// VISUAL ONLY: every value, click, test tag and timer works exactly as before.
 
 @Composable
 fun UnifiedEsportsTopBar(
@@ -68,303 +62,190 @@ fun UnifiedEsportsTopBar(
         if (w.bonusAmount > 0.0) w.bonusAmount else w.bonusBalance / 100.0
     } ?: 0.0
 
+    // Same numbers as before; the ৳ sign is drawn on the gold coin next to the balance
     val formattedBalance = remember(liveBalance, strings) {
-        strings.taka(liveBalance)
+        strings.digits(String.format(Locale.US, "%.2f", liveBalance))
     }
     val formattedBonus = remember(bonusBalance, strings) {
-        "🎁 " + strings.taka(bonusBalance)
+        strings.taka(bonusBalance)
     }
 
-    Surface(
-        color = NavySurface,
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .statusBarsPadding()
+            .background(Brush.verticalGradient(listOf(Color(0xFF2A3BB8), Color(0xFF2232A2), Color(0xFF1D2B93))))
+            .drawBehind { drawTopBarRays() }
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            // Tier 1 — Branded Esports Subtitle Strip (~22.dp)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                // Left cyber divider
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(1.dp)
-                        .background(Brush.horizontalGradient(listOf(Color.Transparent, Gold400.copy(alpha = 0.5f))))
-                )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
+            val k = (maxWidth.value / 400f).coerceIn(0.82f, 1f)
 
-                // Centered Subtitle
-                Text(
-                    text = strings.topBarSubtitle,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Gold400,
-                    letterSpacing = 0.5.sp,
-                    modifier = Modifier.padding(horizontal = 8.dp)
-                )
-
-                // Right cyber divider
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(1.dp)
-                        .background(Brush.horizontalGradient(listOf(Gold400.copy(alpha = 0.5f), Color.Transparent)))
-                )
-            }
-
-            // Tier 2 — Main Action Row (~52.dp)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Left Cluster (Trophy + Clock + Title)
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+                // Tier 1 — ornamental subtitle strip
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    if (navigationIcon != null) {
-                        navigationIcon()
-                        Spacer(modifier = Modifier.width(4.dp))
-                    }
-
-                    // Circular Neon Trophy Logo: Size = 40.dp with 2.dp dual-tone neon sweep gradient border
-                    LogoWithNeonRing(size = 40.dp)
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    // Clock + Title Stack
-                    Column(modifier = Modifier.width(IntrinsicSize.Max)) {
-                        // Live Digital Clock
-                        HeaderLuxuryDigitalClock()
-
-                        Spacer(modifier = Modifier.height(3.dp))
-
-                        // Brand Title (ZERO Truncation)
-                        Text(
-                            text = "AD TOURNAMENT",
-                            style = TextStyle(
-                                fontSize = 13.5.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color.White,
-                                letterSpacing = 0.5.sp
-                            ),
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Visible
-                        )
-                    }
+                    TbDiamond(5.dp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier.weight(1f).height(1.dp)
+                            .background(Brush.horizontalGradient(listOf(TbGold.copy(alpha = 0.2f), Color(0xFFFFE28C))))
+                    )
+                    Text("✦", fontSize = 9.sp, color = Color(0xFFFFE7A0), modifier = Modifier.padding(horizontal = 5.dp))
+                    Text(
+                        text = strings.topBarSubtitle,
+                        style = TextStyle(
+                            brush = Brush.verticalGradient(listOf(Color(0xFFFFF8D8), TbGold, TbGoldMid)),
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 0.6.sp,
+                            shadow = Shadow(Color(0x99000000), Offset(0f, 2f), 4f)
+                        ),
+                        maxLines = 1
+                    )
+                    Text("✦", fontSize = 9.sp, color = Color(0xFFFFE7A0), modifier = Modifier.padding(horizontal = 5.dp))
+                    Box(
+                        modifier = Modifier.weight(1f).height(1.dp)
+                            .background(Brush.horizontalGradient(listOf(Color(0xFFFFE28C), TbGold.copy(alpha = 0.2f))))
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    TbDiamond(5.dp)
                 }
 
-                // Right Cluster (Wallet + Bell + Avatar)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Wallet Capsule
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = Slate900,
-                        border = BorderStroke(1.dp, Gold400.copy(alpha = 0.65f)),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .clickable(onClick = onWalletClick)
-                            .testTag("top_bar_wallet_chip"),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AccountBalanceWallet,
-                                contentDescription = "Wallet",
-                                tint = Gold400,
-                                modifier = Modifier.size(14.dp),
+                // Tier 2 — glass plate with a gold frame
+                val plateShape = RoundedCornerShape(20.dp)
+                Box(
+                    modifier = Modifier
+                        .padding(start = 7.dp, end = 7.dp, top = 4.dp)
+                        .fillMaxWidth()
+                        .shadow(10.dp, plateShape, ambientColor = Color(0xFF050A3C), spotColor = Color(0xFF050A3C))
+                        .clip(plateShape)
+                        .background(Brush.linearGradient(listOf(Color(0x4D788CFF), Color(0x8C2837AA), Color(0xC7121A64))))
+                        .drawBehind {
+                            drawRoundRect(
+                                brush = Brush.verticalGradient(
+                                    listOf(Color.White.copy(alpha = 0.20f), Color.White.copy(alpha = 0f)),
+                                    startY = 0f, endY = size.height * 0.48f
+                                ),
+                                size = Size(size.width, size.height * 0.48f),
+                                cornerRadius = CornerRadius(19.dp.toPx())
                             )
-                            Column(horizontalAlignment = Alignment.Start) {
-                                if (wallet == null) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(12.dp),
-                                        color = Gold400,
-                                        strokeWidth = 2.dp
+                        }
+                        .border(
+                            1.3.dp,
+                            Brush.linearGradient(listOf(TbGoldLight, TbGoldMid, TbGoldMid.copy(alpha = 0.25f), TbGoldMid, TbGoldLight)),
+                            plateShape
+                        )
+                        .padding(horizontal = (9 * k).dp, vertical = (8 * k).dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Left Cluster (Emblem + Clock + Title)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (navigationIcon != null) {
+                                navigationIcon()
+                                Spacer(modifier = Modifier.width(4.dp))
+                            }
+                            TopBarEmblemBadge(badge = (52 * k).dp)
+                            Spacer(modifier = Modifier.width((7 * k).dp))
+                            Column(modifier = Modifier.width(IntrinsicSize.Max)) {
+                                HeaderLuxuryDigitalClock(scale = k)
+                                Spacer(modifier = Modifier.height((4 * k).dp))
+                                Text(
+                                    text = "AD TOURNAMENT",
+                                    style = TextStyle(
+                                        brush = TbGoldText,
+                                        fontSize = (13.5f * k).sp,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 0.6.sp,
+                                        shadow = Shadow(TbBrown, Offset(0f, 3f), 0f)
+                                    ),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Visible
+                                )
+                            }
+                        }
+
+                        // Right Cluster (Wallet + Bell + Avatar)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy((6 * k).dp)
+                        ) {
+                            TbWalletCapsule(
+                                loading = wallet == null,
+                                balanceText = formattedBalance,
+                                bonusText = formattedBonus,
+                                showBonus = bonusBalance > 0.0,
+                                k = k,
+                                onClick = onWalletClick
+                            )
+
+                            TbBellButton(
+                                unreadCount = unreadNotificationsCount,
+                                contentDescription = strings.notificationsTitle,
+                                k = k,
+                                onClick = onNotificationClick
+                            )
+
+                            TbAvatarRing(ring = (42 * k).dp, onClick = onProfileClick) {
+                                key(currentUser?.effectivePhoto) {
+                                    EsportsAvatar(
+                                        photoUrl = currentUser?.effectivePhoto,
+                                        name = currentUser?.effectiveName ?: "Player",
+                                        size = (42 * k).dp - 6.dp,
+                                        borderWidth = 0.dp,
+                                        onClick = null
                                     )
-                                } else {
-                                    Text(
-                                        text = formattedBalance,
-                                        style = MaterialTheme.typography.labelMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp,
-                                            letterSpacing = 0.sp,
-                                        ),
-                                        color = Gold400,
-                                        maxLines = 1,
-                                        softWrap = false,
-                                        modifier = Modifier.padding(end = 2.dp)
+                                }
+                            }
+
+                            // Admin Settings
+                            if (isAdmin && onAdminClick != null) {
+                                IconButton(
+                                    onClick = onAdminClick,
+                                    modifier = Modifier.size(32.dp).testTag("top_bar_admin_button"),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = strings.adminPanel,
+                                        tint = TbGold,
+                                        modifier = Modifier.size(20.dp),
                                     )
-                                    if (bonusBalance > 0.0) {
-                                        Text(
-                                            text = formattedBonus,
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 8.sp,
-                                            ),
-                                            color = Cyan400,
-                                            maxLines = 1,
-                                        )
-                                    }
                                 }
                             }
                         }
                     }
-
-                    // Notification Bell (size = 36.dp)
-                    Surface(
-                        onClick = onNotificationClick,
-                        shape = CircleShape,
-                        color = MidnightNavyCard,
-                        border = BorderStroke(
-                            0.8.dp,
-                            if (unreadNotificationsCount > 0) Rose600.copy(alpha = 0.5f) else MidnightNavyBorder
-                        ),
-                        modifier = Modifier
-                            .size(36.dp)
-                            .testTag("top_bar_notification_button"),
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Notifications,
-                                contentDescription = strings.notificationsTitle,
-                                tint = if (unreadNotificationsCount > 0) Gold400 else Slate300,
-                                modifier = Modifier.size(19.dp),
-                            )
-                            if (unreadNotificationsCount > 0) {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(top = 5.dp, end = 5.dp)
-                                        .size(7.dp)
-                                        .clip(CircleShape)
-                                        .background(Rose600)
-                                        .border(1.dp, MidnightNavyCard, CircleShape)
-                                        .testTag("notification_unread_dot"),
-                                    )
-                            }
-                        }
-                    }
-
-                    // Profile Avatar (size = 38.dp)
-                    key(currentUser?.effectivePhoto) {
-                        EsportsAvatar(
-                            photoUrl = currentUser?.effectivePhoto,
-                            name = currentUser?.effectiveName ?: "Player",
-                            size = 38.dp,
-                            modifier = Modifier.testTag("top_bar_profile_button"),
-                            onClick = onProfileClick
-                        )
-                    }
-
-                    // Admin Settings
-                    if (isAdmin && onAdminClick != null) {
-                        IconButton(
-                            onClick = onAdminClick,
-                            modifier = Modifier.size(32.dp).testTag("top_bar_admin_button"),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = strings.adminPanel,
-                                tint = Cyan400,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                    }
                 }
-            }
-        }
-    }
-}
 
-@Composable
-private fun LogoWithNeonRing(size: Dp = 40.dp) {
-    val infiniteTransition = rememberInfiniteTransition(label = "LogoPulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.98f,
-        targetValue = 1.02f,
-        animationSpec = infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "PulseScale"
-    )
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(8000, easing = LinearEasing), RepeatMode.Restart),
-        label = "Rotation"
-    )
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier.size(size)
-    ) {
-        // Neon Border Ring
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = pulseScale
-                    scaleY = pulseScale
-                }
-                .drawBehind {
-                    rotate(rotation) {
-                        drawCircle(
-                            brush = Brush.sweepGradient(
-                                colors = listOf(Color(0xFF00E5FF), Color(0xFFFFD700), Color(0xFF00E5FF)),
-                                center = center
-                            ),
-                            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
-                        )
-                    }
-                    // Ambient Glow
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(Color(0xFF00E5FF).copy(alpha = 0.15f), Color.Transparent),
-                            radius = (size / 2).toPx()
-                        )
+                // Bottom ornament: gold line with a diamond
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 30.dp, end = 30.dp, top = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier.weight(1f).height(1.dp)
+                            .background(Brush.horizontalGradient(listOf(TbGold.copy(alpha = 0f), TbGold)))
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    TbDiamond(6.dp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier.weight(1f).height(1.dp)
+                            .background(Brush.horizontalGradient(listOf(TbGold, TbGold.copy(alpha = 0f))))
                     )
                 }
-        )
-
-        Surface(
-            shape = CircleShape,
-            color = Slate900,
-            modifier = Modifier.size(size * 0.8f),
-        ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.EmojiEvents,
-                    contentDescription = "AD TOURNAMENT",
-                    tint = Gold400,
-                    modifier = Modifier.size(22.dp),
-                )
             }
         }
     }
 }
 
 @Composable
-fun HeaderLuxuryDigitalClock(modifier: Modifier = Modifier) {
+fun HeaderLuxuryDigitalClock(modifier: Modifier = Modifier, scale: Float = 1f) {
     val strings = LocalAppStrings.current
     var timeText by remember { mutableStateOf("") }
     val timeFormat = remember { SimpleDateFormat("hh:mm:ss a", Locale.getDefault()) }
@@ -380,45 +261,48 @@ fun HeaderLuxuryDigitalClock(modifier: Modifier = Modifier) {
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.4f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800),
-            repeatMode = RepeatMode.Reverse
-        ),
+        animationSpec = infiniteRepeatable(animation = tween(800), repeatMode = RepeatMode.Reverse),
         label = "PulseAlpha"
     )
 
-    Surface(
-        shape = RoundedCornerShape(4.dp),
-        color = NavyCard,
-        border = BorderStroke(
-            1.dp,
-            Gold400.copy(alpha = 0.7f)
-        ),
+    Box(
         modifier = modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(7.dp))
+            .background(Brush.horizontalGradient(listOf(TbGoldLight, TbGoldDeep, Color(0xFFFFE07A), TbGoldDeep)))
+            .padding(1.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(Brush.verticalGradient(listOf(Color(0xEB3C2806), Color(0xF21A1102))))
+            .drawBehind {
+                drawRect(Color(0x4DFFF0BE), topLeft = Offset.Zero, size = Size(size.width, 1.dp.toPx()))
+            }
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.5.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = (7 * scale).dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
             Box(
                 modifier = Modifier
-                    .size(4.dp)
+                    .size(6.dp)
+                    .drawBehind {
+                        drawCircle(Color(0xFF34D399).copy(alpha = pulseAlpha * 0.5f), radius = size.minDimension)
+                    }
                     .clip(CircleShape)
-                    .background(Emerald500.copy(alpha = pulseAlpha))
+                    .background(Color(0xFF34D399).copy(alpha = pulseAlpha))
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(5.dp))
             Text(
                 text = timeText,
                 style = TextStyle(
-                    fontSize = 11.sp,
+                    fontSize = (10.5f * scale).sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
                     textAlign = TextAlign.Center,
-                    letterSpacing = 0.sp
+                    letterSpacing = 0.3.sp,
+                    color = Color(0xFFFFE07A),
+                    shadow = Shadow(Color(0x99FFC850), Offset.Zero, 8f)
                 ),
-                color = Gold400,
                 maxLines = 1,
                 softWrap = false,
                 modifier = Modifier.padding(end = 2.dp)

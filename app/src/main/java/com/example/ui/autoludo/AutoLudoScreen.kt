@@ -452,15 +452,12 @@ fun AutoLudoScreen(
     }
 
     if (showTransferModal) {
-        TransferModal(
+        AdLudoTransferModal(
             uid = currentUid,
             userName = userName,
             userPhone = userPhone,
             mainBalance = wallet?.availableAmount ?: (wallet?.balance ?: 0.0),
             gameBalance = gameWalletBalance,
-            accentColor = Gold400,
-            accentColorLight = Color(0xFFFFF7C2),
-            backgroundColor = MidnightNavyCard,
             onDismiss = { showTransferModal = false },
             onConfirm = { enteredAmount, selectedType ->
                 val requestRef = FirebaseDatabase.getInstance(FirebaseConfig.DATABASE_URL)

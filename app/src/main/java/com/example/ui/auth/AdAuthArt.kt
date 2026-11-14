@@ -65,6 +65,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.ui.splash.AdSplashEmblem
+import com.example.ui.splash.AdTournamentTitle
 import kotlin.math.cos
 import kotlin.random.Random
 
@@ -149,37 +151,14 @@ private fun DrawScope.auSparkle(c: Offset, s: Float, color: Color) {
 
 @Composable
 fun AdAuthLogo(modifier: Modifier = Modifier) {
-    val logo = painterResource(id = R.drawable.ic_launcher_foreground)
-    Canvas(modifier = modifier.size(width = 132.dp, height = 140.dp)) {
-        val s = size.width / 68f
-        drawCircle(
-            Brush.radialGradient(
-                listOf(Color(0xFFFFC107).copy(alpha = 0.35f), Color.Transparent),
-                center = Offset(size.width / 2f, size.height / 2f), radius = size.width * 0.6f
-            ),
-            radius = size.width * 0.6f, center = Offset(size.width / 2f, size.height / 2f)
-        )
-        translate(left = -20f * s, top = -18f * s) {
-            with(logo) { draw(Size(108f * s, 108f * s)) }
-        }
-    }
+    // Same emblem as the Splash page (shared code), a little smaller to leave room for the form
+    AdSplashEmblem(modifier = modifier.size(width = 172.dp, height = 156.dp))
 }
 
 @Composable
 fun AdAuthTitle(tagline: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = "AD TOURNAMENT",
-            style = TextStyle(
-                brush = AuGold,
-                fontSize = 36.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 1.sp,
-                shadow = Shadow(color = Color(0xFF3A2600), offset = Offset(0f, 6f), blurRadius = 0f)
-            ),
-            maxLines = 1,
-            softWrap = false
-        )
+        AdTournamentTitle(fontSize = 36f)
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = tagline,

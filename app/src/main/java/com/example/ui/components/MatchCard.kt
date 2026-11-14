@@ -3,7 +3,9 @@ package com.example.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -35,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import com.example.core.i18n.*
 import com.example.domain.model.MatchEntity
 import com.example.domain.model.MatchStatus
+import com.example.ui.home.adPressScale
 import com.example.ui.theme.*
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
@@ -76,261 +79,115 @@ fun MatchCard(
     match.status.equals("REJECTED", ignoreCase = true) ||
     (isCompleted && match.winnerUserId.isNotBlank() && !isUserWinner)
 
-  val defaultBorder = if (isJoined) Emerald500.copy(alpha = 0.6f) else MidnightNavyBorder
-  val borderColor = when {
-    isCompleted && isUserWinner -> Gold400.copy(alpha = 0.8f)
-    isCompleted && isUserLoser -> Rose600.copy(alpha = 0.6f)
-    isJoined -> Emerald500.copy(alpha = 0.8f)
-    isRunning -> Indigo600
-    isCompleted -> NeonEmerald.copy(alpha = 0.6f)
-    isCancelled -> Rose600.copy(alpha = 0.5f)
-    isPaused || isDisabled -> Amber600.copy(alpha = 0.5f)
-    isUpcoming -> Amber500.copy(alpha = 0.4f)
-    else -> defaultBorder
+  // Card edge colour (look only)
+  val frame = when {
+    isCompleted && isUserWinner -> AdMatchFrame.WIN
+    isCompleted && isUserLoser -> AdMatchFrame.RED
+    isJoined -> AdMatchFrame.GREEN
+    isCompleted -> AdMatchFrame.GREEN
+    isCancelled -> AdMatchFrame.RED
+    isPaused || isDisabled -> AdMatchFrame.AMBER
+    isRunning || isCodeAdded -> AdMatchFrame.CYAN
+    isFull -> AdMatchFrame.RED
+    else -> AdMatchFrame.GOLD
   }
+  val dimArt = isCancelled || isDisabled || (isFull && !isJoined && !isCompleted && !isRunning && !isCodeAdded)
+  val press = remember { MutableInteractionSource() }
 
-  TournamentCard(
+  AdMatchCardFrame(
+    frame = frame,
     modifier = modifier
+      .then(if (onCardClick != null) Modifier.adPressScale(press, 0.97f) else Modifier)
       .fillMaxWidth()
       .testTag("match_card_${match.matchId}")
       .then(
         if (onCardClick != null) {
-          Modifier.clickable { onCardClick() }
+          Modifier.clickable(interactionSource = press, indication = LocalIndication.current) { onCardClick() }
         } else {
           Modifier
         }
       ),
-    backgroundColor = MidnightNavyCard,
-    borderColor = borderColor,
-    backgroundContent = {
-      if (isLudo) {
-        AnimatedLudoAsset(
-          modifier = Modifier
-            .align(Alignment.TopEnd)
-            .padding(top = 4.dp, end = 4.dp),
-          size = 100.dp,
-          alpha = 0.92f,
-        )
-      } else {
-        AnimatedCarromAsset(
-          modifier = Modifier
-            .align(Alignment.TopEnd)
-            .padding(top = 4.dp, end = 4.dp),
-          size = 100.dp,
-          alpha = 0.92f,
-        )
-      }
-    },
   ) {
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.SpaceBetween,
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Row(verticalAlignment = Alignment.CenterVertically) {
-        Surface(
-          color = if (isLudo) Color(0xFF1B1838) else Color(0xFF0C2234),
-          shape = RoundedCornerShape(8.dp),
-          border = BorderStroke(0.8.dp, if (isLudo) Gold400.copy(alpha = 0.7f) else NeonCyan.copy(alpha = 0.7f)),
-        ) {
-          Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-          ) {
-            Box(
-              modifier = Modifier
-                .size(20.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(if (isLudo) Gold400.copy(alpha = 0.2f) else NeonCyan.copy(alpha = 0.2f)),
-              contentAlignment = Alignment.Center,
-            ) {
-              Icon(
-                imageVector = if (isLudo) Icons.Default.Casino else Icons.Default.Album,
-                contentDescription = null,
-                tint = if (isLudo) Gold400 else NeonCyan,
-                modifier = Modifier.size(13.dp),
-              )
-            }
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-              text = if (isLudo) strings.matchCardLudoChip else strings.matchCardCarromChip,
-              style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
-                letterSpacing = if (strings === BengaliStrings) 0.sp else 0.5.sp,
-                fontSize = 12.sp,
-              ),
-              color = Color.White,
-              maxLines = 1,
-              softWrap = false,
-            )
-          }
-        }
+    AdMatchGameArt(isLudo = isLudo, dim = dimArt, modifier = Modifier.align(Alignment.TopEnd).offset(x = 2.dp, y = (-4).dp))
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+      Row(
+        modifier = Modifier.fillMaxWidth().padding(end = 80.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        AdMatchGameChip(isLudo = isLudo, label = if (isLudo) strings.matchCardLudoChip else strings.matchCardCarromChip)
         if (match.matchNumber.isNotBlank()) {
-          Spacer(modifier = Modifier.width(8.dp))
+          Spacer(modifier = Modifier.width(7.dp))
           Text(
             text = strings.digits(match.matchNumber),
-            style = MaterialTheme.typography.labelMedium.copy(
-              fontWeight = FontWeight.Bold,
-              fontSize = 13.sp,
-            ),
-            color = Slate300,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color(0xBFFFF0C8),
             maxLines = 1,
             softWrap = false,
-            modifier = Modifier.padding(end = 2.dp),
           )
         }
+        Spacer(modifier = Modifier.weight(1f))
+        MatchStatusBadge(
+          status = match.status,
+          joinedPlayersCount = match.joinedPlayersCount,
+          maxPlayers = match.maxPlayers,
+          isJoined = isJoined,
+          isWinner = isUserWinner,
+          isLoser = isUserLoser,
+          premium = true,
+        )
       }
 
-      MatchStatusBadge(
-        status = match.status,
-        joinedPlayersCount = match.joinedPlayersCount,
-        maxPlayers = match.maxPlayers,
-        isJoined = isJoined,
-        isWinner = isUserWinner,
-        isLoser = isUserLoser,
-        modifier = Modifier.padding(end = 96.dp)
-      )
-    }
+      Spacer(modifier = Modifier.height(7.dp))
 
-    Spacer(modifier = Modifier.height(10.dp))
-
-    val titleRegex = remember { Regex("(?i)^(ludo|carrom)\\s*1v1\\s*#(\\S+)$") }
-    val displayGameName = if (isLudo) strings.filterLudo else strings.filterCarrom
-    val finalTitle = remember(match.title, match.matchNumber, strings) {
-      match.title.takeIf { it.isNotBlank() }?.let { title ->
-        val matchResult = titleRegex.find(title)
-        if (matchResult != null) {
-          val game = matchResult.groupValues[1]
-          val id = matchResult.groupValues[2]
-          val localizedGame = if (game.equals("ludo", ignoreCase = true)) strings.filterLudo else strings.filterCarrom
-          strings.historyMatchTitle(localizedGame, strings.digits(id))
-        } else {
-          title
-        }
-      } ?: run {
-        val numStr = match.matchNumber.removePrefix("#").trim()
-        if (numStr.isNotBlank()) {
-          strings.historyMatchTitle(displayGameName, strings.digits(numStr))
-        } else {
-          "${displayGameName} ${strings.label1v1Battle}"
+      val titleRegex = remember { Regex("(?i)^(ludo|carrom)\\s*1v1\\s*#(\\S+)$") }
+      val displayGameName = if (isLudo) strings.filterLudo else strings.filterCarrom
+      val finalTitle = remember(match.title, match.matchNumber, strings) {
+        match.title.takeIf { it.isNotBlank() }?.let { title ->
+          val matchResult = titleRegex.find(title)
+          if (matchResult != null) {
+            val game = matchResult.groupValues[1]
+            val id = matchResult.groupValues[2]
+            val localizedGame = if (game.equals("ludo", ignoreCase = true)) strings.filterLudo else strings.filterCarrom
+            strings.historyMatchTitle(localizedGame, strings.digits(id))
+          } else {
+            title
+          }
+        } ?: run {
+          val numStr = match.matchNumber.removePrefix("#").trim()
+          if (numStr.isNotBlank()) {
+            strings.historyMatchTitle(displayGameName, strings.digits(numStr))
+          } else {
+            "${displayGameName} ${strings.label1v1Battle}"
+          }
         }
       }
-    }
 
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.SpaceBetween,
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
       Text(
         text = finalTitle,
-        style = MaterialTheme.typography.titleSmall.copy(
-          fontWeight = FontWeight.Bold,
-          fontSize = 15.sp,
-        ),
-        color = Color.White,
+        fontSize = 17.sp,
+        fontWeight = FontWeight.Black,
+        style = androidx.compose.ui.text.TextStyle(color = Color.White, shadow = androidx.compose.ui.graphics.Shadow(Color(0x80000000), androidx.compose.ui.geometry.Offset(0f, 2f), 4f)),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.weight(1f),
+        modifier = Modifier.fillMaxWidth().padding(end = 80.dp),
       )
-      if (onCardClick != null) {
-        Icon(
-          imageVector = Icons.Default.ChevronRight,
-          contentDescription = strings.labelViewResult,
-          tint = Slate400,
-          modifier = Modifier.size(20.dp),
-        )
-      }
-    }
 
-    Spacer(modifier = Modifier.height(12.dp))
+      Spacer(modifier = Modifier.height(12.dp))
 
-    Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .clip(RoundedCornerShape(10.dp))
-        .background(Slate900)
-        .border(BorderStroke(0.8.dp, MidnightNavyBorder), RoundedCornerShape(10.dp))
-        .padding(horizontal = 14.dp, vertical = 10.dp),
-      horizontalArrangement = Arrangement.SpaceBetween,
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Column {
-        Text(
-          text = strings.entryFeeLabel,
-          style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-          color = Slate400,
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-          text = strings.taka(match.displayEntryFee),
-          style = MaterialTheme.typography.titleMedium.copy(
-            fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Bold,
-            fontSize = 15.sp,
-            letterSpacing = 0.sp,
-          ),
-          color = Color.White,
-          maxLines = 1,
-          softWrap = false,
-          modifier = Modifier.padding(end = 2.dp),
-        )
-      }
-      Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-          text = strings.labelFormat,
-          style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-          color = Slate400,
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-          text = strings.label1v1Battle,
-          style = MaterialTheme.typography.titleSmall.copy(
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
-          ),
-          color = NeonCyan,
-          maxLines = 1,
-          softWrap = false,
-        )
-      }
-      Column(horizontalAlignment = Alignment.End) {
-        Text(
-          text = strings.prizePoolLabel,
-          style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-          color = Slate400,
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-          text = strings.taka(match.displayPrizePool),
-          style = MaterialTheme.typography.titleMedium.copy(
-            fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
-            fontSize = 15.sp,
-            letterSpacing = 0.sp,
-          ),
-          color = Gold400,
-          maxLines = 1,
-          softWrap = false,
-          modifier = Modifier.padding(end = 2.dp),
-        )
-      }
-    }
+      AdMatchStats(
+        entryLabel = strings.entryFeeLabel,
+        entry = strings.taka(match.displayEntryFee),
+        formatLabel = strings.labelFormat,
+        format = strings.label1v1Battle,
+        prizeLabel = strings.prizePoolLabel,
+        prize = strings.taka(match.displayPrizePool),
+      )
 
-    Spacer(modifier = Modifier.height(12.dp))
+      Spacer(modifier = Modifier.height(10.dp))
 
-    // Thick seat status bar (Height ~28dp)
-    val joinedCount = match.joinedPlayersCount
-    val barColorBlue = Color(0xFF3B82F6)
-    val barColorRed = Color(0xFFEF4444)
-
-    Box(
-      modifier = Modifier
-        .fillMaxWidth()
-        .height(28.dp)
-        .clip(RoundedCornerShape(6.dp))
-        .background(Slate900)
-        .testTag("seat_status_bar_${match.matchId}"),
-      contentAlignment = Alignment.Center,
-    ) {
+      val joinedCount = match.joinedPlayersCount
       val seatText = when {
         isCompleted -> strings.labelMatchCompleted.uppercase()
         joinedCount >= effectiveMaxPlayers || isFull ->
@@ -340,234 +197,81 @@ fun MatchCard(
         else ->
           strings.matchCardSeatJoined(strings.number(0), strings.number(effectiveMaxPlayers))
       }
+      val seatFill = when {
+        isCompleted -> AdSeatFill.GREEN
+        joinedCount >= effectiveMaxPlayers || isFull -> if (isJoined) AdSeatFill.GREEN else AdSeatFill.RED
+        joinedCount > 0 -> AdSeatFill.GOLD
+        else -> AdSeatFill.EMPTY
+      }
+      AdMatchSeatBar(
+        joined = if (isCompleted || isFull) effectiveMaxPlayers else joinedCount,
+        maxSeats = effectiveMaxPlayers,
+        text = seatText,
+        fill = seatFill,
+        modifier = Modifier.testTag("seat_status_bar_${match.matchId}"),
+      )
+
+      Spacer(modifier = Modifier.height(11.dp))
 
       when {
         isCompleted -> {
-          Box(
-            modifier = Modifier
-              .fillMaxSize()
-              .background(NeonEmerald.copy(alpha = 0.8f)),
-            contentAlignment = Alignment.Center,
-          ) {
-            Text(
-              text = seatText,
-              style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
-                letterSpacing = if (strings === BengaliStrings) 0.sp else 0.5.sp,
-                fontSize = 12.sp,
-              ),
-              color = Color.White,
-              maxLines = 1,
-              softWrap = false,
-            )
-          }
+          AdMatchBanner(
+            kind = if (isUserWinner) AdMatchBannerKind.WIN else if (isUserLoser) AdMatchBannerKind.LOSE else AdMatchBannerKind.DONE,
+            text = when {
+              isUserWinner -> strings.matchCardWinnerBanner(strings.taka(match.displayPrizePool))
+              isUserLoser -> strings.matchCardDefeatBanner
+              else -> strings.labelMatchCompleted
+            },
+            linkText = if (onCardClick != null) "${strings.labelViewResult} →" else null,
+          )
         }
-        joinedCount >= effectiveMaxPlayers || isFull -> {
-          Box(
-            modifier = Modifier
-              .fillMaxSize()
-              .background(barColorRed),
-            contentAlignment = Alignment.Center,
-          ) {
-            Text(
-              text = seatText,
-              style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Bold,
-                letterSpacing = if (strings === BengaliStrings) 0.sp else 0.5.sp,
-                fontSize = 12.sp,
-              ),
-              color = Color.White,
-              maxLines = 1,
-              softWrap = false,
-            )
-          }
+        isCancelled -> {
+          AdMatchBanner(kind = AdMatchBannerKind.CANCEL, text = strings.matchCardCancelledBanner, linkText = null)
         }
-        joinedCount > 0 -> {
-          Row(modifier = Modifier.fillMaxSize()) {
-            Box(
-              modifier = Modifier
-                .weight(joinedCount.toFloat())
-                .fillMaxHeight()
-                .background(barColorBlue)
-            )
-            Box(
-              modifier = Modifier
-                .weight((effectiveMaxPlayers - joinedCount).coerceAtLeast(1).toFloat())
-                .fillMaxHeight()
-                .background(barColorRed)
-            )
-          }
-          Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-          ) {
-            Text(
-              text = seatText,
-              style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Bold,
-                letterSpacing = if (strings === BengaliStrings) 0.sp else 0.5.sp,
-                fontSize = 12.sp,
-              ),
-              color = Color.White,
-              maxLines = 1,
-              softWrap = false,
-            )
-          }
+        isPaused || isDisabled -> {
+          AdMatchBanner(
+            kind = AdMatchBannerKind.PAUSE,
+            text = if (isPaused) strings.matchCardPausedBanner else strings.matchCardDisabledBanner,
+            linkText = null,
+          )
         }
         else -> {
-          Box(
-            modifier = Modifier
-              .fillMaxSize()
-              .background(barColorBlue),
-            contentAlignment = Alignment.Center,
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
           ) {
-            Text(
-              text = seatText,
-              style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Bold,
-                letterSpacing = if (strings === BengaliStrings) 0.sp else 0.5.sp,
-                fontSize = 12.sp,
-              ),
-              color = Color.White,
-              maxLines = 1,
-              softWrap = false,
-            )
-          }
-        }
-      }
-    }
-
-    Spacer(modifier = Modifier.height(14.dp))
-
-    when {
-      isCompleted -> {
-        val bannerBg = if (isUserWinner) Gold500.copy(alpha = 0.15f) else if (isUserLoser) Rose900.copy(alpha = 0.3f) else Emerald900.copy(alpha = 0.3f)
-        val bannerBorder = if (isUserWinner) Gold400.copy(alpha = 0.6f) else if (isUserLoser) Rose500.copy(alpha = 0.4f) else Emerald500.copy(alpha = 0.3f)
-        val bannerTextColor = if (isUserWinner) Gold400 else if (isUserLoser) Rose400 else Emerald400
-        val bannerText = when {
-          isUserWinner -> strings.matchCardWinnerBanner(strings.taka(match.displayPrizePool))
-          isUserLoser -> strings.matchCardDefeatBanner
-          else -> strings.labelMatchCompleted
-        }
-        Row(
-          modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(bannerBg)
-            .border(BorderStroke(1.dp, bannerBorder), RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Text(
-            text = bannerText,
-            style = MaterialTheme.typography.labelMedium.copy(
-              fontWeight = FontWeight.Bold,
-              fontSize = 13.sp,
-            ),
-            color = bannerTextColor,
-            maxLines = 1,
-            softWrap = false,
-            modifier = Modifier.padding(end = 4.dp),
-          )
-          if (onCardClick != null) {
-            Text(
-              text = "${strings.labelViewResult} →",
-              style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 12.sp,
-              ),
-              color = Gold400,
-              maxLines = 1,
-              softWrap = false,
-            )
-          }
-        }
-      }
-      isCancelled -> {
-        Row(
-          modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(Rose900.copy(alpha = 0.3f))
-            .padding(10.dp),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Text(
-            text = strings.matchCardCancelledBanner,
-            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-            color = Rose400,
-          )
-        }
-      }
-      isPaused || isDisabled -> {
-        Row(
-          modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(Amber900.copy(alpha = 0.3f))
-            .padding(10.dp),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Text(
-            text = if (isPaused) strings.matchCardPausedBanner else strings.matchCardDisabledBanner,
-            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-            color = Amber400,
-          )
-        }
-      }
-      else -> {
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          MatchCountdownTimer(match.scheduledTime)
-          when {
-            isJoined -> {
-              TournamentButton(
+            MatchCountdownTimer(match.scheduledTime)
+            Spacer(modifier = Modifier.width(8.dp))
+            when {
+              isJoined -> AdMatchStateButton(
                 text = strings.labelJoined,
-                onClick = { onCardClick?.invoke() },
-                enabled = false,
-                variant = TournamentButtonVariant.JOINED,
-                modifier = Modifier.height(40.dp),
-                testTag = "joined_button_${match.matchId}",
+                kind = AdMatchButtonKind.JOINED,
+                tag = "joined_button_${match.matchId}",
+                onClick = null,
               )
-            }
-            isCodeAdded || isRunning -> {
-              TournamentButton(
+              isCodeAdded || isRunning -> AdMatchStateButton(
                 text = if (isRunning) strings.matchCardButtonInProgress else strings.matchCardButtonCodeReady,
+                kind = AdMatchButtonKind.LIVE,
+                tag = "in_progress_${match.matchId}",
                 onClick = { onCardClick?.invoke() },
-                variant = TournamentButtonVariant.SECONDARY,
-                modifier = Modifier.height(40.dp),
-                testTag = "in_progress_${match.matchId}",
               )
-            }
-            isUpcoming -> {
-              TournamentButton(
+              isUpcoming -> AdMatchStateButton(
                 text = strings.matchCardButtonUpcoming,
-                onClick = { onCardClick?.invoke() },
-                enabled = false,
-                variant = TournamentButtonVariant.SECONDARY,
-                modifier = Modifier.height(40.dp),
-                testTag = "upcoming_button_${match.matchId}",
+                kind = AdMatchButtonKind.UPCOMING,
+                tag = "upcoming_button_${match.matchId}",
+                onClick = null,
               )
-            }
-            isFull -> {
-              TournamentButton(
+              isFull -> AdMatchStateButton(
                 text = strings.matchCardButtonSeatFull,
-                onClick = { onCardClick?.invoke() },
-                enabled = false,
-                modifier = Modifier.height(40.dp),
-                testTag = "match_full_${match.matchId}",
+                kind = AdMatchButtonKind.FULL,
+                tag = "match_full_${match.matchId}",
+                onClick = null,
               )
-            }
-            else -> {
-              TournamentButton(
+              else -> AdMatchJoinButton(
                 text = strings.actionJoinNowCta,
                 onClick = { onJoinClick?.invoke() ?: onCardClick?.invoke() },
-                modifier = Modifier.height(40.dp),
-                testTag = "join_button_${match.matchId}",
+                tag = "join_button_${match.matchId}",
               )
             }
           }
@@ -616,61 +320,14 @@ fun MatchCountdownTimer(scheduledTimeMs: Long) {
   val isExpired = timeRemaining <= 0
   val labelText = strings.matchCardTimeLeft
 
-  Surface(
-    shape = RoundedCornerShape(8.dp),
-    color = Slate950.copy(alpha = 0.88f),
-    border = if (isExpired) {
-      BorderStroke(1.dp, Color(0xFFEF4444))
-    } else {
-      BorderStroke(1.dp, Brush.horizontalGradient(listOf(Gold400, Cyan400)))
-    },
-    modifier = Modifier.testTag("match_time_hud_capsule")
-  ) {
-    Row(
-      modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(5.dp)
-    ) {
-      Icon(
-        imageVector = Icons.Default.Schedule,
-        contentDescription = null,
-        tint = if (isExpired) Color(0xFFEF4444) else Cyan400,
-        modifier = Modifier.size(13.dp)
-      )
-
-      Text(
-        text = scheduledTimeStr,
-        style = MaterialTheme.typography.labelSmall.copy(
-          fontWeight = FontWeight.Bold,
-          fontSize = 11.sp
-        ),
-        color = Slate300,
-        maxLines = 1,
-        softWrap = false,
-      )
-
-      // Vertical Micro-Divider
-      Box(
-        modifier = Modifier
-          .width(1.dp)
-          .height(10.dp)
-          .background(Color.White.copy(alpha = 0.22f))
-      )
-
-      Text(
-        text = "$labelText $countdownText",
-        style = MaterialTheme.typography.labelSmall.copy(
-          fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
-          fontSize = 11.5.sp,
-          letterSpacing = if (strings === BengaliStrings) 0.sp else 0.5.sp
-        ),
-        color = if (isExpired) Color(0xFFEF4444) else Gold400,
-        maxLines = 1,
-        softWrap = false,
-        modifier = Modifier.padding(end = 2.dp)
-      )
-    }
-  }
+  val secondAngle = (((scheduledTimeMs - timeRemaining) / 1000L) % 60L).toFloat() * 6f
+  AdMatchClock(
+    timeText = scheduledTimeStr,
+    leftLabel = labelText,
+    countdown = countdownText,
+    expired = isExpired,
+    secondAngle = secondAngle,
+  )
 }
 
 @Composable
@@ -682,6 +339,7 @@ fun MatchStatusBadge(
   isWinner: Boolean = false,
   isLoser: Boolean = false,
   modifier: Modifier = Modifier,
+  premium: Boolean = false,
 ) {
   val isFull = joinedPlayersCount >= maxPlayers || status.equals(MatchStatus.FULL.name, ignoreCase = true)
   val isRunning = status.equals(MatchStatus.RUNNING.name, ignoreCase = true)
@@ -722,6 +380,11 @@ fun MatchStatusBadge(
         strings.matchCardStatusSlots(strings.number(joinedPlayersCount), strings.number(maxPlayers))
       )
     }
+  }
+
+  if (premium) {
+    AdMatchBadge(label = label, color = textColor, modifier = modifier)
+    return
   }
 
   Surface(
