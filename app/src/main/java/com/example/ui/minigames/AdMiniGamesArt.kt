@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.AdGoldText
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -140,16 +141,7 @@ fun AdMiniGamesHeader(
                     drawCircle(Color(0xFF22C55E), 1f * s, o(18f, 14f))
                 }
             }
-            Text(
-                text = title,
-                style = TextStyle(
-                    brush = Brush.verticalGradient(listOf(Color(0xFFFFFBE8), Color(0xFFFFE07A), Color(0xFFF2B21E), MgGoldDeep)),
-                    fontSize = 25.sp,
-                    fontWeight = FontWeight.Black,
-                    shadow = Shadow(MgBrown, Offset(0f, 4f), 0f)
-                ),
-                maxLines = 1
-            )
+            AdGoldText(text = title, fontSize = 25.sp)
         }
         Box(
             modifier = Modifier

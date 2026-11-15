@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.AdGoldText
 
 // Home page part 5 artwork: the "অটো গেম" heading and the auto game card frame. VISUAL ONLY:
 // the caller keeps every text, click action and test tag.
@@ -54,11 +55,7 @@ fun AdAutoGamesHeading(text: String, modifier: Modifier = Modifier) {
         Box(modifier = Modifier.weight(1f).height(1.5.dp).background(Brush.horizontalGradient(listOf(Color(0x00FFD45A), Color(0xFFFFD45A)))))
         Box(modifier = Modifier.size(6.dp).rotate(45f).background(Color(0xFFFFE7A0)))
         Text("★", style = TextStyle(fontSize = 20.sp, color = Color(0xFFFFD45A).copy(alpha = glow), shadow = Shadow(Color(0xFF8A5A08), Offset(0f, 3f), 2f)))
-        Text(
-            text = text.replace("★", "").trim(),
-            style = TextStyle(brush = AgOrangeGold, fontSize = 26.sp, fontWeight = FontWeight.Black, shadow = Shadow(Color(0xFF5A2A00), Offset(0f, 4f), 0f)),
-            maxLines = 1
-        )
+        AdGoldText(text = text.replace("★", "").trim(), fontSize = 26.sp)
         Text("★", style = TextStyle(fontSize = 20.sp, color = Color(0xFFFFD45A).copy(alpha = glow), shadow = Shadow(Color(0xFF8A5A08), Offset(0f, 3f), 2f)))
         Box(modifier = Modifier.size(6.dp).rotate(45f).background(Color(0xFFFFE7A0)))
         Box(modifier = Modifier.weight(1f).height(1.5.dp).background(Brush.horizontalGradient(listOf(Color(0xFFFFD45A), Color(0x00FFD45A)))))
@@ -177,11 +174,7 @@ fun AdAutoGameCard(
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 15.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                title,
-                style = TextStyle(brush = AgOrangeGold, fontSize = 21.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center, shadow = Shadow(Color(0xFF5A2A00), Offset(0f, 3f), 0f)),
-                maxLines = 1, overflow = TextOverflow.Ellipsis
-            )
+            AdGoldText(text = title, fontSize = 21.sp, textAlign = TextAlign.Center, overflow = TextOverflow.Ellipsis)
             Text(
                 subtitle,
                 style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFFFE7A0), textAlign = TextAlign.Center, shadow = Shadow(Color(0x99000000), Offset(0f, 2f), 3f)),

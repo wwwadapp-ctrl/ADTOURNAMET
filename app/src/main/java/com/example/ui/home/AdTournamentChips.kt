@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.ui.components.AdGoldText
 import com.example.ui.minigames.mgScallopMedal
 import kotlin.math.cos
 import kotlin.math.sin
@@ -164,11 +165,7 @@ fun AdLiveMatchesHeader(
                     drawCircle(Color(0xFFF43F5E), radius = 4.5.dp.toPx())
                 }
             )
-            Text(
-                title,
-                style = TextStyle(brush = TaOrangeGold, fontSize = 19.sp, fontWeight = FontWeight.Black, shadow = Shadow(Color(0xFF5A2A00), Offset(0f, 3f), 0f)),
-                maxLines = 1, overflow = TextOverflow.Ellipsis
-            )
+            AdGoldText(text = title, fontSize = 19.sp, overflow = TextOverflow.Ellipsis)
         }
         Box(
             modifier = Modifier

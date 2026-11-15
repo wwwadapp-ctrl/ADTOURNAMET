@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.core.i18n.BengaliStrings
 import com.example.core.i18n.LocalAppStrings
+import com.example.ui.components.AdGoldText
 
 data class AdDiceArgs(
     val value: Int,
@@ -192,15 +193,10 @@ private fun AdAvatar(player: LudoPlayer, timerProgress: Float) {
 private fun AdPlayerInfo(player: LudoPlayer, isMe: Boolean, align: Alignment.Horizontal) {
     val bn = LocalAppStrings.current === BengaliStrings
     Column(horizontalAlignment = align) {
-        Text(
+        AdGoldText(
             text = player.name,
-            style = androidx.compose.ui.text.TextStyle(
-                brush = Brush.verticalGradient(listOf(Color(0xFFFFF3C4), Color(0xFFFFC107), Color(0xFFC98A10))),
-                fontSize = 19.sp,
-                fontWeight = FontWeight.ExtraBold,
-                shadow = androidx.compose.ui.graphics.Shadow(Color(0xFF4A3000), Offset(0f, 3f), 4f)
-            ),
-            maxLines = 1,
+            fontSize = 19.sp,
+            fontWeight = FontWeight.ExtraBold,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.widthIn(max = 150.dp)
         )

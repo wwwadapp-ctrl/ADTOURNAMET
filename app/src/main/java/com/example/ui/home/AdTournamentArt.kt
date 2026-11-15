@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.ui.components.AdGoldText
 import com.example.ui.minigames.mgScallopMedal
 import kotlin.math.cos
 import kotlin.math.sin
@@ -171,7 +172,7 @@ fun AdAllMatchesCard(
                 .align(Alignment.CenterStart)
                 .padding(start = 98.dp, end = 120.dp)
         ) {
-            Text(title, style = TextStyle(brush = TaOrangeGold, fontSize = 22.sp, fontWeight = FontWeight.Black, shadow = Shadow(Color(0xFF5A2A00), Offset(0f, 4f), 0f)), maxLines = 1)
+            AdGoldText(text = title, fontSize = 22.sp)
             Text(
                 subtitle,
                 style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFE7A0), shadow = Shadow(Color(0x99000000), Offset(0f, 2f), 3f)),

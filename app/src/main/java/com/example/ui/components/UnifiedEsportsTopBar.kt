@@ -155,17 +155,10 @@ fun UnifiedEsportsTopBar(
                             Column(modifier = Modifier.width(IntrinsicSize.Max)) {
                                 HeaderLuxuryDigitalClock(scale = k)
                                 Spacer(modifier = Modifier.height((4 * k).dp))
-                                Text(
+                                AdGoldText(
                                     text = "AD TOURNAMENT",
-                                    style = TextStyle(
-                                        brush = TbGoldText,
-                                        fontSize = (13.5f * k).sp,
-                                        fontWeight = FontWeight.Black,
-                                        letterSpacing = 0.6.sp,
-                                        shadow = Shadow(TbBrown, Offset(0f, 3f), 0f)
-                                    ),
-                                    maxLines = 1,
-                                    softWrap = false,
+                                    fontSize = (13.5f * k).sp,
+                                    letterSpacing = 0.6.sp,
                                     overflow = TextOverflow.Visible
                                 )
                             }

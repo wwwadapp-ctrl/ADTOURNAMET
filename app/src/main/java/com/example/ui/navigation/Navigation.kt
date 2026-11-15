@@ -55,6 +55,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.example.domain.model.NotificationEntity
 import com.example.domain.model.AppSettingsEntity
 import com.example.domain.model.UserEntity
+import com.example.ui.components.AdBottomBarFrame
+import com.example.ui.components.AdBottomNavItem
 import com.example.ui.components.ForceUpdateDialog
 import com.example.BuildConfig
 import kotlinx.coroutines.launch
@@ -330,40 +332,25 @@ fun AppNavigation(
     contentWindowInsets = WindowInsets(0, 0, 0, 0),
     bottomBar = {
       if (isBottomNavVisible) {
-        Surface(
-          color = NavySurface,
-          border = BorderStroke(1.dp, NavyCardBorder),
-          modifier = Modifier
-            .fillMaxWidth()
-            .testTag("main_bottom_navigation"),
-        ) {
-          Row(
-            modifier = Modifier
-              .fillMaxWidth()
-              .navigationBarsPadding()
-              .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-          ) {
-            bottomNavItems.forEach { item ->
-              val isSelected = currentRoute == item.route
-              GamingBottomNavItem(
-                item = item,
-                isSelected = isSelected,
-                onClick = {
-                  if (currentRoute != item.route) {
-                    navController.navigate(item.route) {
-                      popUpTo(Destinations.HOME) {
-                        saveState = false
-                      }
-                      launchSingleTop = true
-                      restoreState = false
+        AdBottomBarFrame(modifier = Modifier.testTag("main_bottom_navigation")) {
+          bottomNavItems.forEach { item ->
+            val isSelected = currentRoute == item.route
+            GamingBottomNavItem(
+              item = item,
+              isSelected = isSelected,
+              onClick = {
+                if (currentRoute != item.route) {
+                  navController.navigate(item.route) {
+                    popUpTo(Destinations.HOME) {
+                      saveState = false
                     }
+                    launchSingleTop = true
+                    restoreState = false
                   }
-                },
-                modifier = Modifier.weight(1f),
-              )
-            }
+                }
+              },
+              modifier = Modifier.weight(1f),
+            )
           }
         }
       }
@@ -1161,188 +1148,15 @@ private fun GamingBottomNavItem(
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  val coroutineScope = rememberCoroutineScope()
-  val scale = remember { Animatable(1f) }
-  val pulseProgress = remember { Animatable(0f) }
-  val pulseAlpha = remember { Animatable(0f) }
-
-  // Subtle ambient gold glow for active tab
-  val ambientGlowAlpha by animateFloatAsState(
-    targetValue = if (isSelected) 0.22f else 0f,
-    animationSpec = tween(durationMillis = 250),
-    label = "ambientGlowAlpha",
+  AdBottomNavItem(
+    icon = item.icon,
+    label = item.label,
+    selected = isSelected,
+    raised = item.route == Destinations.MATCHES,
+    onClick = onClick,
+    tag = if (item.route == Destinations.HISTORY) "bottom_nav_history" else "nav_item_${item.route}",
+    modifier = modifier,
   )
-
-  fun triggerGamingTapEffect() {
-    coroutineScope.launch {
-      // 1. Icon press & bounce: scale down to 0.92, then spring back to 1.0
-      launch {
-        scale.animateTo(
-          targetValue = 0.92f,
-          animationSpec = tween(durationMillis = 90, easing = FastOutSlowInEasing),
-        )
-        scale.animateTo(
-          targetValue = 1.0f,
-          animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium,
-          ),
-        )
-      }
-
-      // 2. Circular energy pulse & micro-sparks (~350ms)
-      launch {
-        pulseProgress.snapTo(0f)
-        pulseAlpha.snapTo(1f)
-        launch {
-          pulseProgress.animateTo(
-            targetValue = 1f,
-            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
-          )
-        }
-        launch {
-          pulseAlpha.animateTo(
-            targetValue = 0f,
-            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
-          )
-        }
-      }
-    }
-  }
-
-  // Trigger effect if item becomes selected via external navigation
-  var wasSelected by remember { mutableStateOf(isSelected) }
-  LaunchedEffect(isSelected) {
-    if (isSelected && !wasSelected) {
-      triggerGamingTapEffect()
-    }
-    wasSelected = isSelected
-  }
-
-  val interactionSource = remember { MutableInteractionSource() }
-
-  Column(
-    horizontalAlignment = Alignment.CenterHorizontally,
-    verticalArrangement = Arrangement.Center,
-    modifier = modifier
-      .clickable(
-        interactionSource = interactionSource,
-        indication = null,
-        onClick = {
-          triggerGamingTapEffect()
-          onClick()
-        },
-      )
-      .padding(vertical = 4.dp)
-      .testTag(if (item.route == Destinations.HISTORY) "bottom_nav_history" else "nav_item_${item.route}"),
-  ) {
-    Box(
-      modifier = Modifier
-        .size(width = 44.dp, height = 32.dp)
-        .then(
-          if (isSelected) {
-            Modifier
-              .clip(RoundedCornerShape(10.dp))
-              .background(Gold400.copy(alpha = 0.16f))
-              .border(1.dp, Gold400.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
-          } else {
-            Modifier
-          }
-        ),
-      contentAlignment = Alignment.Center,
-    ) {
-      Canvas(modifier = Modifier.fillMaxSize()) {
-        // 1. Subtle steady ambient gold/cyan aura when selected
-        if (ambientGlowAlpha > 0.01f) {
-          drawCircle(
-            brush = Brush.radialGradient(
-              colors = listOf(
-                Gold400.copy(alpha = ambientGlowAlpha),
-                Cyan400.copy(alpha = ambientGlowAlpha * 0.35f),
-                Color.Transparent,
-              ),
-              radius = 16.dp.toPx(),
-              center = center,
-            ),
-            radius = 16.dp.toPx(),
-            center = center,
-          )
-        }
-
-        // 2. Gaming tap animation: circular energy pulse + micro-sparks
-        val currentAlpha = pulseAlpha.value
-        if (currentAlpha > 0.01f) {
-          val progress = pulseProgress.value
-          val waveRadius = 10.dp.toPx() + (7.dp.toPx() * progress)
-
-          // Radial energy glow pulse
-          drawCircle(
-            brush = Brush.radialGradient(
-              colors = listOf(
-                Gold400.copy(alpha = 0.40f * currentAlpha),
-                Cyan400.copy(alpha = 0.20f * currentAlpha),
-                Color.Transparent,
-              ),
-              radius = waveRadius,
-              center = center,
-            ),
-            radius = waveRadius,
-            center = center,
-          )
-
-          // Expanding energy ring (Ludo token aura)
-          drawCircle(
-            color = Gold400.copy(alpha = 0.65f * currentAlpha),
-            radius = waveRadius,
-            center = center,
-            style = Stroke(width = (1.2f * (1f - progress * 0.5f)).dp.toPx()),
-          )
-
-          // 6 Micro-sparks (esports spark effect)
-          val sparkDistance = 11.dp.toPx() + (6.dp.toPx() * progress)
-          val sparkRadius = (1.8f * (1f - progress * 0.4f)).dp.toPx()
-          for (i in 0 until 6) {
-            val angleRad = Math.toRadians((i * 60.0) + 15.0)
-            val sx = center.x + (cos(angleRad) * sparkDistance).toFloat()
-            val sy = center.y + (sin(angleRad) * sparkDistance).toFloat()
-            val sparkColor = if (i % 2 == 0) {
-              Gold400.copy(alpha = 0.85f * currentAlpha)
-            } else {
-              Cyan400.copy(alpha = 0.75f * currentAlpha)
-            }
-            drawCircle(
-              color = sparkColor,
-              radius = sparkRadius,
-              center = Offset(sx, sy),
-            )
-          }
-        }
-      }
-
-      Icon(
-        imageVector = item.icon,
-        contentDescription = item.label,
-        tint = if (isSelected) Gold400 else Slate200,
-        modifier = Modifier
-          .size(22.dp)
-          .graphicsLayer {
-            scaleX = scale.value
-            scaleY = scale.value
-          },
-      )
-    }
-
-    Spacer(modifier = Modifier.height(2.dp))
-
-    Text(
-      text = item.label,
-      style = MaterialTheme.typography.labelSmall.copy(
-        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-        fontSize = 11.sp,
-      ),
-      color = if (isSelected) Gold400 else Slate300,
-    )
-  }
 }
 
 fun com.example.domain.repository.MatchRepository.observeMatches(): kotlinx.coroutines.flow.Flow<List<com.example.domain.model.MatchEntity>> =
