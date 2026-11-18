@@ -347,41 +347,6 @@ fun AdSplashEmblem(modifier: Modifier) {
     }
 }
 
-private fun DrawScope.drawRoyalCrown(c: Offset, k: Float) {
-    fun o(x: Float, y: Float) = Offset(c.x + x * k, c.y + y * k)
-    val gold = Brush.verticalGradient(
-        0f to SpGoldStops[0], 0.45f to SpGoldStops[1], 0.75f to SpGoldStops[2], 1f to SpGoldStops[3],
-        startY = c.y - 38f * k, endY = c.y + 27f * k
-    )
-    val dark = Color(0xFF7A5208)
-    val body = Path().apply {
-        val pts = listOf(-52f to 18f, -58f to -22f, -34f to -2f, -18f to -36f, 0f to -8f, 18f to -36f, 34f to -2f, 58f to -22f, 52f to 18f)
-        pts.forEachIndexed { i, (x, y) -> val p = o(x, y); if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) }
-        close()
-    }
-    drawPath(body, gold)
-    drawPath(body, dark, style = Stroke(width = 1.2f * k, join = StrokeJoin.Round))
-    val shade = Path().apply {
-        moveTo(o(-50f, 8f).x, o(-50f, 8f).y); lineTo(o(50f, 8f).x, o(50f, 8f).y)
-        lineTo(o(52f, 18f).x, o(52f, 18f).y); lineTo(o(-52f, 18f).x, o(-52f, 18f).y); close()
-    }
-    drawPath(shade, Brush.verticalGradient(listOf(Color(0xFFC98A10), Color(0xFF5C3A04)), startY = c.y + 8f * k, endY = c.y + 18f * k), alpha = 0.55f)
-    drawRoundRect(gold, o(-54f, 16f), Size(108f * k, 11f * k), CornerRadius(3f * k))
-    drawRoundRect(dark, o(-54f, 16f), Size(108f * k, 11f * k), CornerRadius(3f * k), style = Stroke(width = 1f * k))
-    listOf(-58f to -24f, -18f to -38f, 18f to -38f, 58f to -24f, 0f to -12f).forEach { (x, y) ->
-        drawCircle(gold, 4.3f * k, o(x, y))
-        drawCircle(dark, 4.3f * k, o(x, y), style = Stroke(width = 0.8f * k))
-    }
-    fun jewel(x: Float, y: Float, r: Float, light: Color, deep: Color) {
-        drawCircle(Brush.radialGradient(listOf(light, deep), center = o(x, y), radius = r * k), r * k, o(x, y))
-    }
-    jewel(0f, 21.5f, 3.6f, Color(0xFFFF8A8A), Color(0xFF9E0E0E))
-    jewel(-24f, 21.5f, 3f, Color(0xFF9EC1FF), Color(0xFF1035A8))
-    jewel(24f, 21.5f, 3f, Color(0xFF9EC1FF), Color(0xFF1035A8))
-    val ruby = Path().apply { moveTo(o(-6f, 4f).x, o(-6f, 4f).y); lineTo(o(0f, -6f).x, o(0f, -6f).y); lineTo(o(6f, 4f).x, o(6f, 4f).y); close() }
-    drawPath(ruby, Brush.radialGradient(listOf(Color(0xFFFF8A8A), Color(0xFF9E0E0E)), center = o(0f, 0f), radius = 6f * k), alpha = 0.9f)
-}
-
 @Composable
 private fun SplashCrownIcon(modifier: Modifier, glow: Boolean = false) {
     Canvas(modifier = modifier) {

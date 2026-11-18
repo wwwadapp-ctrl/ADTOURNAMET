@@ -81,7 +81,7 @@ fun WhTopBar(u: Dp, mainText: String, gameText: String, mainLabel: String, gameL
 }
 
 @Composable
-private fun WhBalance(u: Dp, icon: Int, label: String, amount: String, game: Boolean, onClick: (() -> Unit)?, tag: String) {
+fun WhBalance(u: Dp, icon: Int, label: String, amount: String, game: Boolean, onClick: (() -> Unit)?, tag: String) {
     val shape = RoundedCornerShape(u * 7)
     val pulse = rememberInfiniteTransition(label = "whPlus").animateFloat(1f, 1.1f, infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "whPlusS")
     Row(
@@ -166,7 +166,7 @@ fun WhSpinButton(u: Dp, text: String, enabled: Boolean, bet: Int, chipLabel: Str
                 .clickable(interactionSource = src, indication = null, enabled = enabled, onClick = onClick).testTag("spin_action_button"),
             horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text, fontSize = (u * 6.2f).sp(), fontWeight = FontWeight.Black, color = Color(0xFF3A1A00), maxLines = 1, textAlign = TextAlign.Center,
+            Text(text, fontSize = (u * if (text.length > 9) 5.2f else 6.2f).sp(), fontWeight = FontWeight.Black, color = Color(0xFF3A1A00), maxLines = 1, softWrap = false, textAlign = TextAlign.Center, modifier = Modifier.weight(1f, fill = false),
                 style = TextStyle(shadow = Shadow(Color(0x80FFFFFF), Offset(0f, 2f), 0f)))
             Spacer(Modifier.width(u * 3))
             Box(Modifier.graphicsLayer { scaleX = popKey.value; scaleY = popKey.value; rotationZ = (1f - popKey.value) * -250f }

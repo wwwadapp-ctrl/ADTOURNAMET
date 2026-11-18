@@ -73,8 +73,6 @@ import kotlin.random.Random
 // AD premium sign-in / sign-up look. VISUAL ONLY: these pieces never validate, log in or navigate;
 // the screens pass their existing state and callbacks straight through.
 
-private val AuGold = Brush.verticalGradient(listOf(Color(0xFFFFF3C4), Color(0xFFFFD45A), Color(0xFFC98A10), Color(0xFF8A5A08)))
-
 // ---------------------------------------------------------------- background (same sky as the splash)
 
 private class AuDot(val x: Float, val y: Float, val r: Float, val a: Float)

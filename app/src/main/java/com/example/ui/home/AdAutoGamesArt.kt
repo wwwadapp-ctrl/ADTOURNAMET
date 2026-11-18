@@ -40,8 +40,6 @@ import com.example.ui.components.AdGoldText
 // Home page part 5 artwork: the "অটো গেম" heading and the auto game card frame. VISUAL ONLY:
 // the caller keeps every text, click action and test tag.
 
-private val AgOrangeGold = Brush.verticalGradient(listOf(Color(0xFFFFF3B0), Color(0xFFFFC83A), Color(0xFFFF8A1A)))
-
 /** "অটো গেম" in big orange-gold letters with stars, diamonds and gold lines. */
 @Composable
 fun AdAutoGamesHeading(text: String, modifier: Modifier = Modifier) {

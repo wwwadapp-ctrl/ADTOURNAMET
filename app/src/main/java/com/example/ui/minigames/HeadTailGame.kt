@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -51,11 +52,9 @@ import java.security.SecureRandom
 import kotlin.coroutines.resume
 
 // --- Head & Tail Palette ---
-private val HTNavy = Color(0xFF0B0D21)
 private val HTDeepPurple = Color(0xFF1E1538)
 private val HTGold = Color(0xFFFFD700)
 private val HTGoldLight = Color(0xFFFFF7C2)
-private val HTAmber = Color(0xFFFFBF00)
 
 enum class CoinSide { HEAD, TAIL }
 
@@ -255,188 +254,95 @@ fun HeadTailGameScreen(
         }
     }
 
-    Box(
+    // ---------------- NEW HEAD/TAIL LOOK (visual only; game logic above is unchanged) ----------------
+    LaunchedEffect(Unit) { WhSfx.prepare(context) }
+    var coinLanded by remember { mutableStateOf(true) }
+    LaunchedEffect(isRolling) { if (isRolling) { coinLanded = false; WhSfx.play(WhSfx.S.SPIN, 0.6f) } }
+    val showCard = showWinDialog && coinLanded
+    LaunchedEffect(showCard) {
+        if (showCard) {
+            WhSfx.play(if (isLastWin) WhSfx.S.WIN else WhSfx.S.LOSE)
+            delay(3500)
+            showWinDialog = false
+        }
+    }
+
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF0B0D21), Color(0xFF151838), Color(0xFF1E1538))))
+            .background(Brush.verticalGradient(listOf(Color(0xFF0B1040), Color(0xFF121A61))))
     ) {
-        // Particles (Simple simulation)
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val random = java.util.Random(42)
-            repeat(40) {
-                drawCircle(
-                    color = HTGold.copy(alpha = particleAlpha),
-                    radius = random.nextFloat() * 5f,
-                    center = Offset(random.nextFloat() * size.width, random.nextFloat() * size.height)
-                )
-            }
-        }
+        val u = maxWidth / 100
+        val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val geo = WhGeo(maxWidth, maxWidth * 1.7917f, topInset + maxWidth * 0.015f)
 
-        Scaffold(
-            containerColor = Color.Transparent,
-            topBar = {
-                TopBalanceHUD(
-                    mainBalance = userBalance,
-                    gameWallet = gameBalance,
-                    onBack = onNavigateBack,
-                    onWalletClick = { isTransferModalVisible = true },
-                    isRolling = isRolling
-                )
-            }
-        ) { padding ->
-            BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-            ) {
-                val minHeight = maxHeight
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState()),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = minHeight),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Spacer(modifier = Modifier.height(10.dp))
+        HtStage(geo, strings.headTailTitle, strings.headTailSubtitle, u)
+        HtRing(geo)
+        if (!isRolling && coinLanded && resultText != null) HtResultTag(geo, u, resultText ?: "")
+        HtCoin(geo, currentCoinSide == CoinSide.HEAD, isRolling) { coinLanded = true }
+        HtHost(geo, clap = showCard && isLastWin)
 
-                        if (!isGameActive) {
-                            Surface(
-                                modifier = Modifier.padding(bottom = 12.dp).fillMaxWidth().padding(horizontal = 20.dp),
-                                color = Color.Red.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.4f))
-                            ) {
-                                Text(
-                                    strings.headTailClosedBanner,
-                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp),
-                                    color = Color.Red,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
+        WhTopBar(
+            u = u,
+            mainText = strings.taka(userBalance),
+            gameText = strings.taka(gameBalance),
+            mainLabel = strings.spinChipMain,
+            gameLabel = strings.spinChipGame,
+            enabled = !isRolling,
+            onBack = onNavigateBack,
+            onGame = { isTransferModalVisible = true }
+        )
 
-                        // Title
-                        Text(
-                            strings.headTailTitle,
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Black,
-                                fontSize = 32.sp,
-                                letterSpacing = if (strings == com.example.core.i18n.BengaliStrings) 0.sp else 2.sp,
-                                brush = Brush.verticalGradient(listOf(HTGoldLight, HTGold, HTAmber))
-                            )
-                        )
-                        Text(
-                            strings.headTailSubtitle,
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.ExtraBold,
-                                color = HTGold.copy(alpha = 0.8f),
-                                letterSpacing = if (strings == com.example.core.i18n.BengaliStrings) 0.sp else 4.sp,
-                                fontSize = 18.sp
-                            )
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Podium and Coin
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // Glass Podium
-                            PodiumStage()
-
-                            // Coin
-                            Coin3D(
-                                side = currentCoinSide,
-                                modifier = Modifier.graphicsLayer {
-                                    translationY = coinTranslationY.value
-                                    rotationX = coinRotationX.value
-                                    scaleX = coinScale.value
-                                    scaleY = coinScale.value
-                                }
-                            )
-                        }
-
-                        if (isRolling) {
-                            Text(
-                                strings.headTailTossing,
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = HTGold,
-                                    letterSpacing = if (com.example.core.i18n.LocalAppStrings.current == com.example.core.i18n.BengaliStrings) 0.sp else 0.5.sp
-                                ),
-                                modifier = Modifier
-                                    .padding(vertical = 6.dp)
-                                    .alpha(tossingAlpha)
-                            )
-                        } else if (resultText != null) {
-                            Text(
-                                resultText!!,
-                                color = Color.White,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(vertical = 6.dp)
-                            )
-                        } else {
-                            Text(
-                                strings.headTailInstruction,
-                                color = Color.White.copy(alpha = 0.6f),
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(vertical = 6.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        // Selection Cards
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            ChoiceCard(
-                                side = CoinSide.HEAD,
-                                isSelected = selectedSide == CoinSide.HEAD,
-                                onClick = { if (!isRolling && isGameActive) selectedSide = it },
-                                modifier = Modifier.weight(1f)
-                            )
-                            ChoiceCard(
-                                side = CoinSide.TAIL,
-                                isSelected = selectedSide == CoinSide.TAIL,
-                                onClick = { if (!isRolling && isGameActive) selectedSide = it },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        // Betting Console
-                        CasinoBettingConsole(
-                            selectedBet = selectedBetAmount.toInt(),
-                            onBetSelected = { selectedBetAmount = it.toLong() },
-                            actionButtonText = when {
-                                !isGameActive -> strings.headTailClosedBanner
-                                gameBalance < selectedBetAmount -> strings.headTailToastNoBalance
-                                else -> strings.headTailTossButton
-                            },
-                            isActionEnabled = !isRolling && gameBalance >= selectedBetAmount && isGameActive,
-                            onActionClick = { performFlip() }
-                        )
-
-                        Spacer(modifier = Modifier.weight(1f))
+        WhConsole(u, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(start = u * 4, end = u * 4, bottom = u * 5)) {
+            if (!isGameActive) WhClosedBanner(u, strings.headTailClosedBanner)
+            Column {
+                Row(horizontalArrangement = Arrangement.spacedBy(u * 3)) {
+                    HtChoiceCard(u, strings.headTailChoiceHead, strings.digits("1.9") + "x", true, selectedSide == CoinSide.HEAD, !isRolling && isGameActive, "headtail_choice_head", Modifier.weight(1f)) {
+                        WhSfx.play(WhSfx.S.CLICK, 0.8f); selectedSide = CoinSide.HEAD
+                    }
+                    HtChoiceCard(u, strings.headTailChoiceTail, strings.digits("1.9") + "x", false, selectedSide == CoinSide.TAIL, !isRolling && isGameActive, "headtail_choice_tail", Modifier.weight(1f)) {
+                        WhSfx.play(WhSfx.S.CLICK, 0.8f); selectedSide = CoinSide.TAIL
                     }
                 }
+                Row(Modifier.fillMaxWidth().padding(top = u * 1.2f)) {
+                    Text(strings.headTailPayout, fontSize = (u * 2.9f).value.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFE7A0), textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                    Text(strings.headTailPayout, fontSize = (u * 2.9f).value.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFE7A0), textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                }
+            }
+            WhChipRow(
+                u = u,
+                options = listOf(1, 3, 5, 8, 10),
+                selected = selectedBetAmount.toInt(),
+                enabled = !isRolling,
+                label = { "৳" + strings.digits(it.toString()) },
+                onSelect = { WhSfx.play(WhSfx.S.CLICK, 0.8f); selectedBetAmount = it.toLong() }
+            )
+            WhSpinButton(
+                u = u,
+                text = when {
+                    !isGameActive -> strings.headTailClosedBanner
+                    isRolling -> strings.headTailTossing
+                    else -> strings.headTailTossButton
+                },
+                enabled = !isRolling && gameBalance >= selectedBetAmount && isGameActive,
+                bet = selectedBetAmount.toInt(),
+                chipLabel = "৳" + strings.digits(selectedBetAmount.toString()),
+                onClick = { WhSfx.play(WhSfx.S.CLICK); performFlip() }
+            )
+        }
+
+        if (showCard) {
+            if (isLastWin) WhConfetti()
+            Box(Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(top = maxHeight * 0.24f)) {
+                WhResultCard(
+                    u = u,
+                    win = isLastWin,
+                    bigWin = false,
+                    title = if (isLastWin) strings.mgWinTitle else strings.mgLossTitle,
+                    amount = "+" + strings.taka(lastWinAmount),
+                    sub = if (isLastWin) (resultText ?: "") else strings.mgLossMessage,
+                    onClose = { showWinDialog = false }
+                )
             }
         }
     }
@@ -476,259 +382,4 @@ fun HeadTailGameScreen(
         )
     }
 
-    if (showWinDialog) {
-        WinLossDialog(
-            isWin = isLastWin,
-            amount = lastWinAmount,
-            backgroundColor = HTDeepPurple,
-            accentColor = HTGold,
-            accentColorLight = HTGoldLight,
-            onDismiss = { showWinDialog = false }
-        )
-    }
 }
-
-@Composable
-private fun TopBalanceHUD(
-    mainBalance: Double,
-    gameWallet: Double,
-    onBack: () -> Unit,
-    onWalletClick: () -> Unit,
-    isRolling: Boolean
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(
-            onClick = onBack,
-            enabled = !isRolling,
-            modifier = Modifier
-                .size(42.dp)
-                .background(Color.White.copy(alpha = 0.12f), CircleShape)
-                .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
-        ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            val strings = LocalAppStrings.current
-            // Main Balance
-            BalancePill(label = strings.diceMainBalanceLabel, amount = mainBalance, icon = Icons.Default.AccountBalanceWallet)
-            // Game Wallet
-            BalancePill(
-                label = strings.diceGameWalletLabel,
-                amount = gameWallet,
-                icon = Icons.Default.AccountBalanceWallet,
-                isInteractive = true,
-                onClick = onWalletClick,
-                enabled = !isRolling
-            )
-        }
-    }
-}
-
-@Composable
-private fun BalancePill(
-    label: String,
-    amount: Double,
-    icon: ImageVector,
-    isInteractive: Boolean = false,
-    onClick: () -> Unit = {},
-    enabled: Boolean = true
-) {
-    Surface(
-        modifier = Modifier
-            .defaultMinSize(minHeight = 46.dp)
-            .wrapContentHeight()
-            .then(if (isInteractive) Modifier.clickable(enabled = enabled) { onClick() } else Modifier),
-        shape = RoundedCornerShape(24.dp),
-        color = Color(0xFF0F172A).copy(alpha = 0.75f),
-        border = BorderStroke(if (isInteractive) 1.5.dp else 1.dp, if (isInteractive) HTGold else Color.White.copy(alpha = 0.15f))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(icon, contentDescription = null, tint = HTGold, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-                Text(label, fontSize = 9.sp, color = if (isInteractive) HTGold else Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
-                val strings = LocalAppStrings.current
-                Text(strings.taka(amount), fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
-            }
-            if (isInteractive) {
-                Spacer(modifier = Modifier.width(6.dp))
-                Icon(Icons.Default.AddCircle, contentDescription = null, tint = HTGold, modifier = Modifier.size(14.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun PodiumStage() {
-    Canvas(modifier = Modifier.size(200.dp)) {
-        val center = Offset(size.width / 2, size.height / 2 + 25.dp.toPx())
-        
-        // Bottom Rings
-        repeat(3) { i ->
-            drawCircle(
-                color = HTGold.copy(alpha = 0.3f - i * 0.1f),
-                radius = 85.dp.toPx() - (i * 6.dp.toPx()),
-                center = center,
-                style = Stroke(width = 2.dp.toPx())
-            )
-        }
-        
-        // Glass Surface
-        drawCircle(
-            brush = Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.15f), Color.Transparent)),
-            radius = 80.dp.toPx(),
-            center = center
-        )
-        
-        // Inner detail
-        drawCircle(
-            color = HTGold.copy(alpha = 0.5f),
-            radius = 80.dp.toPx(),
-            center = center,
-            style = Stroke(width = 1.dp.toPx())
-        )
-    }
-}
-
-@Composable
-private fun Coin3D(side: CoinSide, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .size(120.dp)
-            .shadow(20.dp, CircleShape, spotColor = HTGold),
-        contentAlignment = Alignment.Center
-    ) {
-        // We simulate 3D thickness by drawing an offset background
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .offset(y = 3.dp)
-                .background(Color(0xFF8B4513), CircleShape)
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.radialGradient(listOf(HTGoldLight, HTGold, HTAmber)),
-                    CircleShape
-                )
-                .border(3.5.dp, Brush.linearGradient(listOf(HTGoldLight, HTAmber)), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            // Inner rim
-            Box(
-                modifier = Modifier
-                    .fillMaxSize(0.88f)
-                    .border(1.5.dp, HTGold.copy(alpha = 0.4f), CircleShape)
-            )
-            
-            // Emblem
-            Icon(
-                imageVector = if (side == CoinSide.HEAD) Icons.Default.Face else Icons.Default.Star,
-                contentDescription = null,
-                tint = Color(0xFF5D4037).copy(alpha = 0.85f),
-                modifier = Modifier.size(62.dp)
-            )
-            
-            // Specular Reflection
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(8.dp)
-                    .background(
-                        Brush.radialGradient(
-                            0.0f to Color.White.copy(alpha = 0.25f),
-                            0.6f to Color.Transparent,
-                            center = Offset(25f, 25f)
-                        ),
-                        CircleShape
-                    )
-            )
-        }
-    }
-}
-
-@Composable
-private fun ChoiceCard(
-    side: CoinSide,
-    isSelected: Boolean,
-    onClick: (CoinSide) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val borderColor = if (isSelected) HTGold else Color.White.copy(alpha = 0.15f)
-    val bgColor = if (isSelected) Color(0xFF1E1B4B) else Color.Black.copy(alpha = 0.35f)
-    
-    Surface(
-        modifier = modifier
-            .height(78.dp)
-            .clickable { onClick(side) },
-        shape = RoundedCornerShape(18.dp),
-        color = bgColor,
-        border = BorderStroke(if (isSelected) 2.5.dp else 1.dp, borderColor)
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            // 1.9x Badge
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(6.dp),
-                shape = RoundedCornerShape(6.dp),
-                color = if (isSelected) HTGold else Color.White.copy(alpha = 0.2f)
-            ) {
-                val strings = LocalAppStrings.current
-                Text(
-                    strings.digits("1.9") + "x",
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    fontSize = 9.sp,
-                    fontWeight = if (strings == com.example.core.i18n.BengaliStrings) FontWeight.Bold else FontWeight.Black,
-                    color = if (isSelected) Color.Black else Color.White
-                )
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                val strings = LocalAppStrings.current
-                Icon(
-                    imageVector = if (side == CoinSide.HEAD) Icons.Default.Face else Icons.Default.Star,
-                    contentDescription = null,
-                    tint = if (isSelected) HTGold else Color.White.copy(alpha = 0.45f),
-                    modifier = Modifier.size(34.dp)
-                )
-                Column(verticalArrangement = Arrangement.Center) {
-                    Text(
-                        if (side == CoinSide.HEAD) strings.headTailChoiceHead else strings.headTailChoiceTail,
-                        color = Color.White,
-                        fontWeight = if (strings == com.example.core.i18n.BengaliStrings) FontWeight.Bold else FontWeight.Black,
-                        fontSize = 15.sp,
-                        letterSpacing = if (strings == com.example.core.i18n.BengaliStrings) 0.sp else 1.sp
-                    )
-                    Text(
-                        strings.headTailPayout,
-                        color = if (isSelected) HTGold else Color.White.copy(alpha = 0.65f),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp
-                    )
-                }
-            }
-        }
-    }
-}
-
-

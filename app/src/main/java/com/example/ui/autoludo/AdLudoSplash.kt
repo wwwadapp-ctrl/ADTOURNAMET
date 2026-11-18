@@ -62,8 +62,6 @@ import kotlin.math.sin
 // AD Ludo branded loading screen (replaces the old image that contained another brand's logo).
 // VISUAL ONLY: same behaviour as before — the bar fills in 3 seconds, then onFinished() is called once.
 
-private val SplashGold = Brush.linearGradient(listOf(Color(0xFFFFF3B0), Color(0xFFFFC107), Color(0xFFB07A00)))
-
 @Composable
 fun AdLudoSplashScreen(onFinished: () -> Unit) {
     val bn = LocalAppStrings.current === BengaliStrings

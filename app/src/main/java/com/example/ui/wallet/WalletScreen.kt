@@ -37,16 +37,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val Slate900 = Color(0xFF0D1527)
-private val Slate850 = Color(0xFF131E3A)
-private val Slate800 = Color(0xFF1F2E4D)
-private val Slate700 = Color(0xFF334155)
-private val Slate600 = Color(0xFF475569)
-private val Slate500 = Color(0xFF64748B)
-private val Slate400 = Color(0xFF94A3B8)
-private val Slate300 = Color(0xFFCBD5E1)
-private val Slate50 = Color(0xFFF8FAFC)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WalletScreen(

@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -57,6 +58,18 @@ fun WhStage(geo: WhGeo, spinning: Boolean) {
     val t by anim.animateFloat(0f, 1f, infiniteRepeatable(tween(1400, easing = LinearEasing)), label = "whBulb")
     val sweep by anim.animateFloat(-0.4f, 1.6f, infiniteRepeatable(tween(2800, easing = FastOutSlowInEasing)), label = "whSweep")
     val tw by anim.animateFloat(0f, 1f, infiniteRepeatable(tween(1800, easing = LinearEasing)), label = "whTw")
+    // fill the strip above the stage (behind the status bar) by stretching the stage's own top row
+    val stageImg = androidx.compose.ui.graphics.ImageBitmap.imageResource(R.drawable.wh_stage)
+    Canvas(Modifier.fillMaxWidth().height(geo.top + 2.dp)) {
+        val l = geo.left.toPx(); val w = geo.sceneW.toPx()
+        drawImage(
+            stageImg,
+            srcOffset = androidx.compose.ui.unit.IntOffset(0, 0),
+            srcSize = androidx.compose.ui.unit.IntSize(stageImg.width, 3),
+            dstOffset = androidx.compose.ui.unit.IntOffset(l.toInt(), 0),
+            dstSize = androidx.compose.ui.unit.IntSize(w.toInt() + 1, size.height.toInt() + 1)
+        )
+    }
     Box(Modifier.offset(x = geo.left, y = geo.top).wrapContentSize(androidx.compose.ui.Alignment.TopStart, unbounded = true).requiredSize(geo.sceneW, geo.sceneH)) {
         Image(painterResource(R.drawable.wh_stage), null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
         Canvas(Modifier.fillMaxSize()) {

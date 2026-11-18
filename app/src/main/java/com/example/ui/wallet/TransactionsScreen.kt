@@ -42,16 +42,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 
-private val Slate900 = Color(0xFF0F172A)
-private val Slate850 = Color(0xFF131E35)
-private val Slate800 = Color(0xFF1E293B)
-private val Slate700 = Color(0xFF334155)
-private val Slate600 = Color(0xFF475569)
-private val Slate500 = Color(0xFF64748B)
-private val Slate400 = Color(0xFF94A3B8)
-private val Slate300 = Color(0xFFCBD5E1)
-private val Slate50 = Color(0xFFF8FAFC)
-
 enum class TransactionFilter(val testTag: String) {
   ALL("transactions_filter_all"),
   DEPOSIT("transactions_filter_deposit"),
@@ -276,6 +266,3 @@ private fun TransactionCard(txn: TransactionEntity) {
     },
   )
 }
-
-private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
-

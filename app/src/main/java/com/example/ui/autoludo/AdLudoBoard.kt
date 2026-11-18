@@ -23,10 +23,6 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.cos
 import kotlin.math.sin
 
-private val AdGreen = Color(0xFF22A84A)
-private val AdYellow = Color(0xFFFFD91A)
-private val AdRed = Color(0xFFE0201C)
-private val AdBlue = Color(0xFF29A9F0)
 private val AdGrid = Color(0xFF9E9E9E)
 
 @Composable

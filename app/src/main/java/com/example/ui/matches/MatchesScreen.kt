@@ -59,15 +59,6 @@ enum class GameFilter(val gameType: GameType?) {
   CARROM(GameType.CARROM),
 }
 
-@Composable
-fun getFilterLabel(filter: GameFilter, strings: AppStrings): String {
-  return when (filter) {
-    GameFilter.ALL -> strings.filterAllGames
-    GameFilter.LUDO -> strings.filterLudo1v1
-    GameFilter.CARROM -> strings.filterCarrom1v1
-  }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MatchesScreen(

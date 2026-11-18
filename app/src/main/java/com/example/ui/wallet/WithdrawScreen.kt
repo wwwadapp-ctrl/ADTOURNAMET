@@ -39,14 +39,6 @@ import com.example.ui.theme.*
 import com.example.core.i18n.*
 import com.example.ui.minigames.TransferModal
 
-private val Slate900 = Color(0xFF0F172A)
-private val Slate850 = Color(0xFF131E35)
-private val Slate800 = Color(0xFF1E293B)
-private val Slate700 = Color(0xFF334155)
-private val Slate600 = Color(0xFF475569)
-private val Slate400 = Color(0xFF94A3B8)
-private val Slate300 = Color(0xFFCBD5E1)
-private val CardBorder = Color(0x33F59E0B)
 private val BkashPink = Color(0xFFE2136E)
 private val NagadOrange = Color(0xFFF7941D)
 

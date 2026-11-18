@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -61,6 +62,8 @@ import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.example.R
+import com.example.ui.minigames.WhBalance
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -245,13 +248,13 @@ fun AutoLudoScreen(
                             strings.autoLudoHeaderTitle,
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Black,
-                                fontSize = 21.sp,
+                                fontSize = 22.sp,
                                 brush = Brush.verticalGradient(
-                                    listOf(Color(0xFFFFF3C4), Color(0xFFFFC107), Color(0xFFC98A10))
+                                    listOf(Color(0xFFFFFDE8), Color(0xFFFFE66A), Color(0xFFFFC21E), Color(0xFFF08A00))
                                 ),
                                 shadow = androidx.compose.ui.graphics.Shadow(
-                                    color = Color(0xFF4A3000),
-                                    offset = Offset(0f, 3f),
+                                    color = Color(0xFF3A1A00),
+                                    offset = Offset(0f, 4f),
                                     blurRadius = 0f
                                 )
                             ),
@@ -274,35 +277,36 @@ fun AutoLudoScreen(
                     IconButton(onClick = onNavigateBack) {
                         Box(
                             modifier = Modifier
-                                .size(40.dp)
-                                .border(1.dp, Color(0xFFFFE7A0), CircleShape)
-                                .padding(1.dp)
+                                .size(42.dp)
+                                .shadow(6.dp, CircleShape, ambientColor = Color(0xFFFFC85A), spotColor = Color(0xFFFFC85A))
                                 .clip(CircleShape)
-                                .background(Brush.radialGradient(listOf(Color(0xFF2E4BB8), Color(0xFF0F1A52))))
-                                .border(2.dp, Color(0xFFE8B23A), CircleShape),
+                                .background(Brush.sweepGradient(listOf(Color(0xFFFFF3C4), Color(0xFFE0A82A), Color(0xFF8A5A08), Color(0xFFE0A82A), Color(0xFFFFF3C4))))
+                                .padding(3.5.dp)
+                                .clip(CircleShape)
+                                .background(Brush.radialGradient(listOf(Color(0xFF3A4AC8), Color(0xFF121A61)))),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 Icons.Default.ArrowBack,
                                 contentDescription = strings.back,
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
+                                tint = Color(0xFFFFE27A),
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DeepNavyBg,
+                    containerColor = Color(0xFF1D2B93),
                     titleContentColor = Color.White
                 )
             )
         },
-        containerColor = DeepNavyBg
+        containerColor = Color(0xFF121A5C)
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MidnightBackgroundGradient)
+                .background(Brush.verticalGradient(listOf(Color(0xFF1D2B93), Color(0xFF1A2685), Color(0xFF161F72), Color(0xFF121A5C))))
                 .padding(innerPadding)
         ) {
             // 1. CREATE MATCH BANNER
@@ -322,38 +326,35 @@ fun AutoLudoScreen(
             ) {
                 filters.forEachIndexed { index, filter ->
                     val isSelected = selectedFilterIndex == index
-                    Surface(
-                        onClick = { selectedFilterIndex = index },
-                        shape = RoundedCornerShape(50),
-                        color = Color.Transparent,
-                        border = BorderStroke(
-                            if (isSelected) 1.8.dp else 1.5.dp,
-                            if (isSelected) Color(0xFFFFE7A0) else Color(0xFFB9861C)
-                        ),
-                        modifier = Modifier.height(36.dp)
+                    val tabShape = RoundedCornerShape(50)
+                    val tabTw by rememberInfiniteTransition(label = "alTab").animateFloat(0.2f, 1f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "alTabTw")
+                    Box(
+                        modifier = Modifier
+                            .height(38.dp)
+                            .then(if (isSelected) Modifier.shadow(10.dp, tabShape, ambientColor = Color(0xFFFFAA3C), spotColor = Color(0xFFFFAA3C)) else Modifier)
+                            .clip(tabShape)
+                            .background(if (isSelected) AlOrangeFill else AlTabGlass)
+                            .border(1.5.dp, if (isSelected) AlGoldBorder else Brush.linearGradient(listOf(Color(0xFFFFE7A0), Color(0xFFB9861C), Color(0xFFFFE7A0))), tabShape)
+                            .clickable { selectedFilterIndex = index }
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .background(
-                                    if (isSelected) {
-                                        Brush.verticalGradient(listOf(Color(0xFF9B6BFF), Color(0xFF6A2BD9)))
-                                    } else {
-                                        Brush.verticalGradient(listOf(Color(0xFF1A2870), Color(0xFF0F1A52)))
-                                    }
-                                )
-                                .padding(horizontal = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = filter,
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp
-                                ),
-                                color = if (isSelected) Color.White else Color(0xFFC9D3FF),
-                                maxLines = 1
-                            )
+                        AlGlassFx(
+                            Modifier.matchParentSize(),
+                            if (isSelected) emptyList() else listOf(listOf(0.88f to 0.32f, 0.12f to 0.40f, 0.90f to 0.70f, 0.14f to 0.65f)[index % 4]),
+                            sweep = false,
+                            starSize = 5f
+                        )
+                        Text(
+                            text = filter,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = if (isSelected) FontWeight.Black else FontWeight.ExtraBold,
+                                fontSize = 13.sp
+                            ),
+                            color = if (isSelected) Color(0xFF3A1A00) else Color(0xFFDCE4FF),
+                            maxLines = 1,
+                            modifier = Modifier.align(Alignment.Center).padding(horizontal = 16.dp)
+                        )
+                        if (isSelected) {
+                            Text("✦", fontSize = 9.sp, color = Color.White.copy(alpha = tabTw), modifier = Modifier.align(Alignment.TopEnd).padding(top = 3.dp, end = 10.dp))
                         }
                     }
                 }
@@ -541,45 +542,6 @@ fun AutoLudoScreen(
 }
 
 @Composable
-fun AutoLudoSplashScreen(onFinished: () -> Unit) {
-    var progress by remember { mutableStateOf(0f) }
-    val animatedProgress by animateFloatAsState(
-        targetValue = progress,
-        animationSpec = tween(durationMillis = 3000, easing = LinearEasing),
-        label = "ProgressAnimation"
-    )
-
-    LaunchedEffect(Unit) {
-        progress = 1f
-        delay(3000)
-        onFinished()
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        AsyncImage(
-            model = "https://i.postimg.cc/m1FBNgvY",
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-
-        LinearProgressIndicator(
-            progress = animatedProgress,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(32.dp)
-                .padding(bottom = 32.dp)
-                .height(8.dp)
-                .clip(RoundedCornerShape(4.dp)),
-            color = Gold400,
-            trackColor = Color(0xFF0D47A1).copy(alpha = 0.3f),
-            strokeCap = StrokeCap.Round
-        )
-    }
-}
-
-@Composable
 private fun TopBalanceHUD(
     mainBalance: Double,
     gameWalletBalance: Double,
@@ -587,100 +549,14 @@ private fun TopBalanceHUD(
     modifier: Modifier = Modifier
 ) {
     val strings = LocalAppStrings.current
+    val u = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.008f).dp
     Row(
         modifier = modifier.padding(end = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Main Balance Pill
-        BalancePill(
-            label = strings.spinChipMain,
-            amount = mainBalance,
-            isHighlight = false
-        )
-        // Game Wallet Pill (Gold Luxury Border)
-        BalancePill(
-            label = strings.spinChipGame,
-            amount = gameWalletBalance,
-            isHighlight = true,
-            onAddClick = onGameWalletAddClick
-        )
-    }
-}
-
-@Composable
-private fun BalancePill(
-    label: String,
-    amount: Double,
-    isHighlight: Boolean,
-    onAddClick: (() -> Unit)? = null
-) {
-    val strings = LocalAppStrings.current
-    val shape = RoundedCornerShape(14.dp)
-    val outerColor = if (isHighlight) Color(0xFFFFF3C4) else Color(0xFFFFE7A0)
-    val innerColor = if (isHighlight) Color(0xFFFFC107) else Color(0xFFB9861C)
-
-    Box(
-        modifier = Modifier
-            .heightIn(min = 40.dp)
-            .border(1.dp, outerColor, shape)
-            .padding(1.dp)
-            .clip(shape)
-            .background(Brush.verticalGradient(listOf(Color(0xFF1E2E7E), Color(0xFF0F1A52))))
-            .border(if (isHighlight) 1.8.dp else 1.5.dp, innerColor, shape)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.AccountBalanceWallet,
-                contentDescription = null,
-                tint = if (isHighlight) Color(0xFFFFC107) else Color(0xFFFFD27A),
-                modifier = Modifier.size(16.dp)
-            )
-            Column(horizontalAlignment = Alignment.Start) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                    color = Color(0xFFFFD27A),
-                    maxLines = 1
-                )
-                Text(
-                    text = strings.taka(amount),
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
-                        fontSize = 13.sp,
-                        letterSpacing = if (strings === BengaliStrings) 0.sp else 0.5.sp
-                    ),
-                    color = Color.White,
-                    maxLines = 1
-                )
-            }
-
-            if (isHighlight && onAddClick != null) {
-                Box(
-                    modifier = Modifier
-                        .size(26.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.radialGradient(
-                                listOf(Color(0xFFFFF3C4), Color(0xFFFFC107), Color(0xFFC98A10))
-                            )
-                        )
-                        .clickable { onAddClick() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = label,
-                        tint = Color(0xFF3A2300),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        }
+        WhBalance(u, R.drawable.wh_coin, strings.spinChipMain, strings.taka(mainBalance), false, null, "autoludo_main_balance")
+        WhBalance(u, R.drawable.wh_pad, strings.spinChipGame, strings.taka(gameWalletBalance), true, onGameWalletAddClick, "autoludo_game_balance")
     }
 }
 
@@ -708,13 +584,14 @@ private fun CreateMatchBanner(
             .border(1.5.dp, Color(0xFFFFE7A0), frameShape)
             .padding(1.5.dp)
             .clip(frameShape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color(0xFF1E2E7E), Color(0xFF131E5A), Color(0xFF0D1648))
-                )
-            )
+            .background(AlDeepCard)
             .border(2.5.dp, Color(0xFFB9861C), frameShape)
     ) {
+        AlGlassFx(
+            Modifier.matchParentSize(),
+            listOf(0.035f to 0.30f, 0.03f to 0.62f, 0.965f to 0.28f, 0.97f to 0.64f, 0.30f to 0.035f, 0.70f to 0.035f, 0.40f to 0.97f, 0.62f to 0.97f),
+            starSize = 5f
+        )
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -736,21 +613,32 @@ private fun CreateMatchBanner(
                 text = strings.autoLudoCreateBannerTitle,
                 style = MaterialTheme.typography.titleMedium.copy(
                     brush = Brush.verticalGradient(
-                        listOf(Color(0xFFFFF3C4), Color(0xFFFFC107), Color(0xFFC98A10))
+                        listOf(Color.White, Color(0xFFFFF0A0), Color(0xFFFFC21E), Color(0xFFF08A00))
                     ),
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    textAlign = TextAlign.Center
+                    fontSize = 21.sp,
+                    fontWeight = FontWeight.Black,
+                    textAlign = TextAlign.Center,
+                    shadow = androidx.compose.ui.graphics.Shadow(color = Color(0xFF4A2800), offset = Offset(0f, 4f), blurRadius = 0f)
                 ),
-                modifier = Modifier.padding(bottom = 6.dp)
+                modifier = Modifier.padding(bottom = 4.dp)
             )
+            Row(
+                modifier = Modifier.fillMaxWidth(0.6f).padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.weight(1f).height(1.5.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, Color(0xFFFFD45A)))))
+                Text("✦", fontSize = 11.sp, color = Color(0xFFFFD45A), modifier = Modifier.padding(horizontal = 6.dp))
+                Box(Modifier.weight(1f).height(1.5.dp).background(Brush.horizontalGradient(listOf(Color(0xFFFFD45A), Color.Transparent))))
+            }
             Text(
                 text = strings.autoLudoCreateBannerText,
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontSize = 14.sp,
-                    color = Color(0xFFE6ECFF),
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFF2F5FF),
                     textAlign = TextAlign.Center,
-                    lineHeight = 21.sp
+                    lineHeight = 23.sp,
+                    shadow = androidx.compose.ui.graphics.Shadow(color = Color(0xFF0A1040), offset = Offset(0f, 2f), blurRadius = 0f)
                 ),
                 modifier = Modifier.padding(bottom = 14.dp)
             )
@@ -954,13 +842,14 @@ private fun AutoLudoMatchCard(
             .border(1.5.dp, Color(0xFFFFE7A0), cardShape)
             .padding(1.5.dp)
             .clip(cardShape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color(0xFF1E2E7E), Color(0xFF131E5A), Color(0xFF0D1648))
-                )
-            )
+            .background(AlDeepCard)
             .border(2.5.dp, Color(0xFFB9861C), cardShape)
     ) {
+        AlGlassFx(
+            Modifier.matchParentSize(),
+            listOf(0.025f to 0.32f, 0.025f to 0.66f, 0.975f to 0.40f, 0.975f to 0.74f, 0.32f to 0.015f, 0.58f to 0.985f),
+            starSize = 5f
+        )
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -2538,6 +2427,47 @@ private fun TimeDropdown(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                 )
             }
+        }
+    }
+}
+
+// ---------- Match list glass look (visual only) ----------
+private val AlGlassFill = Brush.verticalGradient(listOf(Color(0x8C6E8CFF), Color(0x6B2840BE), Color(0x8C121E78)))
+private val AlGoldBorder = Brush.linearGradient(listOf(Color(0xFFFFF8D8), Color(0xFFFFD45A), Color(0xFFC98A10)))
+private val AlOrangeFill = Brush.verticalGradient(listOf(Color(0xFFFFD27A), Color(0xFFFFA62B), Color(0xFFE07B0A)))
+private val AlTabGlass = Brush.verticalGradient(listOf(Color(0xB35A78F0), Color(0x993452D2), Color(0xB31E2E9E)))
+private val AlDeepCard = Brush.verticalGradient(listOf(Color(0xFF26369A), Color(0xFF17227A), Color(0xFF0F1858)))
+
+/** Glass shine (top sheen + slow light sweep) and small twinkling stars at [stars] (x, y as fractions). */
+@Composable
+private fun AlGlassFx(modifier: Modifier, stars: List<Pair<Float, Float>>, sweep: Boolean = true, starSize: Float = 7f) {
+    val inf = rememberInfiniteTransition(label = "alGlass")
+    val t by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(2600, easing = LinearEasing)), label = "alTw")
+    val sw by inf.animateFloat(-0.4f, 2.2f, infiniteRepeatable(tween(4500, easing = FastOutSlowInEasing)), label = "alSw")
+    Canvas(modifier) {
+        drawRect(
+            Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.22f), Color.Transparent), 0f, size.height * 0.46f),
+            size = androidx.compose.ui.geometry.Size(size.width, size.height * 0.46f)
+        )
+        if (sweep && sw < 1.3f) {
+            val x = size.width * sw
+            val w = size.height * 0.35f
+            drawRect(Brush.linearGradient(
+                listOf(Color.Transparent, Color.White.copy(alpha = 0.22f), Color.Transparent),
+                start = Offset(x - w, 0f), end = Offset(x + w, size.height * 0.6f)
+            ))
+        }
+        stars.forEachIndexed { i, (fx, fy) ->
+            val ph = (t + i * 0.37f) % 1f
+            val k = 0.5f + 0.5f * kotlin.math.sin(ph * 2f * Math.PI.toFloat())
+            val r = starSize.dp.toPx() * (0.45f + 0.55f * k) * (if (i % 3 == 0) 1.3f else 1f)
+            val c = Offset(size.width * fx, size.height * fy)
+            val p = Path().apply {
+                moveTo(c.x, c.y - r); lineTo(c.x + r * 0.16f, c.y - r * 0.16f); lineTo(c.x + r, c.y); lineTo(c.x + r * 0.16f, c.y + r * 0.16f)
+                lineTo(c.x, c.y + r); lineTo(c.x - r * 0.16f, c.y + r * 0.16f); lineTo(c.x - r, c.y); lineTo(c.x - r * 0.16f, c.y - r * 0.16f); close()
+            }
+            drawCircle(Color(0xFFFFF0BE).copy(alpha = 0.35f * k), r * 0.6f, c)
+            drawPath(p, Color.White.copy(alpha = 0.12f + 0.83f * k))
         }
     }
 }
