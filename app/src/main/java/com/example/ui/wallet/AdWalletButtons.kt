@@ -81,11 +81,11 @@ fun WlActionButton(primary: Boolean, title: String, subtitle: String, @DrawableR
                     }
                 }
         ) {
-            Box(modifier = Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 2.dp).size(66.dp), contentAlignment = Alignment.Center) {
-                if (!primary) WlRays(104.dp)
-                WlImage(picture, 62.dp)
+            Box(modifier = Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 4.dp).size(50.dp), contentAlignment = Alignment.Center) {
+                if (!primary) WlRays(86.dp)
+                WlImage(picture, 48.dp)
             }
-            Column(modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 9.dp, end = 60.dp)) {
+            Column(modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 12.dp, bottom = 7.dp, end = 8.dp)) {
                 if (primary) Text(title, fontSize = 15.sp, fontWeight = FontWeight.Black, color = Color(0xFF1B1040), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                 else WlText3D(title, 16.sp, WlTone.CREAM)
                 Text(subtitle, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = if (primary) Color(0xFF5A2A00) else Color(0xFFF2C94C), maxLines = 1, overflow = TextOverflow.Ellipsis)

@@ -55,6 +55,10 @@ import com.example.core.i18n.*
 import com.example.domain.model.UserEntity
 import com.example.ui.components.*
 import com.example.ui.theme.*
+import com.example.R
+import com.example.ui.wallet.WlFrame
+import com.example.ui.wallet.WlTone
+import com.example.ui.wallet.wlBackground
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -169,24 +173,10 @@ fun ProfileScreen(
 
   Scaffold(
     topBar = {
-      TopAppBar(
-        title = {
-          Text(
-            text = strings.profileTitle,
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-            color = Color.White,
-          )
-        },
-        navigationIcon = {
-          IconButton(onClick = onNavigateBack, modifier = Modifier.testTag("profile_back_button")) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.back, tint = Color.White)
-          }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = NavySurface),
-      )
+      PfHeader(title = strings.profileTitle, backLabel = strings.back, onBack = onNavigateBack)
     },
-    containerColor = DeepNavyBg,
-    modifier = modifier.fillMaxSize(),
+    containerColor = Color.Transparent,
+    modifier = modifier.fillMaxSize().wlBackground(),
   ) { innerPadding ->
     if (currentUser == null) {
       Box(
@@ -209,168 +199,50 @@ fun ProfileScreen(
         // Feedback Banner
         item {
           AnimatedVisibility(visible = bannerMessage != null) {
-            Surface(
-              color = Cyan500.copy(alpha = 0.15f),
-              border = BorderStroke(1.dp, Cyan400),
-              shape = RoundedCornerShape(8.dp),
-              modifier = Modifier.fillMaxWidth(),
-            ) {
-              Row(
-                modifier = Modifier.padding(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-              ) {
-                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Cyan400, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                  text = bannerMessage ?: "",
-                  color = Color.White,
-                  style = MaterialTheme.typography.bodySmall,
-                  modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = { bannerMessage = null }, modifier = Modifier.size(24.dp)) {
-                  Icon(Icons.Default.Close, contentDescription = strings.close, tint = Slate400, modifier = Modifier.size(16.dp))
-                }
-              }
-            }
+            PfMessageBanner(
+              message = bannerMessage ?: "",
+              closeLabel = strings.close,
+              onClose = { bannerMessage = null },
+            )
           }
         }
 
         // 1. ESPORTS PROFILE HEADER CARD
         item {
-          TournamentCard(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = NavyCard,
-            borderColor = NavyCardBorder,
-          ) {
+          WlFrame(modifier = Modifier.fillMaxWidth().padding(top = 6.dp), gold = true, pad = 14.dp) {
             Column(
-              modifier = Modifier.fillMaxWidth(),
+              modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
               horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-              // Interactive Avatar with Edit Photo Badge
-              Box(
-                contentAlignment = Alignment.BottomEnd,
-                modifier = Modifier
-                  .clickable { showAvatarDialog = true }
-                  .testTag("profile_avatar_badge"),
-              ) {
+              PfAvatarHalo(cameraLabel = strings.changePhotoTitle, onClick = { showAvatarDialog = true }) {
                 EsportsAvatar(
                   photoUrl = currentUser.effectivePhoto,
                   name = currentUser.effectiveName,
-                  size = 84.dp,
-                )
-                Surface(
-                  shape = CircleShape,
-                  color = Gold400,
-                  border = BorderStroke(2.dp, NavyCard),
-                  modifier = Modifier.size(26.dp),
-                ) {
-                  Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                      imageVector = Icons.Default.CameraAlt,
-                      contentDescription = strings.changePhotoTitle,
-                      tint = Color.Black,
-                      modifier = Modifier.size(14.dp),
-                    )
-                  }
-                }
-              }
-
-              Spacer(modifier = Modifier.height(12.dp))
-
-              // Player Name + Edit action
-              Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable { showEditNameDialog = true },
-              ) {
-                Text(
-                  text = currentUser.effectiveName.ifBlank { strings.playerLabel },
-                  style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                  color = Color.White,
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Icon(
-                  imageVector = Icons.Default.Edit,
-                  contentDescription = strings.updateDisplayNameTitle,
-                  tint = Gold400,
-                  modifier = Modifier.size(18.dp),
+                  size = 114.dp,
+                  borderWidth = 0.dp,
                 )
               }
-
-              Spacer(modifier = Modifier.height(4.dp))
-
-              // User ID (Copyable)
+              Spacer(modifier = Modifier.height(6.dp))
+              PfNameRow(
+                name = currentUser.effectiveName.ifBlank { strings.playerLabel },
+                editLabel = strings.updateDisplayNameTitle,
+                onEdit = { showEditNameDialog = true },
+              )
+              Spacer(modifier = Modifier.height(8.dp))
               val uidToDisplay = currentUser.userId.ifBlank { currentUser.uid }
-              Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                  .clickable {
-                    clipboardManager.setText(AnnotatedString(uidToDisplay))
-                    bannerMessage = strings.userCopied(uidToDisplay)
-                  }
-                  .testTag("copy_user_id_button"),
-              ) {
-                Text(
-                  text = "${strings.labelId} $uidToDisplay",
-                  style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                  color = Cyan400,
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Icon(
-                  imageVector = Icons.Default.ContentCopy,
-                  contentDescription = strings.labelId,
-                  tint = Cyan400,
-                  modifier = Modifier.size(14.dp),
-                )
-              }
-
+              PfIdPill(
+                text = "${strings.labelId} $uidToDisplay",
+                copyLabel = strings.copy,
+                onClick = {
+                  clipboardManager.setText(AnnotatedString(uidToDisplay))
+                  bannerMessage = strings.userCopied(uidToDisplay)
+                },
+              )
               Spacer(modifier = Modifier.height(14.dp))
-
-              // Verified Mobile Number Badge (Locked)
-              Surface(
-                color = Slate900,
-                shape = RoundedCornerShape(8.dp),
-                border = BorderStroke(1.dp, CardBorder),
-                modifier = Modifier.fillMaxWidth(),
-              ) {
-                Row(
-                  modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                  verticalAlignment = Alignment.CenterVertically,
-                  horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                  Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Phone, contentDescription = null, tint = Slate400, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                      text = currentUser.effectiveMobile,
-                      style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                      color = Color.White,
-                    )
-                  }
-                  Surface(
-                    color = Slate800,
-                    shape = RoundedCornerShape(6.dp),
-                  ) {
-                    Row(
-                      modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                      verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                      Icon(Icons.Default.Lock, contentDescription = null, tint = Slate400, modifier = Modifier.size(12.dp))
-                      Spacer(modifier = Modifier.width(4.dp))
-                      Text(
-                        text = strings.locked,
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                        color = Slate400,
-                      )
-                    }
-                  }
-                }
-              }
-
-              Text(
-                text = strings.mobileLockedNotice,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                color = Slate500,
-                modifier = Modifier.padding(top = 6.dp),
+              PfMobileRow(
+                number = currentUser.effectiveMobile,
+                lockedText = strings.locked,
+                notice = strings.mobileLockedNotice,
               )
             }
           }
@@ -379,66 +251,26 @@ fun ProfileScreen(
         // 2. CAREER STATISTICS GRID
         item {
           Column {
-            Text(
-              text = strings.careerStatistics,
-              style = MaterialTheme.typography.titleSmall.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp,
-                fontSize = 15.sp,
-              ),
-              color = Gold400,
-            )
-            Spacer(modifier = Modifier.height(10.dp))
+            PfSectionTitle(strings.careerStatistics)
             val totalMatches = uiState.totalMatches
             val wins = uiState.wins
             val losses = uiState.losses
             val winRate = uiState.winRate
             Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.spacedBy(8.dp),
+              modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+              horizontalArrangement = Arrangement.spacedBy(9.dp),
             ) {
-              StatBox(
-                title = strings.statMatches,
-                value = strings.number(totalMatches),
-                subtitle = strings.statMatchesSub,
-                modifier = Modifier.weight(1f)
-              )
-              StatBox(
-                title = strings.statWins,
-                value = strings.number(wins),
-                subtitle = strings.winRateSubtitle(winRate),
-                color = Emerald500,
-                glowColor = Emerald500,
-                modifier = Modifier.weight(1f)
-              )
-              StatBox(
-                title = strings.statLosses,
-                value = strings.number(losses),
-                subtitle = strings.statLossesSub,
-                color = Rose500,
-                modifier = Modifier.weight(1f)
-              )
+              PfStatTile(R.drawable.wl_gamepad, strings.statMatches, strings.number(totalMatches), strings.statMatchesSub, Color(0xFF7DA8FF), WlTone.CREAM, Modifier.weight(1f))
+              PfStatTile(R.drawable.wl_trophy, strings.statWins, strings.number(wins), strings.winRateSubtitle(winRate), Color(0xFF4ADE80), WlTone.GOLD, Modifier.weight(1f))
+              PfStatTile(R.drawable.mg_dice, strings.statLosses, strings.number(losses), strings.statLossesSub, Color(0xFFFF6B81), WlTone.RED, Modifier.weight(1f))
             }
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Row(
               modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.spacedBy(8.dp),
+              horizontalArrangement = Arrangement.spacedBy(9.dp),
             ) {
-              StatBox(
-                title = strings.statTotalWinnings,
-                value = strings.taka(currentUser.getDisplayTotalWinnings()),
-                subtitle = strings.statAllTimeRewards,
-                color = Gold400,
-                glowColor = Gold400,
-                modifier = Modifier.weight(1f),
-              )
-              StatBox(
-                title = strings.statMemberSince,
-                value = joinDateFormatted,
-                subtitle = strings.statVerifiedPlayer,
-                color = Cyan400,
-                modifier = Modifier.weight(1f),
-              )
+              PfWideTile(R.drawable.wl_moneybag, strings.statTotalWinnings, strings.taka(currentUser.getDisplayTotalWinnings()), strings.statAllTimeRewards, Color(0xFFFFD45A), WlTone.GOLD, Modifier.weight(1f))
+              PfWideTile(R.drawable.mg_coin, strings.statMemberSince, joinDateFormatted, strings.statVerifiedPlayer, Color(0xFF67E8F9), WlTone.CREAM, Modifier.weight(1f), coin = true)
             }
           }
         }
@@ -446,20 +278,8 @@ fun ProfileScreen(
         // 3. SUPPORT CENTER HUB
         item {
           Column {
-            Text(
-              text = strings.helpAndSupportTitle,
-              style = MaterialTheme.typography.titleSmall.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
-              ),
-              color = Gold400,
-            )
-            Text(
-              text = strings.helpAndSupportSubtitle,
-              style = MaterialTheme.typography.bodySmall,
-              color = Slate400,
-              modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
-            )
+            PfSectionTitle(strings.helpAndSupportTitle, strings.helpAndSupportSubtitle)
+            Spacer(modifier = Modifier.height(10.dp))
 
             // AI Support Card (Full Width)
             SupportActionCard(
@@ -525,107 +345,16 @@ fun ProfileScreen(
 
         // 5. APP LANGUAGE SELECTION CARD
         item {
-          TournamentCard(
-            modifier = Modifier
-              .fillMaxWidth()
-              .testTag("profile_language_card"),
-            backgroundColor = NavyCard,
-            borderColor = CardBorder,
-          ) {
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              Box(
-                modifier = Modifier
-                  .size(38.dp)
-                  .clip(CircleShape)
-                  .background(Cyan400.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center,
-              ) {
-                Icon(
-                  imageVector = Icons.Default.Language,
-                  contentDescription = null,
-                  tint = Cyan400,
-                  modifier = Modifier.size(22.dp),
-                )
-              }
-              Spacer(modifier = Modifier.width(12.dp))
-              Column(modifier = Modifier.weight(1f)) {
-                Text(
-                  text = strings.languageSettingTitle,
-                  style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                  color = Color.White,
-                )
-                Text(
-                  text = strings.languageSettingSubtitle,
-                  style = MaterialTheme.typography.bodySmall,
-                  color = Slate400,
-                )
-              }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-              val isBnSelected = currentLanguage == AppLanguage.BN
-              Surface(
-                modifier = Modifier
-                  .weight(1f)
-                  .clickable { onLanguageChange(AppLanguage.BN) }
-                  .testTag("language_option_bn"),
-                shape = RoundedCornerShape(10.dp),
-                color = if (isBnSelected) Indigo600.copy(alpha = 0.4f) else Slate900,
-                border = BorderStroke(1.dp, if (isBnSelected) Gold400 else Slate800),
-              ) {
-                Row(
-                  modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
-                  verticalAlignment = Alignment.CenterVertically,
-                  horizontalArrangement = Arrangement.Center,
-                ) {
-                  if (isBnSelected) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Gold400, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                  }
-                  Text(
-                    text = strings.languageBengali,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                    color = if (isBnSelected) Gold400 else Slate300,
-                  )
-                }
-              }
-
-              val isEnSelected = currentLanguage == AppLanguage.EN
-              Surface(
-                modifier = Modifier
-                  .weight(1f)
-                  .clickable { onLanguageChange(AppLanguage.EN) }
-                  .testTag("language_option_en"),
-                shape = RoundedCornerShape(10.dp),
-                color = if (isEnSelected) Indigo600.copy(alpha = 0.4f) else Slate900,
-                border = BorderStroke(1.dp, if (isEnSelected) Gold400 else Slate800),
-              ) {
-                Row(
-                  modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
-                  verticalAlignment = Alignment.CenterVertically,
-                  horizontalArrangement = Arrangement.Center,
-                ) {
-                  if (isEnSelected) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Gold400, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                  }
-                  Text(
-                    text = strings.languageEnglish,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                    color = if (isEnSelected) Gold400 else Slate300,
-                  )
-                }
-              }
-            }
-          }
+          PfLanguageCard(
+            title = strings.languageSettingTitle,
+            subtitle = strings.languageSettingSubtitle,
+            bnText = strings.languageBengali,
+            enText = strings.languageEnglish,
+            bnSelected = currentLanguage == AppLanguage.BN,
+            onBn = { onLanguageChange(AppLanguage.BN) },
+            onEn = { onLanguageChange(AppLanguage.EN) },
+            modifier = Modifier.fillMaxWidth().testTag("profile_language_card"),
+          )
         }
 
         // 6. FAIR PLAY & INTEGRITY POLICY
@@ -637,50 +366,20 @@ fun ProfileScreen(
             "PENDING" -> strings.profileStatusPending
             else -> currentUser.status
           }
-          TournamentCard(
+          PfFairPlayCard(
+            title = strings.fairPlayTitle,
+            text = strings.fairPlayText(localizedStatus),
             modifier = Modifier.fillMaxWidth(),
-            backgroundColor = NavyCard,
-            borderColor = CardBorder,
-          ) {
-            Text(
-              text = strings.fairPlayTitle,
-              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 15.sp),
-              color = Gold400,
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-              text = strings.fairPlayText(localizedStatus),
-              style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.5.sp),
-              color = Slate400,
-              lineHeight = 20.sp,
-            )
-          }
+          )
         }
 
         // 7. SIGN OUT BUTTON
         item {
-          val interactionSource = remember { MutableInteractionSource() }
-          val isPressed by interactionSource.collectIsPressedAsState()
-          val pressScale by animateFloatAsState(if (isPressed) 0.97f else 1f, label = "LogoutPress")
-
-          TournamentButton(
+          PfLogoutButton(
             text = strings.signOutButton,
             onClick = { showSignOutDialog = true },
-            variant = TournamentButtonVariant.DANGER,
-            leadingIcon = {
-              Icon(Icons.Default.Logout, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-            },
-            modifier = Modifier
-              .fillMaxWidth()
-              .graphicsLayer {
-                scaleX = pressScale
-                scaleY = pressScale
-              }
-              .border(
-                BorderStroke(1.dp, Brush.linearGradient(listOf(Rose500.copy(alpha = 0.5f), Color.Transparent))),
-                shape = RoundedCornerShape(12.dp)
-              ),
-            testTag = "profile_logout_button",
+            tag = "profile_logout_button",
+            modifier = Modifier.padding(top = 4.dp),
           )
         }
       }
@@ -731,153 +430,54 @@ fun ProfileScreen(
 
   // AVATAR PICKER DIALOG (Presets + Gallery)
   if (showAvatarDialog && currentUser != null) {
-    AlertDialog(
-      onDismissRequest = { showAvatarDialog = false },
-      title = {
-        Text(
-          text = strings.changePhotoTitle,
-          style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-          color = Color.White,
+    val isBn = strings === BengaliStrings
+    PfAvatarPicker(
+      title = strings.changePhotoTitle,
+      subtitle = strings.chooseAvatarPreset,
+      maleText = if (isBn) "ছেলে" else "Male",
+      femaleText = if (isBn) "মেয়ে" else "Female",
+      presets = avatarPresets,
+      selectedId = findAvatarPreset(currentUser.effectivePhoto)?.id,
+      labelOf = { strings.profileAvatarPreset(it) },
+      onPick = { id ->
+        val uid = currentUser.userId.ifBlank { currentUser.uid }
+        viewModel.updatePhoto(uid, id)
+        showAvatarDialog = false
+      },
+      galleryText = strings.uploadFromGallery,
+      onGallery = {
+        showAvatarDialog = false
+        photoPickerLauncher.launch(
+          PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
         )
       },
-      text = {
-        Column(modifier = Modifier.fillMaxWidth()) {
-          Text(
-            text = strings.chooseAvatarPreset,
-            style = MaterialTheme.typography.bodySmall,
-            color = Slate400,
-            modifier = Modifier.padding(bottom = 12.dp),
-          )
-
-          // 3x2 Preset Grid
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-          ) {
-            avatarPresets.take(3).forEach { preset ->
-              AvatarPresetItem(
-                preset = preset,
-                isSelected = currentUser.effectivePhoto == preset.id,
-                onClick = {
-                  val uid = currentUser.userId.ifBlank { currentUser.uid }
-                  viewModel.updatePhoto(uid, preset.id)
-                  showAvatarDialog = false
-                },
-              )
-            }
-          }
-
-          Spacer(modifier = Modifier.height(10.dp))
-
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-          ) {
-            avatarPresets.drop(3).take(3).forEach { preset ->
-              AvatarPresetItem(
-                preset = preset,
-                isSelected = currentUser.effectivePhoto == preset.id,
-                onClick = {
-                  val uid = currentUser.userId.ifBlank { currentUser.uid }
-                  viewModel.updatePhoto(uid, preset.id)
-                  showAvatarDialog = false
-                },
-              )
-            }
-          }
-
-          Spacer(modifier = Modifier.height(16.dp))
-
-          // Gallery Upload Option
-          Surface(
-            modifier = Modifier
-              .fillMaxWidth()
-              .clickable {
-                showAvatarDialog = false
-                photoPickerLauncher.launch(
-                  PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                )
-              },
-            shape = RoundedCornerShape(10.dp),
-            color = Slate900,
-            border = BorderStroke(1.dp, CardBorder),
-          ) {
-            Row(
-              modifier = Modifier.padding(12.dp),
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.Center,
-            ) {
-              Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = Gold400, modifier = Modifier.size(18.dp))
-              Spacer(modifier = Modifier.width(8.dp))
-              Text(
-                text = strings.uploadFromGallery,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = Gold400,
-              )
-            }
-          }
-        }
-      },
-      confirmButton = {},
-      dismissButton = {
-        TextButton(onClick = { showAvatarDialog = false }) {
-          Text(strings.cancel, color = Slate400)
-        }
-      },
-      containerColor = NavyCard,
+      cancelText = strings.cancel,
+      onDismiss = { showAvatarDialog = false },
     )
   }
 
   // SIGN OUT CONFIRMATION DIALOG
   if (showSignOutDialog) {
-    AlertDialog(
-      onDismissRequest = { showSignOutDialog = false },
-      title = {
-        Text(
-          text = strings.profileLogoutDialogTitle,
-          style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 16.sp),
-          color = Color.White
-        )
+    PfLogoutConfirm(
+      title = strings.profileLogoutDialogTitle,
+      message = strings.profileLogoutDialogMessage,
+      confirmText = strings.profileLogoutConfirmButton,
+      cancelText = strings.cancel,
+      onConfirm = {
+        showSignOutDialog = false
+        viewModel.signOut(onSignedOut)
       },
-      text = {
-        Text(
-          text = strings.profileLogoutDialogMessage,
-          color = Slate300,
-          style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-        )
-      },
-      confirmButton = {
-        TournamentButton(
-          text = strings.profileLogoutConfirmButton,
-          variant = TournamentButtonVariant.DANGER,
-          onClick = {
-            showSignOutDialog = false
-            viewModel.signOut(onSignedOut)
-          },
-        )
-      },
-      dismissButton = {
-        TextButton(onClick = { showSignOutDialog = false }) {
-          Text(strings.cancel, color = Slate400)
-        }
-      },
-      containerColor = NavyCard,
+      onDismiss = { showSignOutDialog = false },
     )
   }
 
   // COMING SOON / FEATURE NOTICE DIALOG
   showFeatureNoticeDialog?.let { (title, desc) ->
-    AlertDialog(
-      onDismissRequest = { showFeatureNoticeDialog = null },
-      title = { Text(title, color = Color.White) },
-      text = { Text(desc, color = Slate300, style = MaterialTheme.typography.bodyMedium) },
-      confirmButton = {
-        TournamentButton(
-          text = strings.close,
-          onClick = { showFeatureNoticeDialog = null },
-        )
-      },
-      containerColor = NavyCard,
+    PfNoticeWindow(
+      title = title,
+      description = desc,
+      closeText = strings.close,
+      onClose = { showFeatureNoticeDialog = null },
     )
   }
 }
@@ -923,87 +523,7 @@ private fun SupportActionCard(
   modifier: Modifier = Modifier,
   onClick: () -> Unit,
 ) {
-  val infiniteTransition = rememberInfiniteTransition(label = "AISupportGlow")
-  val haloScale by infiniteTransition.animateFloat(
-    initialValue = 1f,
-    targetValue = 1.6f,
-    animationSpec = infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Restart),
-    label = "HaloScale"
-  )
-  val haloAlpha by infiniteTransition.animateFloat(
-    initialValue = 0.4f,
-    targetValue = 0f,
-    animationSpec = infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Restart),
-    label = "HaloAlpha"
-  )
-
-  val interactionSource = remember { MutableInteractionSource() }
-  val isPressed by interactionSource.collectIsPressedAsState()
-  val pressScale by animateFloatAsState(if (isPressed) 0.96f else 1f, label = "PressScale")
-
-  TournamentCard(
-    modifier = modifier
-      .graphicsLayer {
-        scaleX = pressScale
-        scaleY = pressScale
-      }
-      .clickable(interactionSource = interactionSource, indication = null) { onClick() },
-    backgroundColor = NavyCard,
-    borderColor = Cyan400.copy(alpha = 0.6f),
-    backgroundContent = {
-       Box(
-         modifier = Modifier
-           .fillMaxSize()
-           .background(
-             Brush.linearGradient(
-               colors = listOf(Indigo900.copy(alpha = 0.15f), Color.Transparent),
-               start = Offset(0f, 0f),
-               end = Offset(1000f, 1000f)
-             )
-           )
-       )
-    }
-  ) {
-    Column {
-      Box(
-        modifier = Modifier.size(36.dp),
-        contentAlignment = Alignment.Center
-      ) {
-        // Pulsing Energy Halo
-        Canvas(modifier = Modifier.fillMaxSize()) {
-          drawCircle(
-            brush = Brush.radialGradient(
-              colors = listOf(Cyan400.copy(alpha = haloAlpha), Color.Transparent),
-              radius = (size.minDimension / 2) * haloScale
-            )
-          )
-        }
-        
-        Box(
-          modifier = Modifier
-            .size(36.dp)
-            .clip(CircleShape)
-            .background(iconBg),
-          contentAlignment = Alignment.Center,
-        ) {
-          Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
-        }
-      }
-      Spacer(modifier = Modifier.height(10.dp))
-      Text(
-        text = title,
-        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-        color = Color.White,
-      )
-      Spacer(modifier = Modifier.height(2.dp))
-      Text(
-        text = subtitle,
-        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-        color = Slate400,
-        lineHeight = 14.sp,
-      )
-    }
-  }
+  PfAiCard(title = title, subtitle = subtitle, onClick = onClick, modifier = modifier)
 }
 
 @Composable
@@ -1015,76 +535,18 @@ private fun SupportChannelItem(
   isAvailable: Boolean,
   onClick: () -> Unit,
 ) {
-  val interactionSource = remember { MutableInteractionSource() }
-  val isPressed by interactionSource.collectIsPressedAsState()
-  val pressScale by animateFloatAsState(if (isPressed) 0.97f else 1f, label = "PressScale")
-
-  TournamentCard(
-    modifier = Modifier
-      .fillMaxWidth()
-      .graphicsLayer {
-        scaleX = pressScale
-        scaleY = pressScale
-      }
-      .clickable(enabled = isAvailable, interactionSource = interactionSource, indication = null) { onClick() },
-    backgroundColor = NavyCard,
-    borderColor = CardBorder,
-  ) {
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.SpaceBetween,
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.weight(1f),
-      ) {
-        Box(
-          modifier = Modifier
-            .size(38.dp)
-            .clip(CircleShape)
-            .background(iconTint.copy(alpha = 0.15f)),
-          contentAlignment = Alignment.Center,
-        ) {
-          Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
-          Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-            color = if (isAvailable) Color.White else Slate400,
-          )
-          Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = if (isAvailable) Slate400 else Slate500,
-          )
-        }
-      }
-      if (isAvailable) {
-        Icon(
-          imageVector = Icons.Default.ChevronRight,
-          contentDescription = null,
-          tint = Slate400,
-          modifier = Modifier.size(20.dp),
-        )
-      } else {
-        Surface(
-          color = Slate800,
-          shape = RoundedCornerShape(4.dp),
-        ) {
-          val strings = LocalAppStrings.current
-          Text(
-            text = strings.profileSupportOffline,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
-            color = Slate400,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-          )
-        }
-      }
-    }
-  }
+  val strings = LocalAppStrings.current
+  val isWhatsapp = icon == Icons.Default.Phone
+  PfChannelRow(
+    icon = icon,
+    light = if (isWhatsapp) Color(0xFF25D366) else Color(0xFF2AABEE),
+    dark = if (isWhatsapp) Color(0xFF0B5A2A) else Color(0xFF0B4A6A),
+    title = title,
+    subtitle = subtitle,
+    available = isAvailable,
+    offlineText = strings.profileSupportOffline,
+    onClick = onClick,
+  )
 }
 
 @Composable

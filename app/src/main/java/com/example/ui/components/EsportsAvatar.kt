@@ -39,22 +39,53 @@ import coil.compose.AsyncImage
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.filled.*
 import com.example.ui.theme.*
+import androidx.annotation.DrawableRes
+import androidx.compose.ui.res.painterResource
+import com.example.R
 
 data class AvatarPreset(
     val id: String,
     val label: String,
     val icon: ImageVector,
     val gradient: List<Color>,
+    @DrawableRes val image: Int = 0,
+    val female: Boolean = false,
 )
 
+private val AvatarBg = listOf(Color(0xFF2C3AB0), Color(0xFF0C1150))
+
+/** 12 picture avatars: 6 male (m1..m6) then 6 female (f1..f6). */
 val avatarPresets = listOf(
-    AvatarPreset("preset://dragon", "Dragon", Icons.Default.EmojiEvents, listOf(Color(0xFFE53935), Color(0xFFFFB300))),
-    AvatarPreset("preset://cyber", "Cyber", Icons.Default.SportsEsports, listOf(Color(0xFF7C4DFF), Color(0xFF00E5FF))),
-    AvatarPreset("preset://ninja", "Ninja", Icons.Default.Bolt, listOf(Color(0xFF00B0FF), Color(0xFF1DE9B6))),
-    AvatarPreset("preset://crown", "Crown", Icons.Default.Star, listOf(Color(0xFFFFD700), Color(0xFFFF6D00))),
-    AvatarPreset("preset://sniper", "Sniper", Icons.Default.Security, listOf(Color(0xFF00E676), Color(0xFF00B0FF))),
-    AvatarPreset("preset://shield", "Knight", Icons.Default.Shield, listOf(Color(0xFF90A4AE), Color(0xFF37474F))),
+    AvatarPreset("preset://m1", "Gamer", Icons.Default.SportsEsports, AvatarBg, R.drawable.av_m1),
+    AvatarPreset("preset://m2", "Cool", Icons.Default.Bolt, AvatarBg, R.drawable.av_m2),
+    AvatarPreset("preset://m3", "Champion", Icons.Default.EmojiEvents, AvatarBg, R.drawable.av_m3),
+    AvatarPreset("preset://m4", "Smart", Icons.Default.Star, AvatarBg, R.drawable.av_m4),
+    AvatarPreset("preset://m5", "King", Icons.Default.Star, AvatarBg, R.drawable.av_m5),
+    AvatarPreset("preset://m6", "Fan", Icons.Default.Star, AvatarBg, R.drawable.av_m6),
+    AvatarPreset("preset://f1", "Gamer", Icons.Default.SportsEsports, AvatarBg, R.drawable.av_f1, female = true),
+    AvatarPreset("preset://f2", "Hijabi", Icons.Default.Star, AvatarBg, R.drawable.av_f2, female = true),
+    AvatarPreset("preset://f3", "Sporty", Icons.Default.Bolt, AvatarBg, R.drawable.av_f3, female = true),
+    AvatarPreset("preset://f4", "Smart", Icons.Default.Star, AvatarBg, R.drawable.av_f4, female = true),
+    AvatarPreset("preset://f5", "Queen", Icons.Default.EmojiEvents, AvatarBg, R.drawable.av_f5, female = true),
+    AvatarPreset("preset://f6", "Traditional", Icons.Default.Star, AvatarBg, R.drawable.av_f6, female = true),
 )
+
+/** Avatar ids saved before the redesign still show a picture. */
+private val legacyAvatarIds = mapOf(
+    "preset://dragon" to "preset://m6",
+    "preset://cyber" to "preset://m1",
+    "preset://ninja" to "preset://m2",
+    "preset://crown" to "preset://m5",
+    "preset://sniper" to "preset://m4",
+    "preset://shield" to "preset://m3",
+)
+
+/** Finds the avatar for a saved "preset://..." id (old ids included). Returns null for photos. */
+fun findAvatarPreset(id: String?): AvatarPreset? {
+    if (id.isNullOrBlank() || !id.startsWith("preset://")) return null
+    val realId = legacyAvatarIds[id] ?: id
+    return avatarPresets.firstOrNull { it.id == realId }
+}
 
 @Composable
 fun EsportsAvatar(
@@ -78,11 +109,7 @@ fun EsportsAvatar(
         }
     }
 
-    val preset = remember(photoUrl) {
-        if (photoUrl?.startsWith("preset://") == true) {
-            avatarPresets.firstOrNull { it.id == photoUrl }
-        } else null
-    }
+    val preset = remember(photoUrl) { findAvatarPreset(photoUrl) }
 
     val bitmap = remember(photoUrl) {
         if (photoUrl?.startsWith("data:image/") == true) {
@@ -171,6 +198,14 @@ fun EsportsAvatar(
                         contentScale = ContentScale.Crop,
                     )
                 }
+                preset != null && preset.image != 0 -> {
+                    Image(
+                        painter = painterResource(id = preset.image),
+                        contentDescription = preset.label,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
                 preset != null -> {
                     Icon(
                         imageVector = preset.icon,
@@ -188,8 +223,13 @@ fun EsportsAvatar(
                     )
                 }
                 else -> {
-                    // Stylized Gamer Silhouette instead of plain letter
-                    GamerSilhouette(gender = genderFallback, avatarSize = size)
+                    // Default picture avatar by guessed gender (first male / first female avatar)
+                    Image(
+                        painter = painterResource(id = if (genderFallback == GenderType.FEMALE) R.drawable.av_f1 else R.drawable.av_m1),
+                        contentDescription = name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
                 }
             }
         }

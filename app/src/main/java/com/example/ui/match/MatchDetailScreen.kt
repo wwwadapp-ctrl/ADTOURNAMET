@@ -34,6 +34,16 @@ import com.example.ui.components.TournamentButton
 import com.example.ui.components.TournamentButtonVariant
 import com.example.ui.components.TournamentCard
 import com.example.ui.theme.*
+import androidx.compose.foundation.text.KeyboardOptions
+import com.example.R
+import com.example.ui.components.EsportsAvatar
+import com.example.ui.profile.PfStatTile
+import com.example.ui.wallet.DpBigButton
+import com.example.ui.wallet.DpField
+import com.example.ui.wallet.DpNotice
+import com.example.ui.wallet.DpUploadBox
+import com.example.ui.wallet.WlTone
+import com.example.ui.wallet.wlBackground
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -184,28 +194,16 @@ fun MatchDetailScreen(
     Column(
       modifier = Modifier
         .fillMaxSize()
+        .wlBackground()
         .padding(innerPadding)
         .verticalScroll(rememberScrollState())
         .padding(16.dp),
     ) {
-      TournamentCard(
-        modifier = Modifier.fillMaxWidth(),
-        backgroundColor = NavyCard,
-        borderColor = if (isCompleted && isUserWinner) Gold400 else if (isCompleted && isUserLoser) Rose600.copy(alpha = 0.6f) else Gold500.copy(alpha = 0.4f),
-      ) {
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Text(
-            text = if (isLudo) strings.matchDetailLudoHeader else strings.matchDetailCarromHeader,
-            style = MaterialTheme.typography.labelMedium.copy(
-              fontWeight = FontWeight.Bold,
-              fontSize = 13.sp,
-            ),
-            color = if (isLudo) Indigo400 else Cyan400,
-          )
+      MdHeroCard(
+        isLudo = isLudo,
+        chipText = if (isLudo) strings.matchDetailLudoHeader else strings.matchDetailCarromHeader,
+        title = finalTitle,
+        badge = {
           MatchStatusBadge(
             status = match.status,
             joinedPlayersCount = displayPlayersCount,
@@ -213,383 +211,89 @@ fun MatchDetailScreen(
             isJoined = isUserRegistered,
             isWinner = isUserWinner,
             isLoser = isUserLoser,
+            premium = true,
           )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Text(
-          text = finalTitle,
-          style = MaterialTheme.typography.headlineSmall.copy(
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
-          ),
-          color = Color.White,
-        )
-
-        if (isUserRegistered) {
-          Spacer(modifier = Modifier.height(8.dp))
-          if (isCompleted || isResultApproved || isResultLost || isResultRejected || isUserWinner || isUserLoser) {
-            if (isUserWinner) {
-              Surface(
-                color = Gold500.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(20.dp),
-                border = BorderStroke(1.dp, Gold400.copy(alpha = 0.7f)),
-                modifier = Modifier.testTag("winner_chip"),
-              ) {
-                Row(
-                  modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
-                  verticalAlignment = Alignment.CenterVertically,
-                  horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                  Icon(
-                    imageVector = Icons.Default.EmojiEvents,
-                    contentDescription = strings.badgeVictory,
-                    tint = Gold400,
-                    modifier = Modifier.size(16.dp),
-                  )
-                  Text(
-                    text = strings.matchDetailYouWonBanner(strings.taka(match.displayPrizePool)),
-                    style = MaterialTheme.typography.labelMedium.copy(
-                      fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Bold,
-                      fontSize = 13.sp,
-                    ),
-                    color = Gold400,
-                  )
-                }
+        },
+        statusChip = if (!isUserRegistered) null else {
+          {
+            if (isCompleted || isResultApproved || isResultLost || isResultRejected || isUserWinner || isUserLoser) {
+              if (isUserWinner) {
+                MdStatusChip(strings.matchDetailYouWonBanner(strings.taka(match.displayPrizePool)), 1, "winner_chip")
+              } else {
+                MdStatusChip(if (isResultRejected) strings.matchDetailProofRejectedLoser else strings.matchDetailMatchFinishedLoser, 2, "loser_chip")
               }
             } else {
-              Surface(
-                color = Rose900.copy(alpha = 0.45f),
-                shape = RoundedCornerShape(20.dp),
-                border = BorderStroke(1.dp, Rose500.copy(alpha = 0.6f)),
-                modifier = Modifier.testTag("loser_chip"),
-              ) {
-                Row(
-                  modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
-                  verticalAlignment = Alignment.CenterVertically,
-                  horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                  Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = strings.badgeDefeat,
-                    tint = Rose400,
-                    modifier = Modifier.size(16.dp),
-                  )
-                  Text(
-                    text = if (isResultRejected) strings.matchDetailProofRejectedLoser else strings.matchDetailMatchFinishedLoser,
-                    style = MaterialTheme.typography.labelMedium.copy(
-                      fontWeight = FontWeight.Bold,
-                      fontSize = 13.sp,
-                    ),
-                    color = Rose400,
-                  )
-                }
-              }
-            }
-          } else {
-            Surface(
-              color = Emerald900.copy(alpha = 0.55f),
-              shape = RoundedCornerShape(20.dp),
-              border = BorderStroke(1.dp, Emerald500),
-              modifier = Modifier.testTag("registered_chip"),
-            ) {
-              Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-              ) {
-                Icon(
-                  imageVector = Icons.Default.CheckCircle,
-                  contentDescription = null,
-                  tint = Emerald400,
-                  modifier = Modifier.size(16.dp),
-                )
-                Text(
-                  text = strings.matchDetailRegisteredSlot(registeredSlotLabel),
-                  style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                  ),
-                  color = Emerald300,
-                )
-              }
+              MdStatusChip(strings.matchDetailRegisteredSlot(registeredSlotLabel), 0, "registered_chip")
             }
           }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Row(
-          modifier = Modifier
-            .fillMaxWidth()
-            .background(Slate900, RoundedCornerShape(10.dp))
-            .padding(14.dp),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Column {
-            Text(
-              text = strings.entryFeeLabel,
-              style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-              color = Slate400,
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-              text = strings.taka(match.displayEntryFee),
-              style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Bold,
-                fontSize = 15.sp,
-                letterSpacing = 0.sp,
-              ),
-              color = Color.White,
-              maxLines = 1,
-              softWrap = false,
-              modifier = Modifier.padding(end = 2.dp),
-            )
-          }
-          Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-              text = strings.playersLabel,
-              style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-              color = Slate400,
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-              text = "${strings.number(displayPlayersCount)} / ${strings.number(match.maxPlayers)}",
-              style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                letterSpacing = 0.sp,
-              ),
-              color = Cyan400,
-              maxLines = 1,
-              softWrap = false,
-              modifier = Modifier.padding(end = 2.dp),
-            )
-          }
-          Column(horizontalAlignment = Alignment.End) {
-            Text(
-              text = strings.matchDetailWinnerPrizeLabel,
-              style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-              color = Slate400,
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-              text = strings.taka(match.displayPrizePool),
-              style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
-                fontSize = 15.sp,
-                letterSpacing = 0.sp,
-              ),
-              color = Gold400,
-              maxLines = 1,
-              softWrap = false,
-              modifier = Modifier.padding(end = 2.dp),
-            )
-          }
-        }
-      }
+        },
+        tiles = {
+          PfStatTile(R.drawable.wl_moneybag, strings.entryFeeLabel, strings.taka(match.displayEntryFee), "", Color(0xFF4ADE80), WlTone.CREAM, Modifier.weight(1f))
+          PfStatTile(R.drawable.wl_gamepad, strings.playersLabel, "${strings.number(displayPlayersCount)} / ${strings.number(match.maxPlayers)}", "", Color(0xFF67E8F9), WlTone.CREAM, Modifier.weight(1f))
+          PfStatTile(R.drawable.wl_trophy, strings.matchDetailWinnerPrizeLabel, strings.taka(match.displayPrizePool), "", Color(0xFFFFD45A), WlTone.GOLD, Modifier.weight(1f))
+        },
+        modifier = Modifier.fillMaxWidth(),
+      )
 
       Spacer(modifier = Modifier.height(16.dp))
 
       if (uiState.successMessage != null) {
-        Surface(
-          color = Emerald900.copy(alpha = 0.5f),
-          shape = RoundedCornerShape(8.dp),
-          border = BorderStroke(1.dp, Emerald500),
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 12.dp),
-        ) {
-          Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-          ) {
-            Icon(
-              imageVector = Icons.Default.CheckCircle,
-              contentDescription = null,
-              tint = Emerald400,
-              modifier = Modifier.size(20.dp),
-            )
-            Text(
-              text = uiState.successMessage ?: "",
-              color = Emerald400,
-              style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-            )
-          }
-        }
+        MdInfoCard(R.drawable.wl_trophy, Color(0xFF4ADE80), null, mdShownMessage(uiState.successMessage ?: "", strings), Modifier.padding(bottom = 12.dp))
       }
 
       if (isUpcoming) {
-        Surface(
-          color = Amber900.copy(alpha = 0.35f),
-          shape = RoundedCornerShape(8.dp),
-          border = BorderStroke(1.dp, Amber500.copy(alpha = 0.5f)),
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 12.dp),
-        ) {
-          Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-          ) {
-            Icon(
-              imageVector = Icons.Default.Schedule,
-              contentDescription = null,
-              tint = Amber400,
-              modifier = Modifier.size(20.dp),
-            )
-            Text(
-              text = strings.matchDetailUpcomingNotice,
-              color = Amber400,
-              style = MaterialTheme.typography.bodySmall.copy(
-                fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
-              ),
-            )
-          }
-        }
+        MdInfoCard(R.drawable.wl_hourglass, Color(0xFFF59E0B), null, strings.matchDetailUpcomingNotice, Modifier.padding(bottom = 12.dp), tiltPicture = true)
       }
 
       if (uiState.errorMessage != null) {
-        Surface(
-          color = Rose900.copy(alpha = 0.4f),
-          shape = RoundedCornerShape(8.dp),
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 12.dp),
-        ) {
-          Text(
-            text = uiState.errorMessage ?: "",
-            color = Rose400,
-            style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-            modifier = Modifier.padding(12.dp),
-          )
-        }
+        DpNotice(mdShownMessage(uiState.errorMessage ?: "", strings), Icons.Default.Error, true, Modifier.padding(bottom = 12.dp))
       }
 
       // Game Room Code section with strict privacy
-      TournamentCard(
+      MdRoomCodeCard(
+        title = strings.matchDetailRoomCodeTitle,
+        unlockedText = if (isUserRegistered) strings.matchDetailUnlockedBadge else null,
         modifier = Modifier.fillMaxWidth(),
-        backgroundColor = NavyCard,
-        borderColor = if (isUserRegistered || uiState.isAdmin) Indigo600 else NavyCardBorder,
       ) {
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Text(
-            text = strings.matchDetailRoomCodeTitle,
-            style = MaterialTheme.typography.titleMedium.copy(
-              fontWeight = FontWeight.Bold,
-              fontSize = 15.sp,
-            ),
-            color = Color.White,
-          )
-          if (isUserRegistered) {
-            Surface(
-              color = Emerald900.copy(alpha = 0.4f),
-              shape = RoundedCornerShape(6.dp),
-              border = BorderStroke(1.dp, Emerald500.copy(alpha = 0.7f)),
-            ) {
-              Text(
-                text = strings.matchDetailUnlockedBadge,
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = FontWeight.Bold,
-                  fontSize = 10.sp,
-                ),
-                color = Emerald400,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-              )
-            }
-          }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
         if (isUserRegistered || uiState.isAdmin) {
           if (match.gameCode.isNotBlank()) {
-            Surface(
-              color = Indigo900.copy(alpha = 0.5f),
-              shape = RoundedCornerShape(8.dp),
-              border = BorderStroke(1.dp, Indigo600),
-              modifier = Modifier.fillMaxWidth(),
-            ) {
-              Column(
-                modifier = Modifier.padding(14.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-              ) {
-                Text(
-                  text = strings.roomCodeLabel,
-                  style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-                  color = Gold400
-                )
-                Text(
-                  text = displayRoomCode,
-                  style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 4.sp,
-                  ),
-                  color = Color.White,
-                )
-                Text(
-                  text = strings.matchDetailRoomCodeInstructions,
-                  style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-                  color = Slate400,
-                  modifier = Modifier.padding(top = 6.dp),
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
-                val context = androidx.compose.ui.platform.LocalContext.current
-                TournamentButton(
-                  text = strings.copy,
-                  onClick = {
-                    clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(displayRoomCode))
-                    Toast.makeText(context, strings.roomCodeCopiedNotice, Toast.LENGTH_SHORT).show()
-
-                    // Authoritative Anti-Cheat Audit Log (Fire-and-forget)
-                    viewModel.logRoomCodeCopy(
-                      matchId = match.matchId,
-                      matchNumber = match.matchNumber.toString(),
-                      roomCode = displayRoomCode,
-                      userUid = activeUid,
-                      userName = currentUser?.effectiveName ?: "",
-                      userPhone = currentUser?.effectiveMobile ?: ""
-                    )
-                  },
-                  variant = TournamentButtonVariant.SECONDARY,
-                  modifier = Modifier.widthIn(min = 120.dp),
-                )
-              }
-            }
-          } else {
-            Text(
-              text = strings.matchDetailWaitingRoomCode,
-              style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.5.sp),
-              color = Slate300,
-            )
-          }
-        } else {
-          Surface(
-            color = Slate850,
-            shape = RoundedCornerShape(8.dp),
-            modifier = Modifier.fillMaxWidth(),
-          ) {
-            Row(
-              modifier = Modifier.padding(12.dp),
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              Icon(Icons.Default.Lock, contentDescription = null, tint = Amber400)
-              Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+              MdCodeDigits(strings.roomCodeLabel, displayRoomCode)
               Text(
-                text = strings.matchDetailConfidentialNotice,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp),
-                color = Slate400,
+                text = strings.matchDetailRoomCodeInstructions,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFFFF3D8),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.padding(top = 9.dp),
+              )
+              Spacer(modifier = Modifier.height(12.dp))
+              val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+              val context = androidx.compose.ui.platform.LocalContext.current
+              MdCopyButton(
+                text = strings.copy,
+                onClick = {
+                  clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(displayRoomCode))
+                  Toast.makeText(context, strings.roomCodeCopiedNotice, Toast.LENGTH_SHORT).show()
+
+                  // Authoritative Anti-Cheat Audit Log (Fire-and-forget)
+                  viewModel.logRoomCodeCopy(
+                    matchId = match.matchId,
+                    matchNumber = match.matchNumber.toString(),
+                    roomCode = displayRoomCode,
+                    userUid = activeUid,
+                    userName = currentUser?.effectiveName ?: "",
+                    userPhone = currentUser?.effectiveMobile ?: ""
+                  )
+                },
+                tag = "detail_copy_room_code_btn",
               )
             }
+          } else {
+            MdNote(strings.matchDetailWaitingRoomCode, "⏳")
           }
+        } else {
+          MdNote(strings.matchDetailConfidentialNotice, "🔒")
         }
       }
       Spacer(modifier = Modifier.height(16.dp))
@@ -599,88 +303,28 @@ fun MatchDetailScreen(
 
       if (currentResult != null) {
         val result = currentResult
-        TournamentCard(
-          modifier = Modifier.fillMaxWidth(),
-          backgroundColor = NavyCard,
-          borderColor = when (result.status) {
-            "APPROVED" -> Emerald500
-            "REJECTED" -> Rose500
-            else -> Gold400
+        val isApprovedRes = result.status == "APPROVED"
+        val isRejectedRes = result.status == "REJECTED"
+        val resultDesc = listOfNotNull(
+          if (!result.status.equals("APPROVED", ignoreCase = true) && !result.status.equals("REJECTED", ignoreCase = true)) strings.matchDetailReviewWaitingText else null,
+          if (result.reviewNotes.isNotBlank()) "${strings.matchDetailNotesLabel} ${result.reviewNotes}" else null,
+        ).joinToString("\n")
+        MdInfoCard(
+          picture = if (isApprovedRes) R.drawable.wl_trophy else if (isRejectedRes) R.drawable.mg_dice else R.drawable.wl_hourglass,
+          ring = if (isApprovedRes) Color(0xFF4ADE80) else if (isRejectedRes) Color(0xFFFF6B81) else Color(0xFFFFD45A),
+          title = when (result.status) {
+            "APPROVED" -> strings.matchDetailApprovedTitle
+            "REJECTED" -> strings.matchDetailRejectedTitle
+            else -> strings.matchDetailScreenshotSubmittedTitle
           },
-        ) {
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-          ) {
-            Text(
-              text = when (result.status) {
-                "APPROVED" -> strings.matchDetailApprovedTitle
-                "REJECTED" -> strings.matchDetailRejectedTitle
-                else -> strings.matchDetailScreenshotSubmittedTitle
-              },
-              style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-              ),
-              color = when (result.status) {
-                "APPROVED" -> Emerald400
-                "REJECTED" -> Rose400
-                else -> Color.White
-              },
-            )
-            Surface(
-              color = when (result.status) {
-                "APPROVED" -> Emerald900.copy(alpha = 0.5f)
-                "REJECTED" -> Rose900.copy(alpha = 0.5f)
-                else -> Amber900.copy(alpha = 0.5f)
-              },
-              shape = RoundedCornerShape(6.dp),
-              border = BorderStroke(
-                1.dp,
-                when (result.status) {
-                  "APPROVED" -> Emerald500
-                  "REJECTED" -> Rose500
-                  else -> Gold400
-                },
-              ),
-            ) {
-              Text(
-                text = when (result.status) {
-                  "APPROVED" -> strings.matchDetailApprovedBadge
-                  "REJECTED" -> strings.matchDetailRejectedBadge
-                  else -> strings.matchDetailUnderReviewBadge
-                },
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = FontWeight.Bold,
-                  fontSize = 11.5.sp,
-                ),
-                color = when (result.status) {
-                  "APPROVED" -> Emerald400
-                  "REJECTED" -> Rose400
-                  else -> Gold400
-                },
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-              )
-            }
-          }
-          Spacer(modifier = Modifier.height(8.dp))
-          if (!result.status.equals("APPROVED", ignoreCase = true) && !result.status.equals("REJECTED", ignoreCase = true)) {
-            Text(
-              text = strings.matchDetailReviewWaitingText,
-              style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-              color = Slate300,
-            )
-          }
-          if (result.reviewNotes.isNotBlank()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-              text = "${strings.matchDetailNotesLabel} ${result.reviewNotes}",
-              style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-              color = if (result.status == "REJECTED") Rose400 else Slate400,
-            )
-          }
-        }
+          description = resultDesc,
+          badge = when (result.status) {
+            "APPROVED" -> strings.matchDetailApprovedBadge
+            "REJECTED" -> strings.matchDetailRejectedBadge
+            else -> strings.matchDetailUnderReviewBadge
+          },
+          tiltPicture = !isApprovedRes && !isRejectedRes,
+        )
         Spacer(modifier = Modifier.height(16.dp))
       }
 
@@ -698,216 +342,54 @@ fun MatchDetailScreen(
         val canSubmitProof = !isLocked && hasRoomCode && isTwoMinutesPassed
 
         if (uiState.isSubmittingResult) {
-          TournamentCard(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = NavyCard,
-            borderColor = Indigo600,
-          ) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(12.dp),
-              modifier = Modifier.padding(4.dp),
-            ) {
-              CircularProgressIndicator(
-                modifier = Modifier.size(24.dp),
-                color = Gold400,
-                strokeWidth = 2.5.dp,
-              )
-              Column {
-                Text(
-                  text = strings.matchDetailSubmittingScreenshotTitle,
-                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
-                  color = Color.White,
-                )
-                Text(
-                  text = strings.matchDetailSubmittingScreenshotSubtitle,
-                  style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                  color = Slate400,
-                )
-              }
-            }
-          }
+          MdInfoCard(R.drawable.wl_hourglass, Color(0xFF67E8F9), strings.matchDetailSubmittingScreenshotTitle, strings.matchDetailSubmittingScreenshotSubtitle, tiltPicture = true)
           Spacer(modifier = Modifier.height(16.dp))
         } else if (isResultRejected) {
-          TournamentCard(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Rose900.copy(alpha = 0.2f),
-            borderColor = Rose500.copy(alpha = 0.5f),
-          ) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-              Icon(Icons.Default.Cancel, contentDescription = null, tint = Rose400, modifier = Modifier.size(22.dp))
-              Column {
-                Text(
-                  text = strings.matchDetailProofRejectedTitle,
-                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
-                  color = Rose400,
-                )
-                Text(
-                  text = strings.matchDetailProofRejectedDesc,
-                  style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                  color = Slate300,
-                )
-              }
-            }
-          }
+          MdInfoCard(R.drawable.mg_dice, Color(0xFFFF6B81), strings.matchDetailProofRejectedTitle, strings.matchDetailProofRejectedDesc)
           Spacer(modifier = Modifier.height(16.dp))
         } else if (isCompleted || isMatchCompleted) {
-          TournamentCard(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = NavyCard,
-            borderColor = if (isUserWinner) Gold400.copy(alpha = 0.5f) else CardBorder,
-          ) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-              Icon(
-                imageVector = if (isUserWinner) Icons.Default.EmojiEvents else Icons.Default.Lock,
-                contentDescription = null,
-                tint = if (isUserWinner) Gold400 else Slate400,
-                modifier = Modifier.size(22.dp),
-              )
-              Column {
-                Text(
-                  text = strings.matchDetailMatchFinishedTitle,
-                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
-                  color = Color.White,
-                )
-                Text(
-                  text = if (isUserWinner) strings.matchDetailMatchFinishedWinnerDesc else strings.matchDetailMatchFinishedLoserDesc,
-                  style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                  color = Slate300,
-                )
-              }
-            }
-          }
+          MdInfoCard(
+            if (isUserWinner) R.drawable.wl_trophy else R.drawable.mg_dice,
+            if (isUserWinner) Color(0xFFFFD45A) else Color(0xFF8088B0),
+            strings.matchDetailMatchFinishedTitle,
+            if (isUserWinner) strings.matchDetailMatchFinishedWinnerDesc else strings.matchDetailMatchFinishedLoserDesc,
+          )
           Spacer(modifier = Modifier.height(16.dp))
         } else if (isResultApproved) {
-          TournamentCard(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Emerald900.copy(alpha = 0.2f),
-            borderColor = Emerald500.copy(alpha = 0.5f),
-          ) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-              Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Emerald400, modifier = Modifier.size(22.dp))
-              Column {
-                Text(
-                  text = strings.matchDetailResultApprovedTitle,
-                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
-                  color = Emerald300,
-                )
-                Text(
-                  text = strings.matchDetailResultApprovedDesc,
-                  style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                  color = Slate300,
-                )
-              }
-            }
-          }
+          MdInfoCard(R.drawable.wl_trophy, Color(0xFF4ADE80), strings.matchDetailResultApprovedTitle, strings.matchDetailResultApprovedDesc)
           Spacer(modifier = Modifier.height(16.dp))
         } else if (isResultLost || isLoser) {
-          TournamentCard(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = NavyCard,
-            borderColor = CardBorder,
-          ) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-              Icon(Icons.Default.Info, contentDescription = null, tint = Slate400, modifier = Modifier.size(22.dp))
-              Column {
-                Text(
-                  text = strings.matchDetailDefeatedTitle,
-                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
-                  color = Slate300,
-                )
-                Text(
-                  text = strings.matchDetailDefeatedDesc,
-                  style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                  color = Slate400,
-                )
-              }
-            }
-          }
+          MdInfoCard(R.drawable.mg_dice, Color(0xFF8088B0), strings.matchDetailDefeatedTitle, strings.matchDetailDefeatedDesc)
           Spacer(modifier = Modifier.height(16.dp))
         } else if (canSubmitProof) {
-          TournamentButton(
+          DpBigButton(
             text = strings.matchDetailSubmitProofCta,
             onClick = { showProofDialog = true },
-            modifier = Modifier.fillMaxWidth(),
-            testTag = "detail_submit_proof_btn",
+            tag = "detail_submit_proof_btn",
           )
           Spacer(modifier = Modifier.height(16.dp))
         } else if (!hasRoomCode) {
-          TournamentCard(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = NavyCard,
-            borderColor = CardBorder,
-          ) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-              Icon(Icons.Default.Schedule, contentDescription = null, tint = Amber400, modifier = Modifier.size(20.dp))
-              Text(
-                text = strings.matchDetailWaitingRoomCodeForProof,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-                color = Slate300,
-              )
-            }
-          }
+          MdInfoCard(R.drawable.wl_hourglass, Color(0xFFF59E0B), null, strings.matchDetailWaitingRoomCodeForProof, tiltPicture = true)
           Spacer(modifier = Modifier.height(16.dp))
         } else if (!isTwoMinutesPassed) {
-          TournamentCard(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = NavyCard,
-            borderColor = CardBorder,
-          ) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-              Icon(Icons.Default.Schedule, contentDescription = null, tint = Amber400, modifier = Modifier.size(20.dp))
-              Text(
-                text = strings.matchDetailTwoMinutesWaitingText,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-                color = Slate300,
-              )
-            }
-          }
+          MdInfoCard(R.drawable.wl_hourglass, Color(0xFFF59E0B), null, strings.matchDetailTwoMinutesWaitingText, tiltPicture = true)
           Spacer(modifier = Modifier.height(16.dp))
         }
       }
 
-      TournamentCard(
+      MdPlayersCard(
+        title = strings.matchDetailRegisteredPlayersTitle(
+          strings.number(displayPlayersCount),
+          strings.number(match.maxPlayers)
+        ),
         modifier = Modifier.fillMaxWidth(),
-        backgroundColor = NavyCard,
-        borderColor = NavyCardBorder,
       ) {
-        Text(
-          text = strings.matchDetailRegisteredPlayersTitle(
-            strings.number(displayPlayersCount),
-            strings.number(match.maxPlayers)
-          ),
-          style = MaterialTheme.typography.titleMedium.copy(
-            fontWeight = FontWeight.Bold,
-            fontSize = 15.sp,
-          ),
-          color = Color.White,
-        )
-        Spacer(modifier = Modifier.height(10.dp))
         if (uiState.players.isEmpty()) {
           Text(
             text = strings.matchDetailNoPlayersJoined,
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
-            color = Slate400,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFFFFE7A0),
           )
         } else {
           uiState.players.forEach { p ->
@@ -915,70 +397,20 @@ fun MatchDetailScreen(
                 p.userId == viewModel.currentUserId ||
                 p.uid == viewModel.currentUserId ||
                 (!authUid.isNullOrBlank() && (p.effectiveUid == authUid || p.uid == authUid || p.userId == authUid))
-            Row(
-              modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                  if (isCurrent) Emerald900.copy(alpha = 0.25f) else Color.Transparent,
-                  shape = RoundedCornerShape(8.dp)
+            MdPlayerRow(
+              name = p.username,
+              slot = formatSlot(p.slot),
+              isCurrent = isCurrent,
+              youText = strings.matchDetailYouBadge,
+              avatar = {
+                EsportsAvatar(
+                  photoUrl = if (isCurrent) currentUser?.effectivePhoto else null,
+                  name = p.username,
+                  size = 38.dp,
+                  borderWidth = 0.dp,
                 )
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-              Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-              ) {
-                Icon(
-                  Icons.Default.AccountCircle,
-                  contentDescription = null,
-                  tint = if (isCurrent) Emerald400 else Gold400,
-                  modifier = Modifier.size(24.dp)
-                )
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                  Text(
-                    text = p.username,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                      fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                      fontSize = 14.sp,
-                    ),
-                    color = Color.White
-                  )
-                  if (isCurrent) {
-                    Surface(
-                      color = Emerald500.copy(alpha = 0.2f),
-                      shape = RoundedCornerShape(4.dp),
-                    ) {
-                      Text(
-                        text = strings.matchDetailYouBadge,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                          fontWeight = FontWeight.Bold,
-                          fontSize = 10.sp,
-                        ),
-                        color = Emerald400,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                      )
-                    }
-                  }
-                }
-              }
-              Surface(
-                color = if (isCurrent) Emerald900.copy(alpha = 0.5f) else Slate850,
-                shape = RoundedCornerShape(6.dp),
-                border = if (isCurrent) BorderStroke(1.dp, Emerald500.copy(alpha = 0.5f)) else null,
-              ) {
-                Text(
-                  text = formatSlot(p.slot),
-                  style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                  ),
-                  color = if (isCurrent) Emerald300 else Cyan400,
-                  modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                )
-              }
-            }
+              },
+            )
           }
         }
       }
@@ -993,260 +425,170 @@ fun MatchDetailScreen(
           isResultRejected || isResultLost -> strings.badgeDefeat
           else -> strings.labelJoined
         }
-        val buttonVariant = when {
-          (isCompleted && isUserWinner) || isResultApproved -> TournamentButtonVariant.PRIMARY
-          isCompleted || isResultRejected || isResultLost -> TournamentButtonVariant.SECONDARY
-          else -> TournamentButtonVariant.JOINED
+        val buttonKind = when {
+          (isCompleted && isUserWinner) || isResultApproved -> 1
+          isCompleted || isResultRejected || isResultLost -> 2
+          else -> 0
         }
-        TournamentButton(
-          text = buttonText,
-          onClick = { /* non-joinable */ },
-          enabled = false,
-          variant = buttonVariant,
-          modifier = Modifier.fillMaxWidth(),
-          testTag = "detail_joined_button",
-        )
+        MdStateButton(text = buttonText, kind = buttonKind, tag = "detail_joined_button")
       } else if (isUpcoming) {
-        TournamentButton(
-          text = strings.matchDetailUpcomingButton,
-          onClick = { /* non-joinable */ },
-          enabled = false,
-          variant = TournamentButtonVariant.SECONDARY,
-          modifier = Modifier.fillMaxWidth(),
-          testTag = "detail_upcoming_button",
-        )
+        MdStateButton(text = strings.matchDetailUpcomingButton, kind = 2, tag = "detail_upcoming_button")
       } else if (!isFull && !isRunning && !isCompleted) {
-        TournamentButton(
+        DpBigButton(
           text = strings.matchDetailJoinMatchButton(strings.taka(match.displayEntryFee)),
           onClick = { showJoinConfirmationDialog = true },
+          tag = "detail_join_button",
           isLoading = uiState.isJoining,
-          modifier = Modifier.fillMaxWidth(),
-          testTag = "detail_join_button",
         )
       }
     }
   }
 
   if (showJoinConfirmationDialog && match != null) {
-    AlertDialog(
-      onDismissRequest = { showJoinConfirmationDialog = false },
-      containerColor = NavyCard,
-      title = {
-        Text(
-          text = strings.matchDetailJoinDialogTitle,
-          style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-          color = Color.White
-        )
+    MdJoinWindow(
+      title = strings.matchDetailJoinDialogTitle,
+      nameNotice = if (isLudo) strings.matchDetailLudoNameNotice else strings.matchDetailCarromNameNotice,
+      feeNotice = strings.matchDetailJoinFeeNotice(strings.taka(match.displayEntryFee)),
+      cancelText = strings.cancel,
+      confirmText = strings.matchDetailAgreeAndJoin,
+      onConfirm = {
+        showJoinConfirmationDialog = false
+        viewModel.joinMatch()
       },
-      text = {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-          val gameNotice = if (isLudo) strings.matchDetailLudoNameNotice else strings.matchDetailCarromNameNotice
-          val feeNotice = strings.matchDetailJoinFeeNotice(strings.taka(match.displayEntryFee))
-
-          Text(text = gameNotice, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.5.sp), color = Slate300)
-          Text(text = feeNotice, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp), color = Gold400)
-        }
-      },
-      confirmButton = {
-        TournamentButton(
-          text = strings.matchDetailAgreeAndJoin,
-          onClick = {
-            showJoinConfirmationDialog = false
-            viewModel.joinMatch()
-          },
-          variant = TournamentButtonVariant.PRIMARY
-        )
-      },
-      dismissButton = {
-        TextButton(onClick = { showJoinConfirmationDialog = false }) {
-          Text(text = strings.cancel, color = Slate400)
-        }
-      }
+      onDismiss = { showJoinConfirmationDialog = false },
     )
   }
 
   if (showProofDialog && !isProofLocked) {
-    AlertDialog(
-      onDismissRequest = {
-        if (!uiState.isSubmittingResult) {
-          showProofDialog = false
-        }
-      },
-      containerColor = NavyCard,
-      title = {
-        Text(
-          text = strings.matchDetailSubmitProofTitle,
-          style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-          color = Color.White,
-        )
-      },
-      text = {
-        Column(
-          verticalArrangement = Arrangement.spacedBy(12.dp),
-          modifier = Modifier.verticalScroll(rememberScrollState()),
-        ) {
-          // A) SCREENSHOT
-          Text(
-            text = strings.matchDetailScreenshotRequired,
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-            color = Gold400,
-          )
-
-          TournamentButton(
-            text = if (selectedImageUri == null) {
-              strings.matchDetailSelectScreenshot
-            } else {
-              strings.matchDetailChangeScreenshot
-            },
-            onClick = {
-              photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            },
-            enabled = !uiState.isSubmittingResult,
-            variant = TournamentButtonVariant.SECONDARY,
-            modifier = Modifier.fillMaxWidth(),
-          )
-
-          if (selectedImageUri != null) {
-            Box(
-              modifier = Modifier
-                .fillMaxWidth()
-                .height(140.dp)
-                .background(Slate900, RoundedCornerShape(8.dp))
-                .padding(4.dp),
-              contentAlignment = Alignment.Center,
-            ) {
-              AsyncImage(
-                model = selectedImageUri,
-                contentDescription = "Selected screenshot preview",
-                modifier = Modifier
-                  .fillMaxSize()
-                  .clip(RoundedCornerShape(6.dp)),
-                contentScale = ContentScale.Crop,
-              )
-            }
-          }
-
-          Spacer(modifier = Modifier.height(4.dp))
-
-          // B) ROOM CODE
-          Text(
-            text = strings.matchDetailRoomCodeRequired,
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-            color = Gold400,
-          )
-          OutlinedTextField(
-            value = roomCodeInput,
-            onValueChange = {
-              roomCodeInput = it
-              proofError = null
-            },
-            enabled = !uiState.isSubmittingResult,
-            label = { Text(strings.roomCodeLabel) },
-            placeholder = { Text(strings.matchDetailRoomCodePlaceholder) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-              focusedTextColor = Color.White,
-              unfocusedTextColor = Color.White,
-              focusedBorderColor = Gold400,
-              unfocusedBorderColor = NavyCardBorder,
-              focusedLabelColor = Gold400,
-              unfocusedLabelColor = Slate400,
-            ),
-          )
-
-          Spacer(modifier = Modifier.height(4.dp))
-
-          // C) MATCH NUMBER
-          Text(
-            text = strings.matchDetailMatchNumberRequired,
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-            color = Gold400,
-          )
-          OutlinedTextField(
-            value = matchNumberInput,
-            onValueChange = {
-              matchNumberInput = it
-              proofError = null
-            },
-            enabled = !uiState.isSubmittingResult,
-            label = { Text(strings.matchDetailMatchNumberLabel) },
-            placeholder = { Text(strings.matchDetailMatchNumberPlaceholder) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-              focusedTextColor = Color.White,
-              unfocusedTextColor = Color.White,
-              focusedBorderColor = Gold400,
-              unfocusedBorderColor = NavyCardBorder,
-              focusedLabelColor = Gold400,
-              unfocusedLabelColor = Slate400,
-            ),
-          )
-
-          Spacer(modifier = Modifier.height(4.dp))
-
-          OutlinedTextField(
-            value = proofNotesInput,
-            onValueChange = { proofNotesInput = it },
-            enabled = !uiState.isSubmittingResult,
-            label = { Text(strings.matchDetailRemarksLabel) },
-            placeholder = { Text(strings.matchDetailRemarksPlaceholder) },
-            maxLines = 3,
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-              focusedTextColor = Color.White,
-              unfocusedTextColor = Color.White,
-              focusedBorderColor = Gold400,
-              unfocusedBorderColor = NavyCardBorder,
-              focusedLabelColor = Gold400,
-              unfocusedLabelColor = Slate400,
-            ),
-          )
-
-          if (proofError != null) {
-            Text(
-              text = proofError!!,
-              style = MaterialTheme.typography.bodySmall,
-              color = Rose400,
-            )
-          }
-        }
-      },
-      confirmButton = {
-        TournamentButton(
+    MdProofWindow(
+      title = strings.matchDetailSubmitProofTitle,
+      cancelText = strings.cancel,
+      cancelEnabled = !uiState.isSubmittingResult,
+      onDismiss = { showProofDialog = false },
+      submit = {
+        DpBigButton(
           text = strings.matchDetailSubmitProofButton,
           onClick = {
-            if (uiState.isSubmittingResult || isProofLocked) return@TournamentButton
-            when {
-              selectedImageUri == null -> {
-                proofError = strings.matchDetailScreenshotRequired
-              }
-              roomCodeInput.trim().isEmpty() -> {
-                proofError = strings.matchDetailRoomCodeRequired
-              }
-              matchNumberInput.trim().isEmpty() -> {
-                proofError = strings.matchDetailMatchNumberRequired
-              }
-              else -> {
-                viewModel.submitVictoryProof(selectedImageUri!!, roomCodeInput.trim(), matchNumberInput.trim(), proofNotesInput.trim())
-                showProofDialog = false
+            if (!uiState.isSubmittingResult && !isProofLocked) {
+              when {
+                selectedImageUri == null -> {
+                  proofError = strings.matchDetailScreenshotRequired
+                }
+                roomCodeInput.trim().isEmpty() -> {
+                  proofError = strings.matchDetailRoomCodeRequired
+                }
+                matchNumberInput.trim().isEmpty() -> {
+                  proofError = strings.matchDetailMatchNumberRequired
+                }
+                else -> {
+                  viewModel.submitVictoryProof(selectedImageUri!!, roomCodeInput.trim(), matchNumberInput.trim(), proofNotesInput.trim())
+                  showProofDialog = false
+                }
               }
             }
           },
-          enabled = !uiState.isSubmittingResult && !isProofLocked,
+          tag = "dialog_confirm_proof_btn",
           isLoading = uiState.isSubmittingResult,
-          testTag = "dialog_confirm_proof_btn",
         )
       },
-      dismissButton = {
-        TextButton(
-          onClick = { showProofDialog = false },
-          enabled = !uiState.isSubmittingResult,
-        ) {
-          Text(strings.cancel, color = Slate400)
-        }
-      },
-    )
+    ) {
+      // A) SCREENSHOT
+      DpUploadBox(
+        title = if (selectedImageUri == null) strings.matchDetailSelectScreenshot else strings.matchDetailChangeScreenshot,
+        subtitle = strings.matchDetailScreenshotRequired,
+        icon = Icons.Default.AddPhotoAlternate,
+        onClick = {
+          if (!uiState.isSubmittingResult) {
+            photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+          }
+        },
+      )
+      if (selectedImageUri != null) {
+        AsyncImage(
+          model = selectedImageUri,
+          contentDescription = "Selected screenshot preview",
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(140.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(Slate900),
+          contentScale = ContentScale.Crop,
+        )
+      }
+      // B) ROOM CODE
+      DpField(
+        label = strings.matchDetailRoomCodeRequired,
+        value = roomCodeInput,
+        onValueChange = {
+          roomCodeInput = it
+          proofError = null
+        },
+        placeholder = strings.matchDetailRoomCodePlaceholder,
+        icon = Icons.Default.VpnKey,
+        keyboardOptions = KeyboardOptions.Default,
+        tag = "proof_room_code_input",
+      )
+      // C) MATCH NUMBER
+      DpField(
+        label = strings.matchDetailMatchNumberRequired,
+        value = matchNumberInput,
+        onValueChange = {
+          matchNumberInput = it
+          proofError = null
+        },
+        placeholder = strings.matchDetailMatchNumberPlaceholder,
+        icon = Icons.Default.Tag,
+        keyboardOptions = KeyboardOptions.Default,
+        tag = "proof_match_number_input",
+      )
+      DpField(
+        label = strings.matchDetailRemarksLabel,
+        value = proofNotesInput,
+        onValueChange = { proofNotesInput = it },
+        placeholder = strings.matchDetailRemarksPlaceholder,
+        icon = Icons.Default.EditNote,
+        keyboardOptions = KeyboardOptions.Default,
+        tag = "proof_notes_input",
+      )
+      if (proofError != null) {
+        DpNotice(proofError!!, Icons.Default.Error, true)
+      }
+    }
+  }
+}
+
+/**
+ * Display only: turns the known English join / proof messages into clear Bengali sentences
+ * when the app is in Bengali. Any other message is shown as it is.
+ */
+private fun mdShownMessage(msg: String, strings: AppStrings): String {
+  if (strings !== BengaliStrings) return msg
+  val m = msg.trim()
+  return when {
+    m.contains("registration deadline has passed", ignoreCase = true) ->
+      "দুঃখিত, এই ম্যাচে জয়েন করার সময় শেষ হয়ে গেছে। অনুগ্রহ করে অন্য একটি ম্যাচ বেছে নিন।"
+    m.contains("already joined", ignoreCase = true) || m.contains("entry transaction already exists", ignoreCase = true) ->
+      "আপনি ইতিমধ্যেই এই ম্যাচে যুক্ত আছেন।"
+    m.contains("Match is full", ignoreCase = true) ->
+      "দুঃখিত, এই ম্যাচের সব আসন পূর্ণ হয়ে গেছে। অনুগ্রহ করে অন্য একটি ম্যাচ বেছে নিন।"
+    m.contains("not available to join", ignoreCase = true) ->
+      "এই ম্যাচে এখন জয়েন করা যাচ্ছে না। অনুগ্রহ করে অন্য একটি ম্যাচ বেছে নিন।"
+    m.contains("account is blocked", ignoreCase = true) ->
+      "আপনার অ্যাকাউন্টটি বন্ধ রয়েছে, তাই ম্যাচে জয়েন করা যাবে না। সাহায্যের জন্য সাপোর্টে যোগাযোগ করুন।"
+    m.contains("Authentication required", ignoreCase = true) || m.contains("must be authenticated", ignoreCase = true) ->
+      "অনুগ্রহ করে আবার লগইন করে চেষ্টা করুন।"
+    m.contains("Invalid entry fee", ignoreCase = true) ->
+      "এই ম্যাচের এন্ট্রি ফি-তে সমস্যা আছে। অনুগ্রহ করে অন্য একটি ম্যাচ বেছে নিন।"
+    m.contains("Wallet not found", ignoreCase = true) ->
+      "আপনার ওয়ালেট খুঁজে পাওয়া যায়নি। কিছুক্ষণ পর আবার চেষ্টা করুন।"
+    m.startsWith("Match ", ignoreCase = true) && m.contains("not found", ignoreCase = true) ->
+      "ম্যাচটি খুঁজে পাওয়া যায়নি। কিছুক্ষণ পর আবার চেষ্টা করুন।"
+    m.contains("Successfully joined", ignoreCase = true) ->
+      "অভিনন্দন! আপনি সফলভাবে ম্যাচে যুক্ত হয়েছেন। 🎉"
+    m.contains("proof submitted successfully", ignoreCase = true) ->
+      "আপনার জয়ের প্রমাণ সফলভাবে জমা হয়েছে। অ্যাডমিন যাচাই করে দেখবেন।"
+    m.contains("Failed to upload screenshot", ignoreCase = true) ->
+      "স্ক্রিনশট আপলোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"
+    else -> msg
   }
 }

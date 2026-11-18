@@ -3,6 +3,7 @@ package com.example.ui.wallet
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -113,6 +114,7 @@ fun TransactionsScreen(
     LazyColumn(
       modifier = Modifier
         .fillMaxSize()
+        .wlBackground()
         .padding(innerPadding)
         .testTag("transactions_list"),
       contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
@@ -120,165 +122,36 @@ fun TransactionsScreen(
     ) {
       // 2. PAGE IDENTITY
       item {
-        Column(
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 2.dp, bottom = 4.dp),
-        ) {
-          Text(
-            text = strings.txHistoryTitle,
-            style = MaterialTheme.typography.headlineSmall.copy(
-              fontWeight = FontWeight.Black,
-              letterSpacing = 1.sp,
-              fontSize = 20.sp,
-            ),
-            color = Color.White,
-          )
-          Spacer(modifier = Modifier.height(2.dp))
-          Text(
-            text = strings.txHistorySubtitle,
-            style = MaterialTheme.typography.bodySmall.copy(
-              color = Slate400,
-              fontSize = 13.sp,
-            ),
-          )
-        }
+        WlPageTitle(title = strings.txHistoryTitle, subtitle = strings.txHistorySubtitle, modifier = Modifier.padding(top = 4.dp, bottom = 2.dp))
       }
 
       // 3. BALANCE SUMMARY CARD
       item {
-        Surface(
-          shape = RoundedCornerShape(14.dp),
-          color = NavyCard,
-          border = BorderStroke(
-            1.dp,
-            Brush.horizontalGradient(
-              listOf(
-                Gold500.copy(alpha = 0.5f),
-                Cyan400.copy(alpha = 0.4f),
-              )
-            ),
-          ),
-          modifier = Modifier.fillMaxWidth(),
-        ) {
-          Column(modifier = Modifier.padding(14.dp)) {
-            // Main row: Available Balance
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.SpaceBetween,
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              Column {
-                Row(
-                  verticalAlignment = Alignment.CenterVertically,
-                  horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                  Box(
-                    modifier = Modifier
-                      .size(8.dp)
-                      .clip(CircleShape)
-                      .background(Emerald400),
-                  )
-                  Text(
-                    text = strings.availableBalanceNotice("").replace(": ৳", "").uppercase(),
-                    style = MaterialTheme.typography.labelSmall.copy(
-                      fontWeight = FontWeight.Bold,
-                      letterSpacing = 0.5.sp,
-                      fontSize = 12.sp,
-                    ),
-                    color = Gold400,
-                  )
-                }
-                Spacer(modifier = Modifier.height(3.dp))
-                Text(
-                  text = strings.taka(wallet?.availableAmount ?: 0.0),
-                  style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.Black,
-                    fontSize = 24.sp,
-                  ),
-                  color = Color.White,
-                )
-              }
-
-              Surface(
-                shape = CircleShape,
-                color = Slate900,
-                border = BorderStroke(1.dp, Gold500.copy(alpha = 0.3f)),
-                modifier = Modifier.size(42.dp),
-              ) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                  Icon(
-                    imageVector = Icons.Default.AccountBalanceWallet,
-                    contentDescription = null,
-                    tint = Gold400,
-                    modifier = Modifier.size(22.dp),
-                  )
-                }
-              }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = Slate800, thickness = 1.dp)
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Secondary Stats: Deposited, Winnings, Withdrawn
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
+        WlFrame(gold = true, pad = 14.dp) {
+          Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(start = 6.dp)) {
               Column(modifier = Modifier.weight(1f)) {
-                Text(
-                  text = strings.statDeposited,
-                  style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                  ),
-                  color = Slate400,
-                )
-                Text(
-                  text = strings.takaWhole(wallet?.totalDepositedAmount ?: 0.0),
-                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
-                  color = Cyan400,
-                )
+                WlPill(strings.availableBalanceNotice("").replace(": ৳", "").uppercase(), Color(0xFF8CFF4A), listOf(Color(0xFF0E3A2A), Color(0xFF07241A)), Color(0xFF4ADE80), Color(0xFFB8FFC8))
+                Spacer(modifier = Modifier.height(8.dp))
+                val availText = strings.taka(wallet?.availableAmount ?: 0.0)
+                WlText3D(availText, if (availText.length > 10) 26.sp else 32.sp, WlTone.GOLD)
               }
-
-              Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-              ) {
-                Text(
-                  text = strings.statWinnings,
-                  style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                  ),
-                  color = Slate400,
-                )
-                Text(
-                  text = strings.takaWhole(wallet?.winningsAmount ?: 0.0),
-                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
-                  color = Emerald400,
-                )
-              }
-
-              Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.End,
-              ) {
-                Text(
-                  text = strings.statWithdrawn,
-                  style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                  ),
-                  color = Slate400,
-                )
-                Text(
-                  text = strings.takaWhole(wallet?.totalWithdrawnAmount ?: 0.0),
-                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
-                  color = Amber400,
-                )
-              }
+              WlCoinMedal(74)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 2.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Brush.verticalGradient(listOf(Color(0xFF0A0E3C), Color(0xFF101655))))
+                .border(1.3.dp, Color(0xB3E8B84A), RoundedCornerShape(16.dp))
+                .padding(horizontal = 4.dp, vertical = 8.dp),
+            ) {
+              WlMiniStat(R.drawable.wl_moneybag, strings.statDeposited, strings.takaWhole(wallet?.totalDepositedAmount ?: 0.0), Color(0xFF4ADE80), WlTone.CREAM, Modifier.weight(1f))
+              WlMiniStat(R.drawable.wl_trophy, strings.statWinnings, strings.takaWhole(wallet?.winningsAmount ?: 0.0), Color(0xFF7DA8FF), WlTone.CREAM, Modifier.weight(1f))
+              WlMiniStat(R.drawable.wl_withdraw, strings.statWithdrawn, strings.takaWhole(wallet?.totalWithdrawnAmount ?: 0.0), Color(0xFFFF9A4A), WlTone.GOLD, Modifier.weight(1f))
             }
           }
         }
@@ -288,7 +161,8 @@ fun TransactionsScreen(
       item {
         LazyRow(
           modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          horizontalArrangement = Arrangement.spacedBy(7.dp),
+          contentPadding = PaddingValues(vertical = 4.dp),
         ) {
           items(TransactionFilter.values()) { filter ->
             val isSelected = selectedFilter == filter
@@ -299,30 +173,12 @@ fun TransactionsScreen(
               TransactionFilter.WINNING -> strings.txHistoryFilterWinning
               TransactionFilter.WITHDRAW -> strings.txHistoryFilterWithdraw
             }
-            Surface(
+            WlFilterChip(
+              text = displayName,
+              selected = isSelected,
               onClick = { selectedFilter = filter },
-              shape = RoundedCornerShape(20.dp),
-              color = if (isSelected) Gold500.copy(alpha = 0.22f) else Slate850,
-              border = BorderStroke(
-                1.dp,
-                if (isSelected) Gold400 else Slate700,
-              ),
-              modifier = Modifier.testTag(filter.testTag),
-            ) {
-              Box(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-                contentAlignment = Alignment.Center,
-              ) {
-                Text(
-                  text = displayName,
-                  style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
-                    fontSize = 12.sp,
-                  ),
-                  color = if (isSelected) Gold400 else Slate300,
-                )
-              }
-            }
+              tag = filter.testTag,
+            )
           }
         }
       }
@@ -375,56 +231,12 @@ fun TransactionsScreen(
       } else if (filteredTransactions.isEmpty()) {
         // 8. EMPTY STATE
         item {
-          Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = Slate850,
-            border = BorderStroke(1.dp, Slate700),
-            modifier = Modifier
-              .fillMaxWidth()
-              .padding(vertical = 12.dp),
-          ) {
-            Column(
-              modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 40.dp, horizontal = 20.dp),
-              horizontalAlignment = Alignment.CenterHorizontally,
-              verticalArrangement = Arrangement.Center,
-            ) {
-              Surface(
-                shape = CircleShape,
-                color = Slate900,
-                border = BorderStroke(1.dp, Slate700),
-                modifier = Modifier.size(60.dp),
-              ) {
-                Box(
-                  modifier = Modifier.fillMaxSize(),
-                  contentAlignment = Alignment.Center,
-                ) {
-                  Icon(
-                    imageVector = Icons.Default.ReceiptLong,
-                    contentDescription = null,
-                    tint = Slate400,
-                    modifier = Modifier.size(30.dp),
-                  )
-                }
-              }
-              Spacer(modifier = Modifier.height(14.dp))
-              Text(
-                text = if (selectedFilter == TransactionFilter.ALL) strings.txHistoryEmptyTitle else strings.txHistoryEmptyFilterTitle,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 16.sp),
-                color = Color.White,
-              )
-              Spacer(modifier = Modifier.height(4.dp))
-              Text(
-                text = if (selectedFilter == TransactionFilter.ALL)
-                  strings.txHistoryEmptyDesc
-                else
-                  strings.txHistoryEmptyFilterDesc,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                color = Slate400,
-                modifier = Modifier.padding(horizontal = 16.dp),
-              )
-            }
+          WlFrame(gold = true, pad = 12.dp, modifier = Modifier.padding(vertical = 8.dp)) {
+            WlEmptyState(
+              title = if (selectedFilter == TransactionFilter.ALL) strings.txHistoryEmptyTitle else strings.txHistoryEmptyFilterTitle,
+              description = if (selectedFilter == TransactionFilter.ALL) strings.txHistoryEmptyDesc else strings.txHistoryEmptyFilterDesc,
+              modifier = Modifier.padding(vertical = 8.dp),
+            )
           }
         }
       } else {
@@ -443,175 +255,26 @@ private fun TransactionCard(txn: TransactionEntity) {
   val clipboardManager = LocalClipboardManager.current
   val context = LocalContext.current
   val display = buildTxDisplay(txn, strings)
-
-  val icon = when (display.iconKind) {
-    "withdraw" -> Icons.Default.ArrowUpward
-    "deposit" -> Icons.Default.AddCircleOutline
-    "prize" -> Icons.Default.EmojiEvents
-    "refund" -> Icons.Default.RotateLeft
-    "game" -> Icons.Default.SportsEsports
-    "admin" -> Icons.Default.Build
-    else -> Icons.Default.SportsEsports
-  }
-  
-  val iconTint = when (display.iconKind) {
-    "withdraw" -> Amber400
-    "deposit" -> Cyan400
-    "prize" -> Gold400
-    "refund" -> Emerald400
-    "admin" -> Rose400
-    else -> Rose400
-  }
-  val iconBg = iconTint.copy(alpha = 0.15f)
-
-  Surface(
-    color = Slate850,
-    shape = RoundedCornerShape(12.dp),
-    border = BorderStroke(1.dp, Slate700),
-    modifier = Modifier.fillMaxWidth(),
-  ) {
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(12.dp),
-    ) {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-      ) {
-        Row(
-          modifier = Modifier.weight(1f),
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-          Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = iconBg,
-            modifier = Modifier.size(40.dp),
-          ) {
-            Box(
-              modifier = Modifier.fillMaxSize(),
-              contentAlignment = Alignment.Center,
-            ) {
-              Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(22.dp),
-              )
-            }
-          }
-
-          Column(modifier = Modifier.weight(1f)) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-              Text(
-                text = display.title,
-                style = MaterialTheme.typography.titleSmall.copy(
-                  fontWeight = FontWeight.Bold,
-                  fontSize = 14.sp,
-                ),
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false)
-              )
-
-              StatusBadge(statusText = display.statusText)
-            }
-
-            if (display.description.isNotBlank()) {
-              Spacer(modifier = Modifier.height(2.dp))
-              Text(
-                text = display.description,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                color = Slate400,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-              )
-            }
-
-            if (display.dateText.isNotBlank()) {
-              Spacer(modifier = Modifier.height(2.dp))
-              Text(
-                text = display.dateText,
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                color = Slate500,
-              )
-            }
-          }
-        }
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        val amountPrefix = if (display.isVoid) "" else if (display.isCredit) "+ " else "- "
-        Text(
-          text = "$amountPrefix${strings.takaFromMinor(txn.displayMinorUnits)}",
-          style = MaterialTheme.typography.titleMedium.copy(
-            fontWeight = FontWeight.Black,
-            fontSize = 16.sp,
-          ),
-          color = if (display.isVoid) Slate400 else if (display.isCredit) Emerald400 else Rose400,
-        )
-      }
-
-      if (txn.referenceId.isNotBlank()) {
-        Spacer(modifier = Modifier.height(8.dp))
-        HorizontalDivider(color = Slate800, thickness = 0.5.dp)
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-          Text(
-            text = "${strings.txHistoryRefLabel} ${txn.referenceId}",
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-            color = Slate400,
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-          )
-
-          Surface(
-            shape = RoundedCornerShape(4.dp),
-            color = Slate800,
-            modifier = Modifier
-              .clickable {
-                clipboardManager.setText(AnnotatedString(txn.referenceId))
-                Toast.makeText(context, strings.txHistoryCopied, Toast.LENGTH_SHORT).show()
-              }
-              .testTag("copy_ref_${txn.effectiveId}"),
-          ) {
-            Row(
-              modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-              Icon(
-                imageVector = Icons.Default.ContentCopy,
-                contentDescription = strings.txHistoryCopyAction,
-                tint = Gold400,
-                modifier = Modifier.size(12.dp),
-              )
-              Text(
-                text = strings.txHistoryCopyAction,
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontSize = 10.sp,
-                  fontWeight = FontWeight.Bold,
-                ),
-                color = Gold400,
-              )
-            }
-          }
-        }
-      }
-    }
-  }
+  val look = wlTxLook(display.iconKind, txn.type)
+  val amountPrefix = if (display.isVoid) "" else if (display.isCredit) "+ " else "- "
+  WlTxRow(
+    picture = look.first,
+    ring = look.second,
+    title = display.title,
+    statusText = display.statusText,
+    statusKind = if (display.isVoid) 2 else if (display.statusText == strings.walletTxStatusPending) 1 else 0,
+    description = display.description,
+    date = display.dateText,
+    amountText = "$amountPrefix${strings.takaFromMinor(txn.displayMinorUnits)}",
+    amountTone = if (display.isVoid) WlTone.GREY else if (display.isCredit) WlTone.GREEN else WlTone.RED,
+    refText = if (txn.referenceId.isNotBlank()) "${strings.txHistoryRefLabel} ${txn.referenceId}" else null,
+    copyText = strings.txHistoryCopyAction,
+    copyTag = "copy_ref_${txn.effectiveId}",
+    onCopy = {
+      clipboardManager.setText(AnnotatedString(txn.referenceId))
+      Toast.makeText(context, strings.txHistoryCopied, Toast.LENGTH_SHORT).show()
+    },
+  )
 }
 
 private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)

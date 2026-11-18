@@ -34,6 +34,9 @@ import com.example.domain.model.WalletEntity
 import com.example.core.i18n.*
 import com.example.ui.components.PremiumNotificationBellButton
 import com.example.ui.components.UnifiedEsportsTopBar
+import com.example.ui.wallet.WlPageTitle
+import com.example.ui.wallet.WlTone
+import com.example.ui.wallet.wlBackground
 import com.example.ui.theme.*
 import com.google.firebase.auth.FirebaseAuth
 import java.text.SimpleDateFormat
@@ -42,6 +45,20 @@ import java.util.Locale
 
 val MatchEntity.completedAt: Long
   get() = if (scheduledAt > 0L) scheduledAt else scheduledTime
+
+/** Auto games are known by their title ("Auto Ludo || Match No:- #1") or game type. Used only to sort and name cards. */
+private fun historyAutoKind(match: MatchEntity): String? {
+  val t = match.title.lowercase(Locale.US).replace(" ", "")
+  val g = match.gameType.uppercase(Locale.US).replace(" ", "").replace("_", "")
+  return when {
+    t.startsWith("autoludo") || g == "AUTOLUDO" -> "AUTO_LUDO"
+    t.startsWith("autocarrom") || g == "AUTOCARROM" -> "AUTO_CARROM"
+    else -> null
+  }
+}
+
+private fun historyAutoCarromLabel(strings: AppStrings): String =
+  if (strings === BengaliStrings) "অটো ক্যারম" else "Auto Carrom"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,13 +100,15 @@ fun HistoryScreen(
     }
   }
 
-  // 2. Filter selection (ALL, LUDO, CARROM)
+  // 2. Filter selection (ALL, LUDO, CARROM, AUTO_LUDO, AUTO_CARROM)
   var selectedFilter by remember { mutableStateOf("ALL") }
 
   val filteredMatches = remember(userHistoricalMatches, selectedFilter) {
     when (selectedFilter) {
-      "LUDO" -> userHistoricalMatches.filter { it.gameType.equals("LUDO", ignoreCase = true) }
-      "CARROM" -> userHistoricalMatches.filter { it.gameType.equals("CARROM", ignoreCase = true) }
+      "LUDO" -> userHistoricalMatches.filter { historyAutoKind(it) == null && it.gameType.equals("LUDO", ignoreCase = true) }
+      "CARROM" -> userHistoricalMatches.filter { historyAutoKind(it) == null && it.gameType.equals("CARROM", ignoreCase = true) }
+      "AUTO_LUDO" -> userHistoricalMatches.filter { historyAutoKind(it) == "AUTO_LUDO" }
+      "AUTO_CARROM" -> userHistoricalMatches.filter { historyAutoKind(it) == "AUTO_CARROM" }
       else -> userHistoricalMatches
     }
   }
@@ -112,32 +131,18 @@ fun HistoryScreen(
     LazyColumn(
       modifier = Modifier
         .fillMaxSize()
+        .wlBackground()
         .padding(innerPadding)
         .testTag("history_match_list"),
       contentPadding = PaddingValues(bottom = 32.dp),
     ) {
       // 1. PAGE TITLE & SUBTITLE
       item {
-        Column(
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        ) {
-          Text(
-            text = strings.matchHistoryTitle,
-            style = MaterialTheme.typography.titleLarge.copy(
-              fontWeight = FontWeight.Black,
-              letterSpacing = 0.8.sp,
-            ),
-            color = Color.White,
-          )
-          Spacer(modifier = Modifier.height(2.dp))
-          Text(
-            text = strings.matchHistorySubtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = Slate400,
-          )
-        }
+        WlPageTitle(
+          title = strings.matchHistoryTitle,
+          subtitle = strings.matchHistorySubtitle,
+          modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        )
       }
 
       // 2. SUMMARY CARD
@@ -173,7 +178,7 @@ fun HistoryScreen(
             subtitle = strings.noMatchHistorySubtext,
             modifier = Modifier
               .fillMaxWidth()
-              .padding(32.dp)
+              .padding(horizontal = 16.dp, vertical = 12.dp)
               .testTag("history_empty_state"),
           )
         }
@@ -184,7 +189,7 @@ fun HistoryScreen(
             subtitle = strings.noFilteredMatchesSubtext,
             modifier = Modifier
               .fillMaxWidth()
-              .padding(32.dp)
+              .padding(horizontal = 16.dp, vertical = 12.dp)
               .testTag("history_empty_state"),
           )
         }
@@ -222,84 +227,18 @@ private fun HistorySummaryCard(
   modifier: Modifier = Modifier,
 ) {
   val strings = LocalAppStrings.current
-  Surface(
-    shape = RoundedCornerShape(14.dp),
-    color = NavySurface,
-    border = BorderStroke(1.dp, Gold400.copy(alpha = 0.25f)),
+  HsSummaryCard(
+    totalLabel = strings.totalPlayed,
+    totalText = strings.number(totalPlayed),
+    wonLabel = strings.totalWon,
+    wonText = strings.number(wonCount),
+    lostLabel = strings.statLosses,
+    lostText = strings.number(lostCount),
+    rateLabel = strings.winRateLabel,
+    rateText = strings.digits("$winRate%"),
+    rateFraction = winRate / 100f,
     modifier = modifier,
-  ) {
-    Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(vertical = 16.dp, horizontal = 8.dp),
-      horizontalArrangement = Arrangement.SpaceEvenly,
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      SummaryStatColumn(
-        label = strings.totalPlayed,
-        value = strings.number(totalPlayed),
-        valueColor = Color.White,
-      )
-      VerticalDivider(
-        modifier = Modifier.height(36.dp),
-        color = CardBorder,
-      )
-      SummaryStatColumn(
-        label = strings.totalWon,
-        value = strings.number(wonCount),
-        valueColor = Emerald400,
-      )
-      VerticalDivider(
-        modifier = Modifier.height(36.dp),
-        color = CardBorder,
-      )
-      SummaryStatColumn(
-        label = strings.statLosses,
-        value = strings.number(lostCount),
-        valueColor = Rose400,
-      )
-      VerticalDivider(
-        modifier = Modifier.height(36.dp),
-        color = CardBorder,
-      )
-      SummaryStatColumn(
-        label = strings.winRateLabel,
-        value = strings.digits("$winRate%"),
-        valueColor = Gold400,
-      )
-    }
-  }
-}
-
-@Composable
-private fun SummaryStatColumn(
-  label: String,
-  value: String,
-  valueColor: Color,
-  modifier: Modifier = Modifier,
-) {
-  Column(
-    modifier = modifier,
-    horizontalAlignment = Alignment.CenterHorizontally,
-  ) {
-    Text(
-      text = label,
-      style = MaterialTheme.typography.labelSmall.copy(
-        fontWeight = FontWeight.Bold,
-        letterSpacing = 0.5.sp,
-        fontSize = 10.sp,
-      ),
-      color = Slate400,
-    )
-    Spacer(modifier = Modifier.height(4.dp))
-    Text(
-      text = value,
-      style = MaterialTheme.typography.titleLarge.copy(
-        fontWeight = FontWeight.Black,
-      ),
-      color = valueColor,
-    )
-  }
+  )
 }
 
 // -----------------------------------------------------------------------------
@@ -313,40 +252,19 @@ private fun HistoryFilterRow(
   modifier: Modifier = Modifier,
 ) {
   val strings = LocalAppStrings.current
-  val filters = listOf(
-    Triple("ALL", strings.filterAll, "history_filter_all"),
-    Triple("LUDO", strings.filterLudo, "history_filter_ludo"),
-    Triple("CARROM", strings.filterCarrom, "history_filter_carrom"),
-  )
-
-  Row(
+  val autoBadge = if (strings === BengaliStrings) "⚡ অটো" else "⚡ AUTO"
+  Column(
     modifier = modifier,
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
-    verticalAlignment = Alignment.CenterVertically,
+    verticalArrangement = Arrangement.spacedBy(8.dp),
   ) {
-    filters.forEach { (key, label, tag) ->
-      val isSelected = selectedFilter == key
-      Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = if (isSelected) Gold500.copy(alpha = 0.2f) else Slate900,
-        border = BorderStroke(
-          1.dp,
-          if (isSelected) Gold400 else CardBorder,
-        ),
-        modifier = Modifier
-          .clickable { onFilterSelected(key) }
-          .testTag(tag),
-      ) {
-        Text(
-          text = label,
-          style = MaterialTheme.typography.labelMedium.copy(
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            letterSpacing = 0.5.sp,
-          ),
-          color = if (isSelected) Gold400 else Slate300,
-          modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-      }
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+      HsFilterCard(strings.filterAll, selectedFilter == "ALL", 0, { onFilterSelected("ALL") }, "history_filter_all", Modifier.weight(1f))
+      HsFilterCard(strings.filterLudo, selectedFilter == "LUDO", 1, { onFilterSelected("LUDO") }, "history_filter_ludo", Modifier.weight(1f))
+      HsFilterCard(strings.filterCarrom, selectedFilter == "CARROM", 2, { onFilterSelected("CARROM") }, "history_filter_carrom", Modifier.weight(1f))
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+      HsFilterCard(strings.homeAutoLudoTitle, selectedFilter == "AUTO_LUDO", 1, { onFilterSelected("AUTO_LUDO") }, "history_filter_auto_ludo", Modifier.weight(1f), badge = autoBadge)
+      HsFilterCard(historyAutoCarromLabel(strings), selectedFilter == "AUTO_CARROM", 2, { onFilterSelected("AUTO_CARROM") }, "history_filter_auto_carrom", Modifier.weight(1f), badge = autoBadge)
     }
   }
 }
@@ -435,242 +353,63 @@ private fun HistoryMatchCard(
 
   val matchIdDisplay = if (matchIdShort.isNotBlank()) "#$matchIdShort" else ""
 
-  Surface(
-    shape = RoundedCornerShape(12.dp),
-    color = NavySurface,
-    border = BorderStroke(
-      1.dp,
-      when {
-        isWinner -> Gold400.copy(alpha = 0.35f)
-        isCancelled -> CardBorder
-        else -> NavyCardBorder
-      },
-    ),
-    modifier = modifier.clickable(onClick = onClick),
-  ) {
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(14.dp),
-    ) {
-      // Upper row: Icon + Title/Info + Result Badge
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        Row(
-          modifier = Modifier.weight(1f),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Box(
-            modifier = Modifier
-              .size(40.dp)
-              .clip(CircleShape)
-              .background(
-                when {
-                  isWinner -> Gold400.copy(alpha = 0.15f)
-                  isCancelled -> Slate800
-                  isUnderReview -> Gold500.copy(alpha = 0.15f)
-                  isRejected -> Rose600.copy(alpha = 0.15f)
-                  isDefeat -> Rose600.copy(alpha = 0.12f)
-                  else -> Slate800
-                }
-              ),
-            contentAlignment = Alignment.Center,
-          ) {
-            Icon(
-              imageVector = when {
-                isWinner -> Icons.Default.EmojiEvents
-                isCancelled -> Icons.Default.Refresh
-                isUnderReview -> Icons.Default.HourglassEmpty
-                isRejected -> Icons.Default.Cancel
-                isDefeat -> Icons.Default.Close
-                else -> Icons.Default.HourglassEmpty
-              },
-              contentDescription = resultText,
-              tint = resultColor,
-              modifier = Modifier.size(22.dp),
-            )
-          }
-          Spacer(modifier = Modifier.width(10.dp))
-          Column(modifier = Modifier.weight(1f)) {
-            Text(
-              text = finalDisplayTitle,
-              style = MaterialTheme.typography.titleSmall.copy(
-                fontWeight = FontWeight.Bold,
-              ),
-              color = Color.White,
-              maxLines = 1,
-              overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-              text = buildString {
-                append(formattedDate)
-                if (matchIdDisplay.isNotBlank()) {
-                  append(" • ")
-                  append(matchIdDisplay)
-                }
-              },
-              style = MaterialTheme.typography.labelSmall,
-              color = Slate400,
-              maxLines = 1,
-              overflow = TextOverflow.Ellipsis,
-            )
-          }
-        }
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        // Result Chip
-        Surface(
-          shape = RoundedCornerShape(8.dp),
-          color = resultBg,
-          border = BorderStroke(1.dp, resultColor.copy(alpha = 0.6f)),
-        ) {
-          Text(
-            text = resultText,
-            style = MaterialTheme.typography.labelSmall.copy(
-              fontWeight = FontWeight.Bold,
-              letterSpacing = 0.5.sp,
-            ),
-            color = resultColor,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-          )
-        }
-      }
-
-      Spacer(modifier = Modifier.height(12.dp))
-
-      // Lower row: Match Details Strip
-      Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = Slate900,
-        modifier = Modifier.fillMaxWidth(),
-      ) {
-        Row(
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          // Game
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-              text = "${strings.historyGameLabel} ",
-              style = MaterialTheme.typography.labelSmall,
-              color = Slate400,
-            )
-            Text(
-              text = if (match.gameType.equals("LUDO", ignoreCase = true)) strings.filterLudo
-                     else if (match.gameType.equals("CARROM", ignoreCase = true)) strings.filterCarrom
-                     else match.gameType,
-              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-              color = Cyan400,
-            )
-          }
-
-          // Entry Fee
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-              text = "${strings.historyEntryLabel} ",
-              style = MaterialTheme.typography.labelSmall,
-              color = Slate400,
-            )
-            Text(
-              text = strings.takaFromMinor(match.effectiveEntryFeeMinorUnits),
-              style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
-                  letterSpacing = 0.sp
-              ),
-              color = Color.White,
-              modifier = Modifier.padding(end = 2.dp)
-            )
-          }
-
-          // Prize
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-              text = "${strings.historyPrizeLabel} ",
-              style = MaterialTheme.typography.labelSmall,
-              color = Slate400,
-            )
-            Text(
-              text = if (isCancelled) "—" else if (isDefeat) strings.taka(0.0) else strings.taka(match.displayPrizePool),
-              style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = if (strings === BengaliStrings) FontWeight.Bold else FontWeight.Black,
-                  letterSpacing = 0.sp
-              ),
-              color = if (isCancelled || isDefeat) Slate400 else Gold400,
-              modifier = Modifier.padding(end = 2.dp)
-            )
-          }
-        }
-      }
-
-      // Cancellation Section
-      if (isCancelled) {
-        Spacer(modifier = Modifier.height(10.dp))
-        Surface(
-          shape = RoundedCornerShape(8.dp),
-          color = Rose600.copy(alpha = 0.08f),
-          border = BorderStroke(1.dp, Rose500.copy(alpha = 0.25f)),
-          modifier = Modifier
-            .fillMaxWidth()
-            .testTag("history_cancellation_section_${match.matchId}"),
-        ) {
-          Column(
-            modifier = Modifier
-              .fillMaxWidth()
-              .padding(horizontal = 12.dp, vertical = 8.dp),
-          ) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-              Icon(
-                imageVector = Icons.Default.Close,
-                contentDescription = strings.matchCancelled,
-                tint = Rose400,
-                modifier = Modifier.size(16.dp),
-              )
-              Text(
-                text = strings.matchCancelled,
-                style = MaterialTheme.typography.labelMedium.copy(
-                  fontWeight = FontWeight.Bold,
-                ),
-                color = Rose400,
-                modifier = Modifier.testTag("history_cancelled_title_${match.matchId}"),
-              )
-            }
-            if (!match.cancelReason.isNullOrBlank()) {
-              Spacer(modifier = Modifier.height(4.dp))
-              Row(
-                verticalAlignment = Alignment.Top,
-                modifier = Modifier.padding(start = 22.dp),
-              ) {
-                Text(
-                  text = "${strings.cancellationReason}: ",
-                  style = MaterialTheme.typography.bodySmall.copy(
-                    fontWeight = FontWeight.SemiBold,
-                  ),
-                  color = Slate300,
-                )
-                Text(
-                  text = match.cancelReason,
-                  style = MaterialTheme.typography.bodySmall,
-                  color = Slate200,
-                  modifier = Modifier.testTag("history_cancelled_reason_${match.matchId}"),
-                )
-              }
-            }
-          }
-        }
-      }
-    }
+  // Auto games: own name and title (look only)
+  val autoKind = historyAutoKind(match)
+  val autoLabel = when (autoKind) {
+    "AUTO_LUDO" -> strings.homeAutoLudoTitle
+    "AUTO_CARROM" -> historyAutoCarromLabel(strings)
+    else -> null
   }
+  val autoNumber = Regex("#\\s*(\\S+)\\s*$").find(match.title)?.groupValues?.get(1).orEmpty()
+  val cardTitle = when {
+    autoKind == "AUTO_LUDO" && autoNumber.isNotBlank() -> strings.autoLudoCardTitle(strings.digits(autoNumber))
+    autoLabel != null && autoNumber.isNotBlank() -> "$autoLabel · #${strings.digits(autoNumber)}"
+    autoLabel != null -> autoLabel
+    else -> finalDisplayTitle
+  }
+  val isLudoGame = autoKind == "AUTO_LUDO" || (autoKind == null && match.gameType.equals("LUDO", ignoreCase = true))
+  val kind = when (matchResult) {
+    HistoryMatchResult.WON -> HsKind.WON
+    HistoryMatchResult.LOST -> HsKind.LOST
+    HistoryMatchResult.PENDING -> HsKind.PENDING
+    HistoryMatchResult.CANCELLED -> HsKind.CANCELLED
+  }
+  val picture = when (kind) {
+    HsKind.WON -> R.drawable.wl_trophy
+    HsKind.PENDING -> R.drawable.wl_hourglass
+    else -> if (isLudoGame) R.drawable.mg_dice else R.drawable.mg_carrom
+  }
+
+  HsMatchCard(
+    kind = kind,
+    picture = picture,
+    resultText = resultText,
+    title = cardTitle,
+    dateLine = buildString {
+      append(formattedDate)
+      if (matchIdDisplay.isNotBlank()) {
+        append(" • ")
+        append(matchIdDisplay)
+      }
+    },
+    gameLabel = strings.historyGameLabel,
+    gameText = autoLabel
+      ?: if (match.gameType.equals("LUDO", ignoreCase = true)) strings.filterLudo
+      else if (match.gameType.equals("CARROM", ignoreCase = true)) strings.filterCarrom
+      else match.gameType,
+    entryLabel = strings.historyEntryLabel,
+    entryText = strings.takaFromMinor(match.effectiveEntryFeeMinorUnits),
+    prizeLabel = strings.historyPrizeLabel,
+    prizeText = if (isCancelled) "—" else if (isDefeat) strings.taka(0.0) else strings.taka(match.displayPrizePool),
+    prizeTone = if (isCancelled) WlTone.GREY else if (isDefeat) WlTone.RED else WlTone.GREEN,
+    onClick = onClick,
+    modifier = modifier,
+    extra = {
+      if (isCancelled) {
+        HsCancelBox(strings.matchCancelled, strings.cancellationReason, match.cancelReason, match.matchId)
+      }
+    },
+  )
 }
 
 // -----------------------------------------------------------------------------
@@ -683,47 +422,5 @@ private fun HistoryEmptyState(
   subtitle: String,
   modifier: Modifier = Modifier,
 ) {
-  Box(
-    modifier = modifier,
-    contentAlignment = Alignment.Center,
-  ) {
-    Column(
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.Center,
-    ) {
-      Surface(
-        shape = CircleShape,
-        color = Slate900,
-        border = BorderStroke(1.dp, CardBorder),
-        modifier = Modifier.size(72.dp),
-      ) {
-        Box(
-          modifier = Modifier.fillMaxSize(),
-          contentAlignment = Alignment.Center,
-        ) {
-          Icon(
-            imageVector = Icons.Default.History,
-            contentDescription = null,
-            tint = Slate400,
-            modifier = Modifier.size(36.dp),
-          )
-        }
-      }
-      Spacer(modifier = Modifier.height(16.dp))
-      Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium.copy(
-          fontWeight = FontWeight.Bold,
-          letterSpacing = 0.5.sp,
-        ),
-        color = Color.White,
-      )
-      Spacer(modifier = Modifier.height(6.dp))
-      Text(
-        text = subtitle,
-        style = MaterialTheme.typography.bodyMedium,
-        color = Slate400,
-      )
-    }
-  }
+  HsEmptyState(title = title, subtitle = subtitle, modifier = modifier)
 }

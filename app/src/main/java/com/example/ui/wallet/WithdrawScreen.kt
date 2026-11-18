@@ -3,6 +3,7 @@ package com.example.ui.wallet
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -16,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -119,522 +121,138 @@ fun WithdrawScreen(
     Column(
       modifier = Modifier
         .fillMaxSize()
+        .wlBackground()
         .padding(innerPadding)
         .verticalScroll(rememberScrollState())
         .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
       if (uiState.withdrawalSubmitted) {
-        TournamentCard(
-          modifier = Modifier.fillMaxWidth(),
-          backgroundColor = Slate900,
-          borderColor = Emerald500,
-        ) {
-          Icon(
-            imageVector = Icons.Default.CheckCircle,
-            contentDescription = null,
-            tint = Emerald400,
-            modifier = Modifier.size(48.dp),
-          )
-          Spacer(modifier = Modifier.height(12.dp))
-          Text(
-            text = strings.withdrawSuccessTitle,
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-            color = Color.White,
-          )
-          Text(
-            text = uiState.successMessage
-              ?: strings.withdrawSuccessDesc(strings.taka(amountNum.toDouble()), methodLabel),
-            style = MaterialTheme.typography.bodyMedium,
-            color = Slate300,
-            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
-          )
-
-          Surface(
-            shape = RoundedCornerShape(8.dp),
-            color = Slate850,
-            border = BorderStroke(1.dp, Slate700),
-            modifier = Modifier
-              .fillMaxWidth()
-              .padding(bottom = 16.dp),
-          ) {
-            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-              Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-              ) {
-                Text(text = strings.withdrawStatusLabel, style = MaterialTheme.typography.bodySmall, color = Slate400)
-                Text(
-                  text = strings.withdrawStatusPending,
-                  style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                  color = Gold400,
-                )
-              }
-              Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-              ) {
-                Text(text = strings.withdrawPayoutMethodLabel, style = MaterialTheme.typography.bodySmall, color = Slate400)
-                Text(text = methodLabel, style = MaterialTheme.typography.bodySmall, color = Color.White)
-              }
-              Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-              ) {
-                Text(text = strings.withdrawRecipientAccountLabel, style = MaterialTheme.typography.bodySmall, color = Slate400)
-                Text(text = recipientNumber, style = MaterialTheme.typography.bodySmall, color = Color.White)
-              }
-              Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-              ) {
-                Text(text = strings.withdrawRequestedAmountLabel, style = MaterialTheme.typography.bodySmall, color = Slate400)
-                Text(
-                  text = strings.taka(amountNum.toDouble()),
-                  style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                  color = Emerald400,
-                )
-              }
-            }
-          }
-
-          TournamentButton(
-            text = strings.withdrawBackToWallet,
-            onClick = {
-              viewModel.clearMessages()
-              onNavigateBack()
-            },
-            modifier = Modifier.fillMaxWidth(),
-          )
-        }
+        WdSuccessCard(
+          title = strings.withdrawSuccessTitle,
+          message = strings.withdrawSuccessDesc(strings.taka(amountNum.toDouble()), methodLabel),
+          statusLabel = strings.withdrawStatusLabel,
+          statusText = strings.withdrawStatusPending,
+          rows = listOf(
+            Triple(strings.withdrawPayoutMethodLabel, methodLabel, null),
+            Triple(strings.withdrawRecipientAccountLabel, recipientNumber, null),
+          ),
+          amountLabel = strings.withdrawRequestedAmountLabel,
+          amountText = strings.taka(amountNum.toDouble()),
+          buttonText = strings.withdrawBackToWallet,
+          onButton = {
+            viewModel.clearMessages()
+            onNavigateBack()
+          },
+          modifier = Modifier.padding(top = 8.dp),
+        )
         return@Column
       }
 
       // 2. PAGE IDENTITY
-      Column(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(top = 2.dp, bottom = 12.dp),
-      ) {
-        Text(
-          text = strings.withdrawHeaderTitle,
-          style = MaterialTheme.typography.headlineSmall.copy(
-            fontWeight = FontWeight.Black,
-            letterSpacing = 1.sp,
-            fontSize = 20.sp
-          ),
-          color = Color.White,
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-          text = strings.withdrawHeaderSubtitle,
-          style = MaterialTheme.typography.bodySmall.copy(
-            color = Slate400,
-            fontSize = 13.sp,
-          ),
-        )
-      }
+      WlPageTitle(title = strings.withdrawHeaderTitle, subtitle = strings.withdrawHeaderSubtitle, modifier = Modifier.padding(top = 4.dp))
+
+      Spacer(modifier = Modifier.height(14.dp))
 
       // 3. AVAILABLE BALANCE CARD
-      Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = NavyCard,
-        border = BorderStroke(
-          1.dp,
-          Brush.horizontalGradient(
-            listOf(
-              Gold500.copy(alpha = 0.5f),
-              Cyan400.copy(alpha = 0.4f),
-            )
-          ),
-        ),
-        modifier = Modifier.fillMaxWidth(),
-      ) {
-        Row(
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(14.dp),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
+      WlFrame(gold = true, pad = 14.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(start = 6.dp, top = 4.dp, bottom = 4.dp)) {
           Column(modifier = Modifier.weight(1f)) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-              Box(
-                modifier = Modifier
-                  .size(8.dp)
-                  .clip(CircleShape)
-                  .background(Emerald400),
-              )
-              Text(
-                text = strings.withdrawAvailableBalanceLabel,
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = FontWeight.Bold,
-                  letterSpacing = 0.5.sp,
-                  fontSize = 12.sp
-                ),
-                color = Gold400,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-              )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-              text = strings.taka(uiState.wallet?.availableAmount ?: 0.0),
-              style = MaterialTheme.typography.titleLarge.copy(
-                fontWeight = FontWeight.Black,
-                fontSize = 22.sp
-              ),
-              color = Color.White,
-              maxLines = 1,
-              overflow = TextOverflow.Ellipsis
-            )
+            WlPill(strings.withdrawAvailableBalanceLabel, Color(0xFF8CFF4A), listOf(Color(0xFF0E3A2A), Color(0xFF07241A)), Color(0xFF4ADE80), Color(0xFFB8FFC8))
+            Spacer(modifier = Modifier.height(8.dp))
+            val balText = strings.taka(uiState.wallet?.availableAmount ?: 0.0)
+            WlText3D(balText, if (balText.length > 10) 24.sp else 30.sp, WlTone.GOLD)
           }
-
-          Surface(
-            shape = CircleShape,
-            color = Slate900,
-            border = BorderStroke(1.dp, Gold500.copy(alpha = 0.3f)),
-            modifier = Modifier.size(42.dp),
-          ) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-              Icon(
-                imageVector = Icons.Default.AccountBalanceWallet,
-                contentDescription = null,
-                tint = Gold400,
-                modifier = Modifier.size(22.dp),
-              )
-            }
-          }
+          WlCoinMedal(66)
         }
       }
 
       Spacer(modifier = Modifier.height(14.dp))
 
-      // 4. PAYMENT METHODS (bKash & Nagad ONLY)
-      Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = NavyCard,
-        border = BorderStroke(1.dp, CardBorder),
-        modifier = Modifier.fillMaxWidth(),
-      ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-          Text(
-            text = strings.withdrawSelectMethodLabel,
-            style = MaterialTheme.typography.labelSmall.copy(
-              fontWeight = FontWeight.Bold,
-              letterSpacing = 0.5.sp,
-              fontSize = 15.sp,
-            ),
-            color = Gold400,
-          )
-          Spacer(modifier = Modifier.height(10.dp))
-
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-          ) {
+      // 4 + 5. PAYMENT METHOD + AMOUNT
+      WlFrame(gold = true, pad = 14.dp) {
+        Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp)) {
+          DpStepHead(number = strings.digits("1"), title = strings.withdrawSelectMethodLabel)
+          Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val isBkash = selectedMethod == "BKASH"
-            val isNagad = selectedMethod == "NAGAD"
-
-            // bKash Option
-            Surface(
-              onClick = { onSelectMethod("BKASH") },
-              color = if (isBkash) BkashPink.copy(alpha = 0.12f) else Slate900,
-              shape = RoundedCornerShape(12.dp),
-              border = BorderStroke(
-                if (isBkash) 1.5.dp else 1.dp,
-                if (isBkash) BkashPink else Slate700,
-              ),
-              modifier = Modifier.weight(1f),
-            ) {
-              Row(
-                modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Start,
-              ) {
-                Surface(
-                  shape = RoundedCornerShape(8.dp),
-                  color = if (isBkash) BkashPink.copy(alpha = 0.2f) else Slate800,
-                  border = BorderStroke(
-                    1.dp,
-                    if (isBkash) BkashPink.copy(alpha = 0.5f) else Color.Transparent,
-                  ),
-                  modifier = Modifier.size(36.dp),
-                ) {
-                  Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                  ) {
-                    Image(
-                      painter = painterResource(id = R.drawable.ic_bkash),
-                      contentDescription = "bKash Logo",
-                      modifier = Modifier.size(24.dp),
-                    )
-                  }
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                  Text(
-                    text = "bKash",
-                    style = MaterialTheme.typography.titleSmall.copy(
-                      fontWeight = FontWeight.Bold,
-                      fontSize = 14.sp,
-                    ),
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                  )
-                  Text(
-                    text = if (isBkash) strings.withdrawMethodSelected else strings.withdrawMethodPersonal,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                      fontSize = 12.sp,
-                      fontWeight = FontWeight.Medium,
-                    ),
-                    color = if (isBkash) BkashPink else Slate400,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                  )
-                }
-              }
-            }
-
-            // Nagad Option
-            Surface(
-              onClick = { onSelectMethod("NAGAD") },
-              color = if (isNagad) NagadOrange.copy(alpha = 0.12f) else Slate900,
-              shape = RoundedCornerShape(12.dp),
-              border = BorderStroke(
-                if (isNagad) 1.5.dp else 1.dp,
-                if (isNagad) NagadOrange else Slate700,
-              ),
-              modifier = Modifier.weight(1f),
-            ) {
-              Row(
-                modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Start,
-              ) {
-                Surface(
-                  shape = RoundedCornerShape(8.dp),
-                  color = if (isNagad) NagadOrange.copy(alpha = 0.2f) else Slate800,
-                  border = BorderStroke(
-                    1.dp,
-                    if (isNagad) NagadOrange.copy(alpha = 0.5f) else Color.Transparent,
-                  ),
-                  modifier = Modifier.size(36.dp),
-                ) {
-                  Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                  ) {
-                    Image(
-                      painter = painterResource(id = R.drawable.ic_nagad),
-                      contentDescription = "Nagad Logo",
-                      modifier = Modifier.size(24.dp),
-                    )
-                  }
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                  Text(
-                    text = "Nagad",
-                    style = MaterialTheme.typography.titleSmall.copy(
-                      fontWeight = FontWeight.Bold,
-                      fontSize = 14.sp,
-                    ),
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                  )
-                  Text(
-                    text = if (isNagad) strings.withdrawMethodSelected else strings.withdrawMethodPersonal,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                      fontSize = 12.sp,
-                      fontWeight = FontWeight.Medium,
-                    ),
-                    color = if (isNagad) NagadOrange else Slate400,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                  )
-                }
-              }
-            }
-          }
-        }
-      }
-
-      Spacer(modifier = Modifier.height(14.dp))
-
-      // 5. WITHDRAW AMOUNT CARD / BANNER
-      Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = Slate850,
-        border = BorderStroke(1.dp, CardBorder),
-        modifier = Modifier.fillMaxWidth(),
-      ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-          ) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(6.dp),
-              modifier = Modifier.weight(1f)
-            ) {
-              Icon(
-                imageVector = Icons.Default.Paid,
-                contentDescription = null,
-                tint = Gold400,
-                modifier = Modifier.size(16.dp),
-              )
-              Text(
-                text = strings.withdrawAmountLabel,
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = FontWeight.Bold,
-                  letterSpacing = 0.5.sp,
-                  fontSize = 15.sp,
-                ),
-                color = Gold400,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-              )
-            }
-            val minAmount = (appSettings?.minWithdrawalTaka ?: 200.0).toLong()
-            Surface(
-              shape = RoundedCornerShape(4.dp),
-              color = Gold500.copy(alpha = 0.12f),
-              border = BorderStroke(0.5.dp, Gold400.copy(alpha = 0.4f)),
-            ) {
-              Text(
-                text = strings.withdrawLimitNotice(strings.number(minAmount)),
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontSize = 11.sp,
-                  fontWeight = FontWeight.SemiBold,
-                ),
-                color = Slate300,
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-              )
-            }
-          }
-
-          Spacer(modifier = Modifier.height(10.dp))
-
-          // Prominent Amount Input Field
-          TournamentTextField(
-            value = amountInput,
-            onValueChange = {
-              amountInput = it.filter { char -> char.isDigit() }
-              clientError = null
-            },
-            label = strings.withdrawEnterAmountHint,
-            placeholder = strings.withdrawEnterAmountPlaceholder,
-            helperText = null,
-            leadingIcon = Icons.Default.CurrencyExchange,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            testTag = "withdraw_amount_input",
-          )
-
-          Spacer(modifier = Modifier.height(10.dp))
-
-          // Quick-Select Amount Pills / Chips
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-          ) {
-            listOf(200, 500, 1000, 2000, 5000).forEach { chipAmount ->
-              val isSelected = amountInput == chipAmount.toString()
-              Surface(
-                onClick = {
-                  amountInput = chipAmount.toString()
-                  clientError = null
-                },
-                shape = RoundedCornerShape(20.dp),
-                color = if (isSelected) Gold500.copy(alpha = 0.22f) else Slate900,
-                border = BorderStroke(
-                  1.dp,
-                  if (isSelected) Gold400 else Slate700,
-                ),
-                modifier = Modifier.weight(1f),
-              ) {
-                Box(
-                  modifier = Modifier.padding(vertical = 7.dp, horizontal = 2.dp),
-                  contentAlignment = Alignment.Center,
-                ) {
-                  Text(
-                    text = strings.takaWhole(chipAmount.toDouble()),
-                    style = MaterialTheme.typography.labelSmall.copy(
-                      fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
-                      fontSize = 12.sp,
-                    ),
-                    color = if (isSelected) Gold400 else Slate300,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                  )
-                }
-              }
-            }
-          }
-        }
-      }
-
-      Spacer(modifier = Modifier.height(14.dp))
-
-      // 6. SAVED / OWN NUMBER INPUT CARD
-      Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = Slate850,
-        border = BorderStroke(1.dp, CardBorder),
-        modifier = Modifier.fillMaxWidth(),
-      ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-          ) {
-            Text(
-              text = strings.withdrawRecipientLabel(methodLabel.uppercase()),
-              style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp,
-                fontSize = 15.sp,
-              ),
-              color = Gold400,
-              modifier = Modifier.weight(1f, fill = false),
-              maxLines = 1,
-              overflow = TextOverflow.Ellipsis
+            DpMethodTile(
+              name = "bKash", badge = if (isBkash) strings.withdrawMethodSelected else strings.withdrawMethodPersonal,
+              logo = R.drawable.ic_bkash, brand = BkashPink, selected = isBkash,
+              onClick = { onSelectMethod("BKASH") }, modifier = Modifier.weight(1f),
             )
-
-            if (savedNumber.isNotBlank() && !isUsingSavedNumber) {
-              TextButton(
-                onClick = {
-                  recipientNumber = savedNumber
-                  clientError = null
-                },
-                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                modifier = Modifier.height(24.dp),
-              ) {
-                Text(
-                  text = strings.withdrawUseSavedNumber,
-                  style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                  ),
-                  color = Cyan400,
+            val isNagad = selectedMethod == "NAGAD"
+            DpMethodTile(
+              name = "Nagad", badge = if (isNagad) strings.withdrawMethodSelected else strings.withdrawMethodPersonal,
+              logo = R.drawable.ic_nagad, brand = NagadOrange, selected = isNagad,
+              onClick = { onSelectMethod("NAGAD") }, modifier = Modifier.weight(1f),
+            )
+          }
+          Spacer(modifier = Modifier.height(14.dp))
+          Column(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0x8C0A0E3C))
+              .border(1.dp, Color(0x8CE8B84A), RoundedCornerShape(18.dp)).padding(12.dp),
+          ) {
+            val minAmount = (appSettings?.minWithdrawalTaka ?: 200.0).toLong()
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+              Image(painter = painterResource(id = R.drawable.wl_withdraw), contentDescription = null, modifier = Modifier.size(24.dp))
+              Spacer(modifier = Modifier.width(6.dp))
+              WlText3D(strings.withdrawAmountLabel, 14.sp, WlTone.GOLD, modifier = Modifier.weight(1f))
+              Text(
+                text = strings.withdrawLimitNotice(strings.number(minAmount)), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFFFF3C4), maxLines = 1,
+                modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(Color(0x26FFD45A)).border(1.dp, Color(0x99FFD45A), RoundedCornerShape(10.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
+              )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            DpField(
+              label = strings.withdrawEnterAmountHint,
+              value = amountInput,
+              onValueChange = {
+                amountInput = it.filter { char -> char.isDigit() }
+                clientError = null
+              },
+              placeholder = strings.withdrawEnterAmountPlaceholder,
+              icon = Icons.Default.CurrencyExchange,
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+              tag = "withdraw_amount_input",
+              big = true,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+              listOf(200, 500, 1000, 2000, 5000).forEach { chipAmount ->
+                DpAmountChip(
+                  text = strings.takaWhole(chipAmount.toDouble()),
+                  selected = amountInput == chipAmount.toString(),
+                  onClick = {
+                    amountInput = chipAmount.toString()
+                    clientError = null
+                  },
+                  modifier = Modifier.weight(1f),
                 )
               }
             }
           }
+        }
+      }
 
+      Spacer(modifier = Modifier.height(14.dp))
+
+      // 6 + 7 + 8. NUMBER, SUMMARY, GUIDELINES
+      WlFrame(gold = true, pad = 14.dp) {
+        Column(modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 14.dp, bottom = 6.dp)) {
+          Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            WlText3D(strings.withdrawRecipientLabel(methodLabel.uppercase()), 14.sp, WlTone.CREAM, modifier = Modifier.weight(1f))
+            if (savedNumber.isNotBlank() && !isUsingSavedNumber) {
+              WdSmallButton(
+                text = strings.withdrawUseSavedNumber,
+                onClick = {
+                  recipientNumber = savedNumber
+                  clientError = null
+                },
+              )
+            }
+          }
           Spacer(modifier = Modifier.height(8.dp))
-
-          TournamentTextField(
+          DpField(
+            label = strings.withdrawRecipientHint(methodLabel),
             value = recipientNumber,
             onValueChange = {
               if (it.length <= 11) {
@@ -642,231 +260,73 @@ fun WithdrawScreen(
                 clientError = null
               }
             },
-            label = strings.withdrawRecipientHint(methodLabel),
             placeholder = strings.withdrawRecipientPlaceholder,
-            leadingIcon = Icons.Default.Phone,
+            icon = Icons.Default.Phone,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-            testTag = "withdraw_recipient_input",
+            tag = "withdraw_recipient_input",
           )
-
-          Spacer(modifier = Modifier.height(6.dp))
-
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-          ) {
-            if (isUsingSavedNumber) {
-              Icon(
-                imageVector = Icons.Default.VerifiedUser,
-                contentDescription = null,
-                tint = Emerald400,
-                modifier = Modifier.size(13.dp),
-              )
-              Text(
-                text = strings.withdrawVerifiedBadge(methodLabel),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-                color = Emerald400,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-              )
-            } else {
-              Icon(
-                imageVector = Icons.Default.Shield,
-                contentDescription = null,
-                tint = Slate400,
-                modifier = Modifier.size(13.dp),
-              )
-              Text(
-                text = strings.withdrawSecurityHint(methodLabel),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-                color = Slate400,
-                lineHeight = 16.sp
-              )
-            }
+          Spacer(modifier = Modifier.height(9.dp))
+          if (isUsingSavedNumber) {
+            DpNotice(text = strings.withdrawVerifiedBadge(methodLabel), icon = Icons.Default.VerifiedUser, error = false)
+          } else {
+            DpNotice(text = strings.withdrawSecurityHint(methodLabel), icon = Icons.Default.Shield, error = false)
           }
-        }
-      }
-
-      Spacer(modifier = Modifier.height(14.dp))
-
-      // 7. WITHDRAW SUMMARY CARD
-      Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = Slate900,
-        border = BorderStroke(1.dp, Slate700),
-        modifier = Modifier.fillMaxWidth(),
-      ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          Text(
-            text = strings.withdrawSummaryTitle,
-            style = MaterialTheme.typography.labelSmall.copy(
-              fontWeight = FontWeight.Bold,
-              letterSpacing = 0.5.sp,
-              fontSize = 15.sp,
+          Spacer(modifier = Modifier.height(14.dp))
+          WdSummaryCard(
+            title = strings.withdrawSummaryTitle,
+            rows = listOf(
+              Triple(strings.withdrawSummaryAmount, strings.taka(amountNum.toDouble()), null),
+              Triple(strings.withdrawSummaryMethod, methodLabel, if (selectedMethod == "BKASH") BkashPink else NagadOrange),
+              Triple(strings.withdrawSummaryNumber, recipientNumber.ifBlank { strings.optional }, null),
             ),
-            color = Slate300,
+            totalLabel = strings.withdrawSummaryTotal,
+            totalText = strings.taka(amountNum.toDouble()),
           )
-
-          HorizontalDivider(color = Slate800, thickness = 1.dp)
-
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-          ) {
-            Text(text = strings.withdrawSummaryAmount, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = Slate400)
-            Text(
-              text = strings.taka(amountNum.toDouble()),
-              style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
-              color = Color.White,
-            )
-          }
-
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-          ) {
-            Text(text = strings.withdrawSummaryMethod, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = Slate400)
-            Text(
-              text = methodLabel,
-              style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
-              color = if (selectedMethod == "BKASH") BkashPink else NagadOrange,
-            )
-          }
-
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-          ) {
-            Text(text = strings.withdrawSummaryNumber, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = Slate400)
-            Text(
-              text = recipientNumber.ifBlank { strings.optional },
-              style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
-              color = Color.White,
-              maxLines = 1,
-              overflow = TextOverflow.Ellipsis
-            )
-          }
-
-          HorizontalDivider(color = Slate800, thickness = 1.dp)
-
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-          ) {
-            Text(
-              text = strings.withdrawSummaryTotal,
-              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 16.sp),
-              color = Gold400,
-            )
-            Text(
-              text = strings.taka(amountNum.toDouble()),
-              style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, fontSize = 18.sp),
-              color = Emerald400,
-            )
-          }
+          Spacer(modifier = Modifier.height(14.dp))
+          val minWithdrawal = (appSettings?.minWithdrawalTaka ?: 200.0).toLong()
+          DpRules(
+            title = strings.withdrawSecurityTitle,
+            steps = listOf(
+              strings.withdrawGuideline1,
+              strings.withdrawGuideline2(strings.number(minWithdrawal)),
+              strings.withdrawGuideline3,
+              strings.withdrawGuideline4,
+              strings.withdrawGuideline5,
+            ).mapIndexed { i, g -> strings.digits((i + 1).toString()) to g.removePrefix("• ").removePrefix("•").trim() },
+          )
         }
       }
 
       Spacer(modifier = Modifier.height(14.dp))
-
-      // 8. SECURITY / GUIDELINE CARD
-      Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = Slate900.copy(alpha = 0.8f),
-        border = BorderStroke(1.dp, Slate800),
-        modifier = Modifier.fillMaxWidth(),
-      ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-          Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-          ) {
-            Icon(
-              imageVector = Icons.Default.Security,
-              contentDescription = null,
-              tint = Cyan400,
-              modifier = Modifier.size(16.dp),
-            )
-            Text(
-              text = strings.withdrawSecurityTitle,
-              style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp,
-                fontSize = 15.sp,
-              ),
-              color = Cyan400,
-            )
-          }
-          Spacer(modifier = Modifier.height(8.dp))
-          val minWithdrawal = (appSettings?.minWithdrawalTaka ?: 200.0).toLong()
-          Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(text = strings.withdrawGuideline1, style = MaterialTheme.typography.bodySmall.copy(color = Slate400, fontSize = 14.sp, lineHeight = 18.sp))
-            Text(text = strings.withdrawGuideline2(strings.number(minWithdrawal)), style = MaterialTheme.typography.bodySmall.copy(color = Slate400, fontSize = 14.sp, lineHeight = 18.sp))
-            Text(text = strings.withdrawGuideline3, style = MaterialTheme.typography.bodySmall.copy(color = Slate400, fontSize = 14.sp, lineHeight = 18.sp))
-            Text(text = strings.withdrawGuideline4, style = MaterialTheme.typography.bodySmall.copy(color = Slate400, fontSize = 14.sp, lineHeight = 18.sp))
-            Text(text = strings.withdrawGuideline5, style = MaterialTheme.typography.bodySmall.copy(color = Slate400, fontSize = 14.sp, lineHeight = 18.sp))
-          }
-        }
-      }
-
-      Spacer(modifier = Modifier.height(16.dp))
 
       // 10. ERROR / VALIDATION MESSAGE
       val displayError = clientError ?: uiState.errorMessage
       if (displayError != null) {
-        Surface(
-          color = Rose900.copy(alpha = 0.45f),
-          shape = RoundedCornerShape(10.dp),
-          border = BorderStroke(1.dp, Rose600.copy(alpha = 0.5f)),
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 12.dp),
-        ) {
-          Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-          ) {
-            Icon(
-              imageVector = Icons.Default.Warning,
-              contentDescription = null,
-              tint = Rose400,
-              modifier = Modifier.size(18.dp),
-            )
-            Text(
-              text = displayError,
-              color = Color.White,
-              style = MaterialTheme.typography.bodySmall.copy(
-                fontWeight = FontWeight.Medium,
-                fontSize = 14.sp
-              ),
-            )
-          }
-        }
+        DpNotice(text = displayError, icon = Icons.Default.Warning, error = true, modifier = Modifier.padding(bottom = 12.dp))
       }
 
       // 9. MAIN CTA: "WITHDRAW NOW"
-      TournamentButton(
+      val canSubmit = !uiState.isSubmitting && amountInput.isNotBlank() && recipientNumber.isNotBlank()
+      DpBigButton(
         text = strings.withdrawNowButton,
         onClick = {
+          if (!canSubmit) return@DpBigButton
           val minAmount = (appSettings?.minWithdrawalTaka ?: 200.0).toLong()
           if (amountNum < minAmount) {
             clientError = strings.withdrawMinError(strings.number(minAmount))
-            return@TournamentButton
+            return@DpBigButton
           }
           if (amountNum > 10000L) {
             clientError = strings.withdrawMaxError
-            return@TournamentButton
+            return@DpBigButton
           }
           if (amountMinor > (uiState.wallet?.availableBalance ?: 0L)) {
             clientError = strings.withdrawInsufficientError(strings.taka(uiState.wallet?.availableAmount ?: 0.0))
-            return@TournamentButton
+            return@DpBigButton
           }
           if (recipientNumber.length < 11) {
             clientError = strings.withdrawInvalidMobileError
-            return@TournamentButton
+            return@DpBigButton
           }
           viewModel.submitWithdrawal(
             amountMinorUnits = amountMinor,
@@ -875,9 +335,8 @@ fun WithdrawScreen(
           )
         },
         isLoading = uiState.isSubmitting,
-        enabled = !uiState.isSubmitting && amountInput.isNotBlank() && recipientNumber.isNotBlank(),
-        modifier = Modifier.fillMaxWidth(),
-        testTag = "submit_withdrawal_button",
+        tag = "submit_withdrawal_button",
+        modifier = Modifier.alpha(if (canSubmit || uiState.isSubmitting) 1f else 0.55f),
       )
 
       Spacer(modifier = Modifier.height(16.dp))

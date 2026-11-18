@@ -1088,58 +1088,14 @@ fun NoticeDialog(
   message: String,
   onDismiss: () -> Unit
 ) {
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    properties = DialogProperties(usePlatformDefaultWidth = false),
-    modifier = Modifier
-      .fillMaxWidth(0.92f)
-      .clip(RoundedCornerShape(24.dp))
-      .border(1.dp, Gold400.copy(alpha = 0.7f), RoundedCornerShape(24.dp)),
-    containerColor = NavySurface,
-    title = {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        Text(
-          text = "📢 জরুরি বিজ্ঞপ্তি",
-          style = MaterialTheme.typography.titleMedium.copy(
-            fontWeight = FontWeight.Black,
-            color = Gold400
-          )
-        )
-        IconButton(onClick = onDismiss) {
-          Icon(Icons.Default.Close, contentDescription = "Close", tint = Gold400)
-        }
-      }
-    },
-    text = {
-      Column(
-        modifier = Modifier
-          .fillMaxWidth()
-          .heightIn(max = 400.dp)
-          .verticalScroll(rememberScrollState())
-          .padding(vertical = 8.dp)
-      ) {
-        Text(
-          text = message,
-          style = MaterialTheme.typography.bodyMedium.copy(
-            color = Color.White,
-            lineHeight = 22.sp
-          )
-        )
-      }
-    },
-    confirmButton = {
-      TournamentButton(
-        text = "ঠিক আছে",
-        onClick = onDismiss,
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(horizontal = 16.dp, vertical = 8.dp)
-      )
-    }
+  val strings = LocalAppStrings.current
+  com.example.ui.profile.PfNoticeWindow(
+    title = strings.homeNoticeTitle.removePrefix("📢").trim(),
+    description = message.trim(),
+    closeText = strings.homeOk,
+    onClose = onDismiss,
+    closeLabel = strings.close,
+    okTag = "home_notice_ok_button",
   )
 }
 

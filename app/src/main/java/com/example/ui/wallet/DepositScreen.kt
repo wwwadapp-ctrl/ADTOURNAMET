@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -131,908 +132,289 @@ fun DepositScreen(
     Column(
       modifier = Modifier
         .fillMaxSize()
+        .wlBackground()
         .padding(innerPadding)
         .verticalScroll(rememberScrollState())
         .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
       if (uiState.depositSubmitted) {
-        AlertDialog(
-          onDismissRequest = {
+        DpSuccessDialog(
+          title = strings.depositSubmittedTitle,
+          message = strings.depositSubmittedDesc,
+          rows = listOf(
+            strings.depositMethodLabel to selectedMethod,
+            strings.depositAmountSummaryLabel to strings.taka(amountInput.toDoubleOrNull() ?: 0.0),
+            strings.senderMobileLabel to senderNumber,
+            strings.trxIdLabel to trxId,
+          ),
+          statusLabel = strings.depositStatusLabel,
+          statusText = strings.depositStatusPending,
+          buttonText = strings.backToWallet,
+          onButton = {
             viewModel.clearMessages()
             onNavigateBack()
           },
-          shape = RoundedCornerShape(16.dp),
-          containerColor = Slate900,
-          icon = {
-            Icon(
-              imageVector = Icons.Default.CheckCircle,
-              contentDescription = null,
-              tint = Emerald400,
-              modifier = Modifier.size(52.dp),
-            )
+          onDismiss = {
+            viewModel.clearMessages()
+            onNavigateBack()
           },
-          title = {
-            Text(
-              text = strings.depositSubmittedTitle,
-              style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 17.sp),
-              color = Color.White,
-              textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            )
-          },
-          text = {
-            Column(
-              horizontalAlignment = Alignment.CenterHorizontally,
-              modifier = Modifier.fillMaxWidth(),
-            ) {
-              Text(
-                text = strings.depositSubmittedDesc,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium, fontSize = 14.sp),
-                color = Slate200,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-              )
-              Spacer(modifier = Modifier.height(14.dp))
-              Surface(
-                color = Slate850,
-                shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.dp, Slate700),
-                modifier = Modifier.fillMaxWidth(),
-              ) {
-                Column(
-                  modifier = Modifier.padding(12.dp),
-                  verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                  Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                  ) {
-                    Text(strings.depositMethodLabel, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp), color = Slate400)
-                    Text(
-                      text = selectedMethod,
-                      style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
-                      color = if (selectedMethod == "BKASH") BkashPink else NagadOrange,
-                    )
-                  }
-                  Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                  ) {
-                    Text(strings.depositAmountSummaryLabel, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp), color = Slate400)
-                    Text(
-                      text = strings.taka(amountInput.toDoubleOrNull() ?: 0.0),
-                      style = MaterialTheme.typography.bodySmall.copy(
-                        fontWeight = if (isBengali) FontWeight.Bold else FontWeight.ExtraBold,
-                        fontSize = 13.sp,
-                      ),
-                      color = Gold400,
-                      modifier = Modifier.padding(end = 2.dp),
-                    )
-                  }
-                  Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                  ) {
-                    Text(strings.senderMobileLabel, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp), color = Slate400)
-                    Text(
-                      text = senderNumber,
-                      style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
-                      color = Color.White,
-                    )
-                  }
-                  Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                  ) {
-                    Text(strings.trxIdLabel, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp), color = Slate400)
-                    Text(
-                      text = trxId,
-                      style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
-                      color = Color.White,
-                    )
-                  }
-                  Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                  ) {
-                    Text(strings.depositStatusLabel, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp), color = Slate400)
-                    Surface(
-                      color = Amber500.copy(alpha = 0.2f),
-                      shape = RoundedCornerShape(4.dp),
-                    ) {
-                      Text(
-                        text = strings.depositStatusPending,
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
-                        color = Amber400,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                      )
-                    }
-                  }
-                }
-              }
-            }
-          },
-          confirmButton = {
-            TournamentButton(
-              text = strings.backToWallet,
-              onClick = {
-                viewModel.clearMessages()
-                onNavigateBack()
-              },
-              modifier = Modifier.fillMaxWidth(),
-              testTag = "deposit_success_confirm_btn",
-            )
-          },
-          modifier = Modifier.testTag("deposit_success_dialog"),
+          buttonTag = "deposit_success_confirm_btn",
+          dialogTag = "deposit_success_dialog",
         )
       }
 
       // 2. PAGE IDENTITY
-      Column(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(top = 2.dp, bottom = 12.dp),
-      ) {
-        Text(
-          text = strings.addMoneyTitle,
-          style = MaterialTheme.typography.headlineSmall.copy(
-            fontWeight = FontWeight.Bold,
-            letterSpacing = if (isBengali) 0.sp else 0.5.sp,
-            fontSize = 20.sp,
-          ),
-          color = Color.White,
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-          text = strings.depositSubtitle,
-          style = MaterialTheme.typography.bodySmall.copy(
-            fontWeight = FontWeight.Medium,
-            fontSize = 13.sp,
-          ),
-          color = Gold400,
-        )
-      }
+      WlPageTitle(title = strings.addMoneyTitle, subtitle = strings.depositSubtitle, modifier = Modifier.padding(top = 4.dp))
+
+      Spacer(modifier = Modifier.height(14.dp))
 
       // 3. CURRENT BALANCE CARD
       val currentBalanceMinor = uiState.wallet?.availableBalance ?: 0L
-      Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = NavyCard,
-        border = BorderStroke(
-          1.dp,
-          Brush.horizontalGradient(
-            listOf(
-              Gold500.copy(alpha = 0.5f),
-              Cyan400.copy(alpha = 0.4f),
-            )
-          ),
-        ),
-        modifier = Modifier.fillMaxWidth(),
-      ) {
-        Row(
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(14.dp),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Column {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-              Box(
-                modifier = Modifier
-                  .size(8.dp)
-                  .clip(CircleShape)
-                  .background(Emerald400),
-              )
-              Text(
-                text = strings.balanceCurrent.uppercase(),
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = FontWeight.Bold,
-                  letterSpacing = 0.5.sp,
-                  fontSize = 11.sp,
-                ),
-                color = Gold400,
-              )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-              text = strings.takaFromMinor(currentBalanceMinor),
-              style = MaterialTheme.typography.titleLarge.copy(
-                fontWeight = if (isBengali) FontWeight.Bold else FontWeight.ExtraBold,
-                fontSize = 22.sp,
-              ),
-              color = Color.White,
-              modifier = Modifier.padding(end = 2.dp),
-            )
+      WlFrame(gold = true, pad = 14.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(start = 6.dp, top = 4.dp, bottom = 4.dp)) {
+          Column(modifier = Modifier.weight(1f)) {
+            WlPill(strings.balanceCurrent.uppercase(), Color(0xFF8CFF4A), listOf(Color(0xFF0E3A2A), Color(0xFF07241A)), Color(0xFF4ADE80), Color(0xFFB8FFC8))
+            Spacer(modifier = Modifier.height(8.dp))
+            val balText = strings.takaFromMinor(currentBalanceMinor)
+            WlText3D(balText, if (balText.length > 10) 24.sp else 30.sp, WlTone.GOLD)
           }
-
-          Surface(
-            shape = CircleShape,
-            color = Slate900,
-            border = BorderStroke(1.dp, Gold500.copy(alpha = 0.3f)),
-            modifier = Modifier.size(42.dp),
-          ) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-              Icon(
-                imageVector = Icons.Default.AccountBalanceWallet,
-                contentDescription = null,
-                tint = Gold400,
-                modifier = Modifier.size(22.dp),
-              )
-            }
-          }
+          WlCoinMedal(66)
         }
       }
 
       Spacer(modifier = Modifier.height(14.dp))
 
       // 4. PAYMENT METHODS (bKash & Nagad ONLY)
-      TournamentCard(
-        modifier = Modifier.fillMaxWidth(),
-        backgroundColor = NavyCard,
-        borderColor = NavyCardBorder,
-      ) {
-        Text(
-          text = strings.stepSelectMethod,
-          style = MaterialTheme.typography.titleMedium.copy(
-            fontWeight = FontWeight.Bold,
-            fontSize = 15.sp,
-          ),
-          color = Color.White,
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-          // bKash
-          val isBkash = selectedMethod == "BKASH"
-          Surface(
-            onClick = {
-              selectedMethod = "BKASH"
-              copiedFeedback = false
-            },
-            color = if (isBkash) BkashPink.copy(alpha = 0.12f) else Slate900,
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(
-              if (isBkash) 1.5.dp else 1.dp,
-              if (isBkash) BkashPink else Slate700,
-            ),
-            modifier = Modifier.weight(1f),
-          ) {
-            Row(
-              modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.Start,
-            ) {
-              Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = if (isBkash) BkashPink.copy(alpha = 0.2f) else Slate800,
-                border = BorderStroke(
-                  1.dp,
-                  if (isBkash) BkashPink.copy(alpha = 0.5f) else Color.Transparent,
-                ),
-                modifier = Modifier.size(36.dp),
-              ) {
-                Box(
-                  modifier = Modifier.fillMaxSize(),
-                  contentAlignment = Alignment.Center,
-                ) {
-                  Image(
-                    painter = painterResource(id = R.drawable.ic_bkash),
-                    contentDescription = "bKash Logo",
-                    modifier = Modifier.size(24.dp),
-                  )
-                }
-              }
-              Spacer(modifier = Modifier.width(10.dp))
-              Column {
-                Text(
-                  text = "bKash",
-                  style = MaterialTheme.typography.titleSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                  ),
-                  color = Color.White,
-                )
-                Text(
-                  text = if (isBkash) strings.selectedBadge else strings.personalBadge,
-                  style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                  ),
-                  color = if (isBkash) BkashPink else Slate400,
-                )
-              }
-            }
-          }
-
-          // Nagad
-          val isNagad = selectedMethod == "NAGAD"
-          Surface(
-            onClick = {
-              selectedMethod = "NAGAD"
-              copiedFeedback = false
-            },
-            color = if (isNagad) NagadOrange.copy(alpha = 0.12f) else Slate900,
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(
-              if (isNagad) 1.5.dp else 1.dp,
-              if (isNagad) NagadOrange else Slate700,
-            ),
-            modifier = Modifier.weight(1f),
-          ) {
-            Row(
-              modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.Start,
-            ) {
-              Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = if (isNagad) NagadOrange.copy(alpha = 0.2f) else Slate800,
-                border = BorderStroke(
-                  1.dp,
-                  if (isNagad) NagadOrange.copy(alpha = 0.5f) else Color.Transparent,
-                ),
-                modifier = Modifier.size(36.dp),
-              ) {
-                Box(
-                  modifier = Modifier.fillMaxSize(),
-                  contentAlignment = Alignment.Center,
-                ) {
-                  Image(
-                    painter = painterResource(id = R.drawable.ic_nagad),
-                    contentDescription = "Nagad Logo",
-                    modifier = Modifier.size(24.dp),
-                  )
-                }
-              }
-              Spacer(modifier = Modifier.width(10.dp))
-              Column {
-                Text(
-                  text = "Nagad",
-                  style = MaterialTheme.typography.titleSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                  ),
-                  color = Color.White,
-                )
-                Text(
-                  text = if (isNagad) strings.selectedBadge else strings.personalBadge,
-                  style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                  ),
-                  color = if (isNagad) NagadOrange else Slate400,
-                )
-              }
-            }
-          }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Configured Payment Number Display & Copy
-        Surface(
-          color = Slate850,
-          shape = RoundedCornerShape(12.dp),
-          border = BorderStroke(1.dp, if (selectedMethod == "BKASH") BkashPink.copy(alpha = 0.5f) else NagadOrange.copy(alpha = 0.5f)),
-          modifier = Modifier.fillMaxWidth(),
-        ) {
-          Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.SpaceBetween,
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-              ) {
-                Icon(
-                  imageVector = Icons.Default.Verified,
-                  contentDescription = null,
-                  tint = if (selectedMethod == "BKASH") BkashPink else NagadOrange,
-                  modifier = Modifier.size(16.dp),
-                )
-                Text(
-                  text = strings.sendMoneyLabel(if (selectedMethod == "BKASH") "bKash" else "Nagad"),
-                  style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
-                  color = Slate300,
-                )
-              }
-              Surface(
-                color = Emerald500.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(4.dp),
-              ) {
-                Text(
-                  text = strings.depositOfficialBadge,
-                  color = Emerald400,
-                  style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
-                  modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                )
-              }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.SpaceBetween,
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              Text(
-                text = configuredPaymentNumber,
-                style = MaterialTheme.typography.titleLarge.copy(
-                  fontWeight = FontWeight.Bold,
-                  letterSpacing = 1.sp,
-                  fontSize = 20.sp,
-                ),
-                color = Gold400,
-              )
-              Button(
-                onClick = {
-                  clipboardManager.setText(AnnotatedString(rawPaymentNumber))
-                  copiedFeedback = true
-                  android.widget.Toast.makeText(
-                    context,
-                    strings.depositNumberCopiedToast(selectedMethod, rawPaymentNumber),
-                    android.widget.Toast.LENGTH_SHORT
-                  ).show()
-                },
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(
-                  containerColor = if (copiedFeedback) Emerald600 else if (selectedMethod == "BKASH") BkashPink else NagadOrange,
-                  contentColor = Color.White,
-                ),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                modifier = Modifier.testTag("deposit_copy_number_btn"),
-              ) {
-                Row(
-                  verticalAlignment = Alignment.CenterVertically,
-                  horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                  Icon(
-                    imageVector = if (copiedFeedback) Icons.Default.Check else Icons.Default.ContentCopy,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                  )
-                  Text(
-                    text = if (copiedFeedback) strings.copied.uppercase() else strings.copy.uppercase(),
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp),
-                  )
-                }
-              }
-            }
-          }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Compact Payment Steps
-        Surface(
-          color = Slate900.copy(alpha = 0.6f),
-          shape = RoundedCornerShape(8.dp),
-          modifier = Modifier.fillMaxWidth(),
-        ) {
-          Column(modifier = Modifier.padding(10.dp)) {
-            Text(
-              text = strings.howToDepositTitle,
-              style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp,
-                color = Slate300,
-              ),
+      val brand = if (selectedMethod == "BKASH") BkashPink else NagadOrange
+      WlFrame(gold = true, pad = 14.dp) {
+        Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp)) {
+          DpStepHead(number = strings.digits("1"), title = strings.stepSelectMethod)
+          Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val isBkash = selectedMethod == "BKASH"
+            DpMethodTile(
+              name = "bKash", badge = if (isBkash) strings.selectedBadge else strings.personalBadge,
+              logo = R.drawable.ic_bkash, brand = BkashPink, selected = isBkash,
+              onClick = { selectedMethod = "BKASH"; copiedFeedback = false },
+              modifier = Modifier.weight(1f),
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            val steps = listOf(
-              "${strings.digits("1")}. ${strings.stepSelectMethod.removePrefix("1. ").removePrefix("১. ")}",
-              "${strings.digits("2")}. ${strings.sendMoneyInstructions}",
-              "${strings.digits("3")}. ${strings.trxIdLabel}",
-              "${strings.digits("4")}. ${strings.paymentScreenshotLabel}",
-              "${strings.digits("5")}. ${strings.submitDepositButton}",
+            val isNagad = selectedMethod == "NAGAD"
+            DpMethodTile(
+              name = "Nagad", badge = if (isNagad) strings.selectedBadge else strings.personalBadge,
+              logo = R.drawable.ic_nagad, brand = NagadOrange, selected = isNagad,
+              onClick = { selectedMethod = "NAGAD"; copiedFeedback = false },
+              modifier = Modifier.weight(1f),
             )
-            steps.forEach { step ->
-              Text(
-                text = step,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                color = Slate400,
-                lineHeight = 16.sp,
-              )
-            }
           }
+          Spacer(modifier = Modifier.height(12.dp))
+          DpNumberBox(
+            label = strings.sendMoneyLabel(if (selectedMethod == "BKASH") "bKash" else "Nagad"),
+            officialText = strings.depositOfficialBadge,
+            number = configuredPaymentNumber,
+            copyText = if (copiedFeedback) strings.copied.uppercase() else strings.copy.uppercase(),
+            copied = copiedFeedback,
+            brand = brand,
+            onCopy = {
+              clipboardManager.setText(AnnotatedString(rawPaymentNumber))
+              copiedFeedback = true
+              android.widget.Toast.makeText(
+                context,
+                strings.depositNumberCopiedToast(selectedMethod, rawPaymentNumber),
+                android.widget.Toast.LENGTH_SHORT
+              ).show()
+            },
+            copyTag = "deposit_copy_number_btn",
+          )
+          Spacer(modifier = Modifier.height(12.dp))
+          DpRules(
+            title = strings.howToDepositTitle,
+            steps = listOf(
+              strings.digits("1") to strings.stepSelectMethod.removePrefix("1. ").removePrefix("১. "),
+              strings.digits("2") to strings.sendMoneyInstructions,
+              strings.digits("3") to strings.trxIdLabel,
+              strings.digits("4") to strings.paymentScreenshotLabel,
+              strings.digits("5") to strings.submitDepositButton,
+            ),
+          )
         }
       }
 
       Spacer(modifier = Modifier.height(14.dp))
 
       // 5. DEPOSIT DETAILS FORM
-      TournamentCard(
-        modifier = Modifier.fillMaxWidth(),
-        backgroundColor = NavyCard,
-        borderColor = NavyCardBorder,
-      ) {
-        Text(
-          text = strings.stepDepositDetails,
-          style = MaterialTheme.typography.titleMedium.copy(
-            fontWeight = FontWeight.Bold,
-            fontSize = 15.sp,
-          ),
-          color = Color.White,
-        )
-        Spacer(modifier = Modifier.height(12.dp))
+      WlFrame(gold = true, pad = 14.dp) {
+        Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp)) {
+          DpStepHead(number = strings.digits("2"), title = strings.stepDepositDetails)
 
-        val displayError = clientError ?: when {
-          uiState.errorMessage?.contains("same sender number", ignoreCase = true) == true ||
-            uiState.errorMessage?.contains("একই প্রেরক", ignoreCase = true) == true -> strings.depositDuplicateError
-          uiState.errorMessage?.contains("20 minutes", ignoreCase = true) == true ||
-            uiState.errorMessage?.contains("২০ মিনিট", ignoreCase = true) == true -> strings.depositLimitExceededError
-          else -> uiState.errorMessage
-        }
-        if (displayError != null) {
-          Surface(
-            color = Rose900.copy(alpha = 0.4f),
-            shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(1.dp, Rose600.copy(alpha = 0.5f)),
+          val displayError = clientError ?: when {
+            uiState.errorMessage?.contains("same sender number", ignoreCase = true) == true ||
+              uiState.errorMessage?.contains("একই প্রেরক", ignoreCase = true) == true -> strings.depositDuplicateError
+            uiState.errorMessage?.contains("20 minutes", ignoreCase = true) == true ||
+              uiState.errorMessage?.contains("২০ মিনিট", ignoreCase = true) == true -> strings.depositLimitExceededError
+            else -> uiState.errorMessage
+          }
+          if (displayError != null) {
+            DpNotice(text = displayError, icon = Icons.Default.Warning, error = true, modifier = Modifier.padding(bottom = 12.dp))
+          }
+
+          // Amount box
+          Column(
             modifier = Modifier
               .fillMaxWidth()
-              .padding(bottom = 12.dp),
+              .clip(RoundedCornerShape(18.dp))
+              .background(Color(0x8C0A0E3C))
+              .border(1.dp, Color(0x8CE8B84A), RoundedCornerShape(18.dp))
+              .padding(12.dp),
           ) {
-            Text(
-              text = displayError,
-              color = Rose400,
-              style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-              modifier = Modifier.padding(10.dp),
-            )
-          }
-        }
-
-        // Premium Deposit Amount Card / Banner
-        Surface(
-          shape = RoundedCornerShape(12.dp),
-          color = Slate850,
-          border = BorderStroke(1.dp, CardBorder),
-          modifier = Modifier.fillMaxWidth(),
-        ) {
-          Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.SpaceBetween,
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-              ) {
-                Icon(
-                  imageVector = Icons.Default.Paid,
-                  contentDescription = null,
-                  tint = Gold400,
-                  modifier = Modifier.size(16.dp),
-                )
-                Text(
-                  text = strings.depositAmount.uppercase(),
-                  style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp,
-                    fontSize = 12.sp,
-                  ),
-                  color = Gold400,
-                )
-              }
-              Surface(
-                shape = RoundedCornerShape(4.dp),
-                color = Gold500.copy(alpha = 0.12f),
-                border = BorderStroke(0.5.dp, Gold400.copy(alpha = 0.4f)),
-              ) {
-                Text(
-                  text = strings.depositRange,
-                  style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold,
-                  ),
-                  color = Slate300,
-                  modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                )
-              }
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+              Image(painter = painterResource(id = R.drawable.mg_coin), contentDescription = null, modifier = Modifier.size(20.dp))
+              Spacer(modifier = Modifier.width(6.dp))
+              WlText3D(strings.depositAmount.uppercase(), 14.sp, WlTone.GOLD, modifier = Modifier.weight(1f))
+              Text(
+                text = strings.depositRange, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFFFF3C4), maxLines = 1,
+                modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(Color(0x26FFD45A)).border(1.dp, Color(0x99FFD45A), RoundedCornerShape(10.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
+              )
             }
-
             Spacer(modifier = Modifier.height(10.dp))
-
-            // Prominent Amount Input Field
-            TournamentTextField(
+            DpField(
+              label = strings.enterAmountLabel,
               value = amountInput,
               onValueChange = {
                 amountInput = it.filter { char -> char.isDigit() }
                 clientError = null
               },
-              label = strings.enterAmountLabel,
               placeholder = strings.depositAmountPlaceholder,
-              helperText = null,
-              leadingIcon = Icons.Default.CurrencyExchange,
+              icon = Icons.Default.CurrencyExchange,
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-              testTag = "deposit_amount_input",
+              tag = "deposit_amount_input",
+              big = true,
             )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Quick-Select Amount Pills / Chips
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
               listOf(50, 100, 200, 500, 1000).forEach { chipAmount ->
-                val isSelected = amountInput == chipAmount.toString()
-                Surface(
+                DpAmountChip(
+                  text = strings.takaWhole(chipAmount.toDouble()),
+                  selected = amountInput == chipAmount.toString(),
                   onClick = {
                     amountInput = chipAmount.toString()
                     clientError = null
                   },
-                  shape = RoundedCornerShape(20.dp),
-                  color = if (isSelected) Gold500.copy(alpha = 0.22f) else Slate900,
-                  border = BorderStroke(
-                    1.dp,
-                    if (isSelected) Gold400 else Slate700,
-                  ),
                   modifier = Modifier.weight(1f),
-                ) {
-                  Box(
-                    modifier = Modifier.padding(vertical = 7.dp, horizontal = 2.dp),
-                    contentAlignment = Alignment.Center,
-                  ) {
-                    Text(
-                      text = strings.takaWhole(chipAmount.toDouble()),
-                      style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = if (isSelected) (if (isBengali) FontWeight.Bold else FontWeight.ExtraBold) else FontWeight.Bold,
-                        fontSize = 11.5.sp,
-                      ),
-                      color = if (isSelected) Gold400 else Slate300,
-                      maxLines = 1,
-                      softWrap = false,
-                      modifier = Modifier.padding(end = 2.dp),
-                    )
-                  }
-                }
+                )
               }
             }
           }
-        }
 
-        Spacer(modifier = Modifier.height(14.dp))
+          Spacer(modifier = Modifier.height(14.dp))
 
-        // Sender Mobile Number
-        TournamentTextField(
-          value = senderNumber,
-          onValueChange = {
-            if (it.length <= 11) {
-              senderNumber = it.filter { char -> char.isDigit() }
+          // Sender Mobile Number
+          DpField(
+            label = strings.senderMobileLabel,
+            value = senderNumber,
+            onValueChange = {
+              if (it.length <= 11) {
+                senderNumber = it.filter { char -> char.isDigit() }
+                clientError = null
+              }
+            },
+            placeholder = "01XXXXXXXXX",
+            icon = Icons.Default.Phone,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            tag = "deposit_sender_input",
+          )
+
+          Spacer(modifier = Modifier.height(12.dp))
+
+          // Transaction ID (TrxID)
+          DpField(
+            label = strings.trxIdLabel,
+            value = trxId,
+            onValueChange = {
+              trxId = it.uppercase()
               clientError = null
-            }
-          },
-          label = strings.senderMobileLabel,
-          placeholder = "01XXXXXXXXX",
-          leadingIcon = Icons.Default.Phone,
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-          testTag = "deposit_sender_input",
-        )
+            },
+            placeholder = strings.depositTrxIdPlaceholder,
+            icon = Icons.Default.Receipt,
+            keyboardOptions = KeyboardOptions.Default,
+            tag = "deposit_trx_input",
+          )
 
-        Spacer(modifier = Modifier.height(12.dp))
+          Spacer(modifier = Modifier.height(14.dp))
 
-        // Transaction ID (TrxID)
-        TournamentTextField(
-          value = trxId,
-          onValueChange = {
-            trxId = it.uppercase()
-            clientError = null
-          },
-          label = strings.trxIdLabel,
-          placeholder = strings.depositTrxIdPlaceholder,
-          leadingIcon = Icons.Default.Receipt,
-          testTag = "deposit_trx_input",
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 6. PAYMENT SCREENSHOT UPLOAD
-        Text(
-          text = strings.paymentScreenshotLabel,
-          style = MaterialTheme.typography.titleSmall.copy(
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 13.5.sp,
-          ),
-          color = Color.White,
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-
-        if (imageBitmap != null) {
-          Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = Slate900,
-            border = BorderStroke(1.dp, Emerald500.copy(alpha = 0.5f)),
-            modifier = Modifier.fillMaxWidth(),
-          ) {
-            Column(modifier = Modifier.padding(10.dp)) {
-              Image(
-                bitmap = imageBitmap!!,
-                contentDescription = strings.depositScreenshotPreview,
-                modifier = Modifier
-                  .fillMaxWidth()
-                  .height(160.dp)
-                  .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop,
-              )
-              Spacer(modifier = Modifier.height(8.dp))
-              Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-              ) {
-                Row(
-                  verticalAlignment = Alignment.CenterVertically,
-                  horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                  Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = Emerald400,
-                    modifier = Modifier.size(16.dp),
-                  )
-                  Text(
-                    text = strings.screenshotAttached,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                    color = Emerald400,
-                  )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                  TextButton(
-                    onClick = {
-                      photoPickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                      )
-                    },
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                  ) {
-                    Text(
-                      text = strings.replace,
-                      style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-                      color = Cyan400,
-                    )
-                  }
-                  TextButton(
-                    onClick = {
-                      selectedImageUri = null
-                      imageBitmap = null
-                    },
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                  ) {
-                    Text(
-                      text = strings.remove,
-                      style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-                      color = Rose400,
-                    )
-                  }
-                }
-              }
-            }
-          }
-        } else {
-          Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = Slate900,
-            border = BorderStroke(1.dp, Slate700),
-            modifier = Modifier
-              .fillMaxWidth()
-              .clip(RoundedCornerShape(10.dp))
-              .clickable {
+          // 6. PAYMENT SCREENSHOT UPLOAD
+          Text(strings.paymentScreenshotLabel, fontSize = 12.5.sp, fontWeight = FontWeight.Black, color = Color(0xFFFFE7A0), modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
+          if (imageBitmap != null) {
+            DpScreenshotPreview(
+              bitmap = imageBitmap!!,
+              previewText = strings.depositScreenshotPreview,
+              attachedText = strings.screenshotAttached,
+              replaceText = strings.replace,
+              removeText = strings.remove,
+              onReplace = {
                 photoPickerLauncher.launch(
                   PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                 )
               },
-          ) {
-            Column(
-              modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 20.dp, horizontal = 16.dp),
-              horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-              Surface(
-                shape = CircleShape,
-                color = Slate800,
-                modifier = Modifier.size(40.dp),
-              ) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                  Icon(
-                    imageVector = Icons.Default.CloudUpload,
-                    contentDescription = null,
-                    tint = Cyan400,
-                    modifier = Modifier.size(22.dp),
-                  )
-                }
+              onRemove = {
+                selectedImageUri = null
+                imageBitmap = null
+              },
+            )
+          } else {
+            DpUploadBox(
+              title = strings.uploadScreenshotTitle,
+              subtitle = strings.uploadScreenshotSub,
+              icon = Icons.Default.CloudUpload,
+              onClick = {
+                photoPickerLauncher.launch(
+                  PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+              },
+            )
+          }
+
+          Spacer(modifier = Modifier.height(14.dp))
+
+          // 7. SECURITY NOTICE
+          DpNotice(text = strings.depositSecurityNotice, icon = Icons.Default.Security, error = false)
+
+          Spacer(modifier = Modifier.height(16.dp))
+
+          // 8. SUBMIT BUTTON
+          DpBigButton(
+            text = strings.submitDepositButton,
+            onClick = {
+              val minAmount = (appSettings?.minDepositTaka ?: 50.0).toLong()
+              val amountNum = amountInput.toLongOrNull() ?: 0L
+              if (amountNum < minAmount) {
+                clientError = strings.depositMinAmountError(strings.takaWhole(minAmount.toDouble()))
+                return@DpBigButton
               }
-              Spacer(modifier = Modifier.height(8.dp))
-              Text(
-                text = strings.uploadScreenshotTitle,
-                style = MaterialTheme.typography.labelMedium.copy(
-                  fontWeight = FontWeight.Bold,
-                  letterSpacing = 0.5.sp,
-                  fontSize = 13.sp,
-                ),
-                color = Color.White,
+              if (amountNum > 25000L) {
+                clientError = strings.depositMaxError
+                return@DpBigButton
+              }
+              if (senderNumber.length < 11) {
+                clientError = strings.invalidMobileError
+                return@DpBigButton
+              }
+              if (trxId.length < 6) {
+                clientError = strings.invalidTrxIdError
+                return@DpBigButton
+              }
+              viewModel.submitDeposit(
+                amountMinorUnits = amountNum * 100L,
+                method = selectedMethod,
+                senderNumber = senderNumber,
+                trxId = trxId,
               )
-              Spacer(modifier = Modifier.height(2.dp))
-              Text(
-                text = strings.uploadScreenshotSub,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                color = Slate400,
-              )
-            }
-          }
+            },
+            isLoading = uiState.isSubmitting,
+            tag = "submit_deposit_button",
+          )
         }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // 7. SECURITY NOTICE
-        Surface(
-          shape = RoundedCornerShape(8.dp),
-          color = Slate900.copy(alpha = 0.8f),
-          border = BorderStroke(0.5.dp, Cyan400.copy(alpha = 0.3f)),
-          modifier = Modifier.fillMaxWidth(),
-        ) {
-          Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-          ) {
-            Icon(
-              imageVector = Icons.Default.Security,
-              contentDescription = null,
-              tint = Cyan400,
-              modifier = Modifier.size(16.dp),
-            )
-            Text(
-              text = strings.depositSecurityNotice,
-              style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-              color = Slate300,
-            )
-          }
-        }
-
-        Spacer(modifier = Modifier.height(18.dp))
-
-        // 8. SUBMIT BUTTON
-        TournamentButton(
-          text = strings.submitDepositButton,
-          onClick = {
-            val minAmount = (appSettings?.minDepositTaka ?: 50.0).toLong()
-            val amountNum = amountInput.toLongOrNull() ?: 0L
-            if (amountNum < minAmount) {
-              clientError = strings.depositMinAmountError(strings.takaWhole(minAmount.toDouble()))
-              return@TournamentButton
-            }
-            if (amountNum > 25000L) {
-              clientError = strings.depositMaxError
-              return@TournamentButton
-            }
-            if (senderNumber.length < 11) {
-              clientError = strings.invalidMobileError
-              return@TournamentButton
-            }
-            if (trxId.length < 6) {
-              clientError = strings.invalidTrxIdError
-              return@TournamentButton
-            }
-            viewModel.submitDeposit(
-              amountMinorUnits = amountNum * 100L,
-              method = selectedMethod,
-              senderNumber = senderNumber,
-              trxId = trxId,
-            )
-          },
-          isLoading = uiState.isSubmitting,
-          modifier = Modifier.fillMaxWidth(),
-          testTag = "submit_deposit_button",
-        )
       }
+
+      Spacer(modifier = Modifier.height(16.dp))
     }
   }
 }

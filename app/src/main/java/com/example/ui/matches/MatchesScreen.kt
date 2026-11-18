@@ -33,6 +33,8 @@ import com.example.ui.components.*
 import com.example.ui.theme.*
 import com.example.core.i18n.LocalAppStrings
 import com.example.core.i18n.AppStrings
+import com.example.ui.wallet.wlBackground
+import com.example.ui.home.AdGameFilterChip
 
 enum class MatchesTab {
   AVAILABLE,
@@ -110,7 +112,7 @@ fun MatchesScreen(
     Column(
       modifier = Modifier
         .fillMaxSize()
-        .background(MidnightBackgroundGradient)
+        .wlBackground()
         .padding(innerPadding),
     ) {
       // 1. Primary Filter Tabs: Available, My Joined, Upcoming, History
@@ -154,13 +156,14 @@ fun MatchesScreen(
             }
             val emptyTitle = emptyStatePair.first
             val emptyMsg = emptyStatePair.second
-            EmptyState(
+            AdMatchesEmpty(
               title = emptyTitle,
               description = emptyMsg,
-              actionButtonText = if (selectedTab != MatchesTab.AVAILABLE) strings.browseAvailableCta else null,
-              onActionClick = if (selectedTab != MatchesTab.AVAILABLE) {
+              actionText = if (selectedTab != MatchesTab.AVAILABLE) strings.browseAvailableCta else null,
+              onAction = if (selectedTab != MatchesTab.AVAILABLE) {
                 { viewModel.setTab(MatchesTab.AVAILABLE) }
               } else null,
+              modifier = Modifier.padding(top = 14.dp),
             )
           } else {
             LazyColumn(
@@ -198,35 +201,14 @@ private fun PrimaryTabRow(
   onTabSelected: (MatchesTab) -> Unit,
   strings: com.example.core.i18n.AppStrings,
 ) {
-  Surface(
-    color = MidnightNavyCard,
-    border = BorderStroke(0.8.dp, MidnightNavyBorder),
-    modifier = Modifier.fillMaxWidth(),
-  ) {
-    ScrollableTabRow(
-      selectedTabIndex = selectedTab.ordinal,
-      containerColor = Color.Transparent,
-      contentColor = Gold400,
-      edgePadding = 16.dp,
-      divider = {},
-    ) {
-      MatchesTab.values().forEach { tab ->
-        val isSelected = selectedTab == tab
-        Tab(
-          selected = isSelected,
-          onClick = { onTabSelected(tab) },
-          text = {
-            Text(
-              text = getTabLabel(tab, strings),
-              style = MaterialTheme.typography.labelLarge.copy(
-                fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
-              ),
-              color = if (isSelected) Gold400 else Slate400,
-            )
-          },
-          modifier = Modifier.testTag("tab_${tab.name.lowercase()}"),
-        )
-      }
+  AdMatchesTabBar(modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 10.dp)) {
+    MatchesTab.values().forEach { tab ->
+      AdMatchesTab(
+        text = getTabLabel(tab, strings),
+        selected = selectedTab == tab,
+        onClick = { onTabSelected(tab) },
+        tag = "tab_${tab.name.lowercase()}",
+      )
     }
   }
 }
@@ -237,95 +219,29 @@ private fun GameFilterRow(
   onFilterSelected: (GameFilter) -> Unit,
   strings: com.example.core.i18n.AppStrings,
 ) {
-  LazyRow(
+  Row(
     modifier = Modifier
       .fillMaxWidth()
-      .padding(horizontal = 16.dp, vertical = 10.dp),
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
+      .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 2.dp),
+    horizontalArrangement = Arrangement.spacedBy(10.dp),
   ) {
-    items(GameFilter.values()) { filter ->
-      val isSelected = selectedFilter == filter
-      val accentColor = when (filter) {
-        GameFilter.ALL -> Indigo400
-        GameFilter.LUDO -> Gold400
-        GameFilter.CARROM -> NeonCyan
-      }
-
-      Surface(
-        color = if (isSelected) Color.Transparent else MidnightNavyCard,
-        shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(
-          0.8.dp,
-          if (isSelected) Gold400 else MidnightNavyBorder,
-        ),
-        shadowElevation = if (isSelected) 4.dp else 1.dp,
-        modifier = Modifier
-          .clip(RoundedCornerShape(14.dp))
-          .then(
-            if (isSelected) {
-              Modifier.background(ElectricAmberGradient)
-            } else {
-              Modifier
-            }
-          )
-          .testTag("filter_${filter.name.lowercase()}"),
+    GameFilter.values().forEach { filter ->
+      AdGameFilterChip(
+        label = when (filter) {
+          GameFilter.ALL -> strings.filterAllGames
+          GameFilter.LUDO -> strings.filterLudo
+          GameFilter.CARROM -> strings.filterCarrom
+        },
+        selected = selectedFilter == filter,
+        iconKind = when (filter) {
+          GameFilter.ALL -> 0
+          GameFilter.LUDO -> 1
+          GameFilter.CARROM -> 2
+        },
         onClick = { onFilterSelected(filter) },
-      ) {
-        Row(
-          modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          // 3D Isometric Tactile Icon Container
-          Box(
-            modifier = Modifier
-              .size(22.dp)
-              .clip(RoundedCornerShape(6.dp))
-              .then(
-                if (isSelected) {
-                  Modifier.background(Slate950.copy(alpha = 0.25f))
-                } else {
-                  Modifier.background(
-                    Brush.radialGradient(
-                      colors = listOf(
-                        accentColor.copy(alpha = 0.3f),
-                        Color.Transparent,
-                      )
-                    )
-                  )
-                }
-              )
-              .border(
-                0.8.dp,
-                if (isSelected) Slate950.copy(alpha = 0.35f) else accentColor.copy(alpha = 0.5f),
-                RoundedCornerShape(6.dp),
-              ),
-            contentAlignment = Alignment.Center,
-          ) {
-            Icon(
-              imageVector = when (filter) {
-                GameFilter.ALL -> Icons.Default.SportsEsports
-                GameFilter.LUDO -> Icons.Default.Casino
-                GameFilter.CARROM -> Icons.Default.Album
-              },
-              contentDescription = null,
-              tint = if (isSelected) Slate950 else accentColor,
-              modifier = Modifier.size(14.dp),
-            )
-          }
-
-          Spacer(modifier = Modifier.width(8.dp))
-
-          Text(
-            text = getFilterLabel(filter, strings),
-            style = MaterialTheme.typography.labelMedium.copy(
-              fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
-              fontSize = 12.sp,
-              letterSpacing = 0.3.sp,
-            ),
-            color = if (isSelected) Slate950 else Color.White,
-          )
-        }
-      }
+        tag = "filter_${filter.name.lowercase()}",
+        modifier = Modifier.weight(1f),
+      )
     }
   }
 }

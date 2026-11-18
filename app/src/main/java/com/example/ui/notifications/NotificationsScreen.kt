@@ -34,6 +34,9 @@ import com.example.domain.repository.NotificationRepository
 import com.example.ui.components.TournamentCard
 import com.example.ui.components.UnifiedEsportsTopBar
 import com.example.ui.theme.*
+import com.example.ui.wallet.WlEmptyState
+import com.example.ui.wallet.WlFrame
+import com.example.ui.wallet.wlBackground
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -167,6 +170,7 @@ fun NotificationsScreen(
     Column(
       modifier = Modifier
         .fillMaxSize()
+        .wlBackground()
         .padding(innerPadding),
     ) {
       // Header Section: Back button, Title & Subtitle, and Mark All Read CTA
@@ -175,144 +179,37 @@ fun NotificationsScreen(
           .fillMaxWidth()
           .padding(horizontal = 16.dp, vertical = 8.dp)
       ) {
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-          Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f, fill = false)
-          ) {
-            IconButton(
-              onClick = onNavigateBack,
-              modifier = Modifier
-                .size(40.dp)
-                .testTag("notifications_back_button")
-            ) {
-              Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = strings.back,
-                tint = Slate200
-              )
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-              Text(
-                text = strings.notificationsTitle,
-                style = MaterialTheme.typography.titleLarge.copy(
-                  fontWeight = FontWeight.Bold,
-                  fontSize = 20.sp
-                ),
-                color = Color.White
-              )
-              Text(
-                text = strings.notifSubtitle,
-                style = MaterialTheme.typography.bodySmall.copy(
-                  fontSize = 12.sp
-                ),
-                color = Slate400
-              )
-            }
-          }
+        NfHeader(
+          title = strings.notificationsTitle,
+          subtitle = strings.notifSubtitle,
+          backLabel = strings.back,
+          onBack = onNavigateBack,
+          markAllText = if (hasUnread) strings.notifMarkAllRead else null,
+          onMarkAll = { viewModel.markAllAsRead() },
+        )
 
-          if (hasUnread) {
-            TextButton(
-              onClick = { viewModel.markAllAsRead() },
-              modifier = Modifier.testTag("mark_all_read_button"),
-              contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-              Icon(
-                imageVector = Icons.Default.DoneAll,
-                contentDescription = null,
-                tint = Gold400,
-                modifier = Modifier.size(16.dp)
-              )
-              Spacer(modifier = Modifier.width(4.dp))
-              Text(
-                text = strings.notifMarkAllRead,
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                color = Gold400,
-              )
-            }
-          }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         // Filter Tabs (All / Unread)
         val unreadCount = remember(notifications) { notifications.count { !it.effectiveRead } }
         Row(
           modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(8.dp)
+          horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-          FilterChip(
+          NfTab(
+            text = strings.notifFilterAll,
             selected = selectedFilter == "ALL",
             onClick = { selectedFilter = "ALL" },
-            label = {
-              Text(
-                text = strings.notifFilterAll,
-                style = MaterialTheme.typography.labelMedium.copy(
-                  fontWeight = if (selectedFilter == "ALL") FontWeight.Bold else FontWeight.Medium
-                )
-              )
-            },
-            colors = FilterChipDefaults.filterChipColors(
-              selectedContainerColor = Indigo600,
-              selectedLabelColor = Color.White,
-              containerColor = MidnightNavyCard,
-              labelColor = Slate300
-            ),
-            border = BorderStroke(
-              1.dp,
-              if (selectedFilter == "ALL") Indigo600 else MidnightNavyBorder
-            ),
-            modifier = Modifier.testTag("notification_filter_all")
+            tag = "notification_filter_all",
+            modifier = Modifier.weight(1f),
           )
-
-          FilterChip(
+          NfTab(
+            text = strings.notifFilterUnread,
             selected = selectedFilter == "UNREAD",
             onClick = { selectedFilter = "UNREAD" },
-            label = {
-              Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                  text = strings.notifFilterUnread,
-                  style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = if (selectedFilter == "UNREAD") FontWeight.Bold else FontWeight.Medium
-                  )
-                )
-                if (unreadCount > 0) {
-                  Spacer(modifier = Modifier.width(6.dp))
-                  Surface(
-                    shape = CircleShape,
-                    color = if (selectedFilter == "UNREAD") Gold400 else Indigo600,
-                    modifier = Modifier.size(18.dp)
-                  ) {
-                    Box(contentAlignment = Alignment.Center) {
-                      Text(
-                        text = strings.digits(unreadCount.toString()),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                          fontSize = 10.sp,
-                          fontWeight = FontWeight.Bold
-                        ),
-                        color = if (selectedFilter == "UNREAD") Color.Black else Color.White
-                      )
-                    }
-                  }
-                }
-              }
-            },
-            colors = FilterChipDefaults.filterChipColors(
-              selectedContainerColor = Indigo600,
-              selectedLabelColor = Color.White,
-              containerColor = MidnightNavyCard,
-              labelColor = Slate300
-            ),
-            border = BorderStroke(
-              1.dp,
-              if (selectedFilter == "UNREAD") Indigo600 else MidnightNavyBorder
-            ),
-            modifier = Modifier.testTag("notification_filter_unread")
+            tag = "notification_filter_unread",
+            modifier = Modifier.weight(1f),
+            badge = if (unreadCount > 0) strings.digits(unreadCount.toString()) else null,
           )
         }
       }
@@ -342,41 +239,18 @@ fun NotificationsScreen(
               .testTag("notifications_empty_state"),
             contentAlignment = Alignment.Center,
           ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-              Box(
-                modifier = Modifier
-                  .size(72.dp)
-                  .clip(CircleShape)
-                  .background(MidnightNavyCard),
-                contentAlignment = Alignment.Center,
-              ) {
-                Icon(
-                  imageVector = Icons.Default.NotificationsNone,
-                  contentDescription = null,
-                  tint = Slate500,
-                  modifier = Modifier.size(36.dp),
-                )
-              }
-              Spacer(modifier = Modifier.height(16.dp))
-              Text(
-                text = if (selectedFilter == "UNREAD" && notifications.isNotEmpty()) {
+            WlFrame(gold = true, pad = 14.dp) {
+              WlEmptyState(
+                title = if (selectedFilter == "UNREAD" && notifications.isNotEmpty()) {
                   strings.notifEmptyFilterTitle
                 } else {
                   strings.noNotificationsTitle
                 },
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-              )
-              Spacer(modifier = Modifier.height(6.dp))
-              Text(
-                text = if (selectedFilter == "UNREAD" && notifications.isNotEmpty()) {
+                description = if (selectedFilter == "UNREAD" && notifications.isNotEmpty()) {
                   strings.notifEmptyFilterSubtext
                 } else {
                   strings.noNotificationsSubtext
                 },
-                color = Slate400,
-                style = MaterialTheme.typography.bodySmall,
-                lineHeight = 18.sp,
               )
             }
           }
@@ -409,96 +283,16 @@ fun NotificationsScreen(
       if (selectedNotification != null) {
         val notif = selectedNotification!!
 
-        AlertDialog(
-          onDismissRequest = { selectedNotification = null },
-          modifier = Modifier.testTag("notification_detail_dialog"),
-          shape = RoundedCornerShape(16.dp),
-          containerColor = Slate900,
-          title = {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              modifier = Modifier.fillMaxWidth(),
-            ) {
-              Box(
-                modifier = Modifier
-                  .size(36.dp)
-                  .clip(CircleShape)
-                  .background(Gold500.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center,
-              ) {
-                Icon(
-                  imageVector = Icons.Default.Notifications,
-                  contentDescription = null,
-                  tint = Gold400,
-                  modifier = Modifier.size(20.dp),
-                )
-              }
-              Spacer(modifier = Modifier.width(10.dp))
-              Text(
-                text = if (strings !== BengaliStrings && notif.titleEn.isNotBlank()) notif.titleEn else notif.title,
-                style = MaterialTheme.typography.titleMedium.copy(
-                  fontWeight = FontWeight.Bold,
-                  fontSize = 16.sp
-                ),
-                color = Color.White,
-              )
-            }
-          },
-          text = {
-            Column(
-              modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-            ) {
-              Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-              ) {
-                Surface(
-                  color = Gold500.copy(alpha = 0.12f),
-                  shape = RoundedCornerShape(4.dp),
-                  border = BorderStroke(1.dp, Gold500.copy(alpha = 0.3f))
-                ) {
-                  Text(
-                    text = getNotificationCategory(notif.type, strings),
-                    style = MaterialTheme.typography.labelSmall.copy(
-                      fontSize = 10.sp,
-                      fontWeight = FontWeight.SemiBold
-                    ),
-                    color = Gold400,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                  )
-                }
-                Text(
-                  text = formatNotificationDetailDate(notif.effectiveTimestamp, strings),
-                  style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                  color = Slate400,
-                )
-              }
-              Spacer(modifier = Modifier.height(12.dp))
-              Text(
-                text = if (strings !== BengaliStrings && notif.messageEn.isNotBlank()) notif.messageEn else notif.effectiveMessage,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                  fontSize = 14.sp,
-                  lineHeight = 22.sp
-                ),
-                color = Slate200,
-              )
-            }
-          },
-          confirmButton = {
-            TextButton(
-              onClick = { selectedNotification = null },
-              modifier = Modifier.testTag("notification_dialog_close_button"),
-            ) {
-              Text(
-                text = strings.notifDialogClose,
-                color = Gold400,
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-              )
-            }
-          },
+        val (dPicture, dRing) = nfLook(notif.type)
+        NfDetailWindow(
+          picture = dPicture,
+          ring = dRing,
+          title = if (strings !== BengaliStrings && notif.titleEn.isNotBlank()) notif.titleEn else notif.title,
+          category = getNotificationCategory(notif.type, strings),
+          date = formatNotificationDetailDate(notif.effectiveTimestamp, strings),
+          message = if (strings !== BengaliStrings && notif.messageEn.isNotBlank()) notif.messageEn else notif.effectiveMessage,
+          closeText = strings.notifDialogClose,
+          onClose = { selectedNotification = null },
         )
       }
     }
@@ -519,125 +313,18 @@ private fun NotificationCard(
     getNotificationCategory(notif.type, strings)
   }
 
-  val (icon, iconColor, bgColor) = remember(notif.type, isRead) {
-    val type = try {
-      com.example.domain.model.NotificationType.valueOf(notif.type)
-    } catch (_: Exception) {
-      com.example.domain.model.NotificationType.ROOM_CODE
-    }
-    when (type) {
-      com.example.domain.model.NotificationType.DEPOSIT_APPROVED -> Triple(Icons.Default.AccountBalanceWallet, Emerald400, Emerald400.copy(alpha = 0.15f))
-      com.example.domain.model.NotificationType.DEPOSIT_REJECTED -> Triple(Icons.Default.AccountBalanceWallet, Rose400, Rose400.copy(alpha = 0.15f))
-      com.example.domain.model.NotificationType.WITHDRAWAL_APPROVED -> Triple(Icons.Default.ArrowUpward, Gold400, Gold400.copy(alpha = 0.15f))
-      com.example.domain.model.NotificationType.WITHDRAWAL_REJECTED -> Triple(Icons.Default.ArrowUpward, Rose400, Rose400.copy(alpha = 0.15f))
-      com.example.domain.model.NotificationType.MATCH_WIN -> Triple(Icons.Default.EmojiEvents, Gold500, Gold500.copy(alpha = 0.15f))
-      com.example.domain.model.NotificationType.MATCH_LOST -> Triple(Icons.Default.SportsEsports, Slate400, Slate400.copy(alpha = 0.15f))
-      com.example.domain.model.NotificationType.MATCH_PROOF_REJECTED -> Triple(Icons.Default.Gavel, Rose400, Rose400.copy(alpha = 0.15f))
-      com.example.domain.model.NotificationType.ROOM_CODE -> Triple(Icons.Default.VpnKey, Cyan400, Cyan400.copy(alpha = 0.15f))
-    }
-  }
+  val (picture, ring) = remember(notif.type) { nfLook(notif.type) }
 
-  TournamentCard(
-    modifier = Modifier
-      .fillMaxWidth()
-      .testTag("notification_item_${notif.effectiveId}"),
+  NfCard(
+    picture = picture,
+    ring = ring,
+    title = if (strings !== BengaliStrings && notif.titleEn.isNotBlank()) notif.titleEn else notif.title,
+    message = if (strings !== BengaliStrings && notif.messageEn.isNotBlank()) notif.messageEn else notif.effectiveMessage,
+    unread = !isRead,
+    newText = strings.notifBadgeNew,
+    category = categoryLabel,
+    time = formattedTime,
     onClick = onClick,
-    backgroundColor = if (!isRead) NavySurface else MidnightNavyCard,
-    borderColor = if (!isRead) Indigo600.copy(alpha = 0.8f) else MidnightNavyBorder,
-  ) {
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      verticalAlignment = Alignment.Top,
-    ) {
-      Box(
-        modifier = Modifier
-          .size(40.dp)
-          .clip(CircleShape)
-          .background(if (!isRead) bgColor else Slate800),
-        contentAlignment = Alignment.Center,
-      ) {
-        Icon(
-          imageVector = icon,
-          contentDescription = null,
-          tint = if (!isRead) iconColor else Slate400,
-          modifier = Modifier.size(20.dp),
-        )
-      }
-      Spacer(modifier = Modifier.width(12.dp))
-      Column(modifier = Modifier.weight(1f)) {
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Text(
-            text = if (strings !== BengaliStrings && notif.titleEn.isNotBlank()) notif.titleEn else notif.title,
-            style = MaterialTheme.typography.titleSmall.copy(
-              fontWeight = FontWeight.Bold,
-              fontSize = 14.sp
-            ),
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false)
-          )
-          if (!isRead) {
-            Spacer(modifier = Modifier.width(8.dp))
-            Surface(
-              color = Indigo600,
-              shape = RoundedCornerShape(4.dp),
-            ) {
-              Text(
-                text = strings.notifBadgeNew,
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontSize = 9.5.sp,
-                  fontWeight = FontWeight.Black
-                ),
-                color = Color.White,
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-              )
-            }
-          }
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-          text = if (strings !== BengaliStrings && notif.messageEn.isNotBlank()) notif.messageEn else notif.effectiveMessage,
-          style = MaterialTheme.typography.bodySmall.copy(
-            fontSize = 13.sp,
-            lineHeight = 18.sp
-          ),
-          color = if (!isRead) Slate200 else Slate400,
-          maxLines = 3,
-          overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          Surface(
-            color = iconColor.copy(alpha = 0.12f),
-            shape = RoundedCornerShape(4.dp),
-            border = BorderStroke(1.dp, iconColor.copy(alpha = 0.3f))
-          ) {
-            Text(
-              text = categoryLabel,
-              style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold
-              ),
-              color = iconColor,
-              modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-            )
-          }
-          Text(
-            text = formattedTime,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-            color = Slate400,
-          )
-        }
-      }
-    }
-  }
+    modifier = Modifier.testTag("notification_item_${notif.effectiveId}"),
+  )
 }

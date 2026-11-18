@@ -283,10 +283,9 @@ private fun AdSplashBackground(twinkle: Float, modifier: Modifier) {
     Canvas(modifier = modifier) {
         val d = density
         drawRect(
-            Brush.radialGradient(
-                0f to Color(0xFF1B2660), 0.55f to Color(0xFF0C1338), 1f to Color(0xFF050820),
-                center = Offset(size.width * 0.5f, size.height * 0.42f),
-                radius = maxOf(size.width, size.height) * 0.75f
+            Brush.verticalGradient(
+                0f to Color(0xFF2A3AB6), 0.18f to Color(0xFF1E2D93), 0.45f to Color(0xFF18227B),
+                0.72f to Color(0xFF131C69), 1f to Color(0xFF121A61)
             )
         )
         bokeh.forEach { b ->
@@ -328,54 +327,23 @@ private fun DrawScope.drawSparkle(c: Offset, s: Float, color: Color) {
 
 @Composable
 fun AdSplashEmblem(modifier: Modifier) {
-    val logo = painterResource(id = R.drawable.ic_launcher_foreground)
-    Canvas(modifier = modifier) {
-        val k = size.width / 230f
-        val ex = 115f * k
-        val ey = 116f * k
-        // soft glow
-        drawOval(
-            Brush.radialGradient(
-                listOf(Color(0xFFFFF6D0).copy(alpha = 0.33f), Color(0xFFFFD27A).copy(alpha = 0.16f), Color.Transparent),
-                center = Offset(ex, ey + 10f * k), radius = 95f * k
-            ),
-            topLeft = Offset(ex - 95f * k, ey + 10f * k - 85f * k), size = Size(190f * k, 170f * k)
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val r = size.minDimension * 0.55f
+            drawCircle(
+                Brush.radialGradient(
+                    listOf(Color(0xFFFFF6D0).copy(alpha = 0.30f), Color(0xFFFFD27A).copy(alpha = 0.14f), Color.Transparent),
+                    center = center, radius = r
+                ),
+                radius = r, center = center
+            )
+        }
+        androidx.compose.foundation.Image(
+            painter = painterResource(id = R.drawable.ad_logo_emblem),
+            contentDescription = "AD Tournament Logo",
+            contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            modifier = Modifier.fillMaxSize()
         )
-        // laurel
-        val leafBrush = Brush.linearGradient(listOf(Color(0xFFFFE7A0), Color(0xFFA8740E)))
-        fun leaf(x: Float, y: Float, rx: Float, ry: Float, deg: Float) {
-            rotate(deg, pivot = Offset(x, y)) {
-                drawOval(leafBrush, Offset(x - rx, y - ry), Size(rx * 2, ry * 2))
-                drawOval(Color(0xFF7A5208), Offset(x - rx, y - ry), Size(rx * 2, ry * 2), style = Stroke(width = 0.5f * k))
-            }
-        }
-        for (side in listOf(-1, 1)) {
-            for (i in 0..10) {
-                val t = i / 10f
-                val angDeg = if (side < 0) 115f + t * 120f else 65f - t * 120f
-                val ang = Math.toRadians(angDeg.toDouble())
-                val rr = 76f * k
-                val x = ex + rr * cos(ang).toFloat(); val y = ey + 12f * k + rr * sin(ang).toFloat() * 1.05f
-                val rot = angDeg + if (side < 0) 90f else -90f
-                val sz = 1f - t * 0.35f
-                leaf(x, y, 4.2f * sz * k, 10f * sz * k, rot + if (side < 0) 25f else -25f)
-                val r2 = 66f * k
-                val x2 = ex + r2 * cos(ang).toFloat(); val y2 = ey + 12f * k + r2 * sin(ang).toFloat() * 1.05f
-                leaf(x2, y2, 3.6f * sz * k, 8.5f * sz * k, rot - if (side < 0) 25f else -25f)
-            }
-        }
-        drawPath(
-            Path().apply { moveTo(ex - 30f * k, ey + 92f * k); quadraticBezierTo(ex, ey + 104f * k, ex + 30f * k, ey + 92f * k) },
-            Brush.horizontalGradient(listOf(Color(0xFF9A6A10), Color(0xFFFFE7A0), Color(0xFF9A6A10)), startX = ex - 30f * k, endX = ex + 30f * k),
-            style = Stroke(width = 3f * k)
-        )
-        // the app's own logo (ic_launcher_foreground), shield about 143 units tall
-        val logoSize = 108f * 2.3f * k
-        translate(left = ex - 54f * 2.3f * k, top = ey + 8f * k - 53f * 2.3f * k) {
-            with(logo) { draw(Size(logoSize, logoSize)) }
-        }
-        // crown on top
-        drawRoyalCrown(Offset(ex, 38f * k), k)
     }
 }
 

@@ -106,10 +106,9 @@ fun AdAuthBackground(modifier: Modifier = Modifier) {
     Canvas(modifier = modifier) {
         val d = density
         drawRect(
-            Brush.radialGradient(
-                0f to Color(0xFF1B2660), 0.55f to Color(0xFF0C1338), 1f to Color(0xFF050820),
-                center = Offset(size.width * 0.5f, size.height * 0.40f),
-                radius = maxOf(size.width, size.height) * 0.75f
+            Brush.verticalGradient(
+                0f to Color(0xFF2A3AB6), 0.18f to Color(0xFF1E2D93), 0.45f to Color(0xFF18227B),
+                0.72f to Color(0xFF131C69), 1f to Color(0xFF121A61)
             )
         )
         bokeh.forEach { b ->
@@ -151,8 +150,23 @@ private fun DrawScope.auSparkle(c: Offset, s: Float, color: Color) {
 
 @Composable
 fun AdAuthLogo(modifier: Modifier = Modifier) {
-    // Same emblem as the Splash page (shared code), a little smaller to leave room for the form
-    AdSplashEmblem(modifier = modifier.size(width = 172.dp, height = 156.dp))
+    Box(modifier = modifier.size(width = 132.dp, height = 140.dp), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.matchParentSize()) {
+            drawCircle(
+                Brush.radialGradient(
+                    listOf(Color(0xFFFFC107).copy(alpha = 0.35f), Color.Transparent),
+                    center = center, radius = size.width * 0.6f
+                ),
+                radius = size.width * 0.6f, center = center
+            )
+        }
+        androidx.compose.foundation.Image(
+            painter = painterResource(id = R.drawable.ad_logo_emblem),
+            contentDescription = "AD Tournament Logo",
+            contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            modifier = Modifier.size(132.dp)
+        )
+    }
 }
 
 @Composable

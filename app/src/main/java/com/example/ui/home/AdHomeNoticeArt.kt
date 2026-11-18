@@ -199,7 +199,7 @@ fun AdNoticeBarArt(
                     .background(Color(0xFFF43F5E).copy(alpha = dot))
             )
             Text(
-                text = message,
+                text = remember(message) { message.trim().replace(Regex("\\s*\\n+\\s*"), "   ✦   ") },
                 style = TextStyle(
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 13.sp,
