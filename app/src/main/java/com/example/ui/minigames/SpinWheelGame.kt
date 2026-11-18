@@ -20,6 +20,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -306,343 +311,110 @@ fun SpinWheelScreen(
         }
     }
 
-    Box(
+    // ---------------- NEW MONEY WHEEL LOOK (visual only; game logic above is unchanged) ----------------
+    val whScope = rememberCoroutineScope()
+    LaunchedEffect(Unit) { WhSfx.prepare(context) }
+    val pegGlow = remember { FloatArray(24) }
+    var glowTick by remember { mutableStateOf(0) }
+    val pointerKick = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        val sl = 360f / 24f
+        fun under(r: Float) = (((270f - r) % 360f + 360f) % 360f / sl).toInt()
+        var last = under(animatedRotation.value)
+        snapshotFlow { animatedRotation.value }.collect { r ->
+            for (q in 0 until 24) pegGlow[q] *= 0.86f
+            val now = under(r)
+            if (now != last) {
+                last = now
+                val j = ((Math.round((270f - r) / sl) % 24) + 24) % 24
+                pegGlow[j] = 1f
+                WhSfx.play(WhSfx.S.TICK, 0.9f)
+                whScope.launch { pointerKick.snapTo(-22f); pointerKick.animateTo(0f, spring(0.35f, 900f)) }
+            }
+            glowTick++
+        }
+    }
+    LaunchedEffect(isSpinning) {
+        if (isSpinning) WhSfx.play(WhSfx.S.SPIN, 0.8f)
+        else repeat(20) { for (q in 0 until 24) pegGlow[q] *= 0.8f; glowTick++; delay(25) }
+    }
+    LaunchedEffect(showWinDialog) {
+        if (showWinDialog) {
+            WhSfx.play(if (lastWinMultiplier > 0) WhSfx.S.WIN else WhSfx.S.LOSE)
+            delay(3500)
+            showWinDialog = false
+        }
+    }
+
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.radialGradient(
-                    colors = listOf(Color(0xFF3A1054), Color(0xFF0E0318)),
-                    center = Offset.Unspecified,
-                    radius = 2000f
-                )
-            )
+            .background(Brush.verticalGradient(listOf(Color(0xFF1E2D93), Color(0xFF121A61))))
     ) {
-        // --- STAGE BACKDROP ELEMENTS ---
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            // Ambient stage light rays
-            drawRect(
-                brush = Brush.verticalGradient(
-                    0.0f to Color.Transparent,
-                    0.5f to RoyalPurple.copy(alpha = 0.3f),
-                    1.0f to Color.Transparent
-                )
+        val u = maxWidth / 100
+        val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val geo = WhGeo(maxWidth, maxWidth * 2.0514f, topInset + maxWidth * 0.113f)
+
+        WhStage(geo, isSpinning)
+        WhWheel(
+            geo = geo,
+            rotation = animatedRotation.value,
+            labels = wheelSlices.map { it.multiplier },
+            digits = { strings.digits(it) },
+            pegGlow = pegGlow,
+            glowTick = glowTick,
+            pointerKick = pointerKick.value
+        )
+        WhHost(geo, clap = showWinDialog && lastWinMultiplier > 0)
+
+        WhTopBar(
+            u = u,
+            mainText = strings.taka(userBalance),
+            gameText = strings.taka(gameBalance),
+            mainLabel = strings.spinChipMain,
+            gameLabel = strings.spinChipGame,
+            enabled = !isSpinning,
+            onBack = onNavigateBack,
+            onGame = { isTransferModalVisible = true }
+        )
+
+        WhConsole(u, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(start = u * 4, end = u * 4, bottom = u * 5)) {
+            if (!isGameActive) WhClosedBanner(u, strings.spinClosedBanner)
+            WhChipRow(
+                u = u,
+                options = listOf(1, 3, 5, 8, 10),
+                selected = selectedBetAmount.toInt(),
+                enabled = !isSpinning,
+                label = { "৳" + strings.digits(it.toString()) },
+                onSelect = { WhSfx.play(WhSfx.S.CLICK, 0.8f); selectedBetAmount = it.toLong() }
+            )
+            WhSpinButton(
+                u = u,
+                text = when {
+                    !isGameActive -> strings.spinClosedBanner
+                    gameBalance < selectedBetAmount -> strings.spinNoBalance
+                    isSpinning -> strings.spinSpinning
+                    else -> strings.spinButton
+                },
+                enabled = !isSpinning && selectedBetAmount > 0 && gameBalance >= selectedBetAmount && isGameActive,
+                bet = selectedBetAmount.toInt(),
+                chipLabel = "৳" + strings.digits(selectedBetAmount.toString()),
+                onClick = { WhSfx.play(WhSfx.S.CLICK); performBetAndSpin() }
             )
         }
 
-        Scaffold(
-            containerColor = Color.Transparent,
-            topBar = {
-                TopAppBar(
-                    title = {},
-                    navigationIcon = {
-                        Surface(
-                            modifier = Modifier.padding(start = 12.dp),
-                            shape = CircleShape,
-                            color = Color.White.copy(alpha = 0.1f),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
-                        ) {
-                            IconButton(onClick = onNavigateBack, enabled = !isSpinning, modifier = Modifier.size(40.dp)) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-                            }
-                        }
-                    },
-                    actions = {
-                        Row(
-                            modifier = Modifier.padding(end = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // Redesigned Main Wallet Badge
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = Color(0xFF1E1538),
-                                border = BorderStroke(1.dp, Color(0x33FFD700))
-                            ) {
-                                Text(
-                                    text = "${strings.spinChipMain}: ${strings.taka(userBalance)}",
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = FontWeight.Bold, 
-                                        fontSize = 13.sp,
-                                        letterSpacing = if (strings == com.example.core.i18n.BengaliStrings) 0.sp else androidx.compose.ui.unit.TextUnit.Unspecified
-                                    ),
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    color = Color.White
-                                )
-                            }
-
-                            // Redesigned Game Balance as a Full Clickable Casino Button
-                            Surface(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .clickable(enabled = !isSpinning) { isTransferModalVisible = true },
-                                shape = RoundedCornerShape(20.dp),
-                                color = Color.Black.copy(alpha = 0.8f),
-                                border = BorderStroke(1.5.dp, Color(0xFFFFD700))
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .height(38.dp)
-                                        .padding(start = 12.dp, end = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "${strings.spinChipGame}: ${strings.taka(gameBalance)}",
-                                        style = MaterialTheme.typography.labelMedium.copy(
-                                            fontWeight = if (strings == com.example.core.i18n.BengaliStrings) FontWeight.Bold else FontWeight.Black,
-                                            fontSize = 13.sp,
-                                            letterSpacing = if (strings == com.example.core.i18n.BengaliStrings) 0.sp else androidx.compose.ui.unit.TextUnit.Unspecified
-                                        ),
-                                        maxLines = 1,
-                                        softWrap = false,
-                                        color = CasinoGold
-                                    )
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .clip(CircleShape)
-                                            .background(CasinoGold),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Add,
-                                            contentDescription = "Add",
-                                            tint = Color.Black,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-                )
-            }
-        ) { padding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // --- CENTERED LUXURY GAME TITLE ---
-                Spacer(modifier = Modifier.height(8.dp))
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (!isGameActive) {
-                        Surface(
-                            modifier = Modifier.padding(bottom = 12.dp).fillMaxWidth().padding(horizontal = 20.dp),
-                            color = Color.Red.copy(alpha = 0.15f),
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.4f))
-                        ) {
-                            Text(
-                                strings.spinClosedBanner,
-                                modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp),
-                                color = Color.Red,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-
-                    Text(
-                        strings.spinTitle,
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Black,
-                            fontSize = 24.sp,
-                            letterSpacing = if (strings == com.example.core.i18n.BengaliStrings) 0.sp else 2.sp,
-                            brush = Brush.verticalGradient(listOf(CasinoGoldLight, CasinoGold))
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = CasinoGold.copy(alpha = 0.15f),
-                        border = BorderStroke(1.dp, CasinoGold.copy(alpha = 0.3f))
-                    ) {
-                        Text(
-                            strings.spinSubtitle,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = CasinoGold,
-                                letterSpacing = if (strings == com.example.core.i18n.BengaliStrings) 0.sp else 1.sp
-                            )
-                        )
-                    }
-                }
-
-                // --- THE WHEEL AREA ---
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Wheel Stand (Tripod)
-                    Canvas(modifier = Modifier.size(120.dp, 40.dp).align(Alignment.BottomCenter).offset(y = 0.dp)) {
-                        val path = Path().apply {
-                            moveTo(size.width / 2, 0f)
-                            lineTo(size.width * 0.3f, size.height)
-                            lineTo(size.width * 0.7f, size.height)
-                            close()
-                        }
-                        drawPath(path, brush = Brush.verticalGradient(listOf(CasinoGold, CasinoGoldDark)))
-                        drawCircle(CasinoGold, radius = 8f, center = Offset(size.width/2, 0f))
-                    }
-
-                    // The Main Wheel Container
-                    Box(modifier = Modifier.size(340.dp), contentAlignment = Alignment.Center) {
-                        // Outer Rim & LED Lights
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            val radius = size.width / 2
-                            // Rim
-                            drawCircle(
-                                brush = Brush.sweepGradient(listOf(CasinoGoldDark, CasinoGold, CasinoGoldDark)),
-                                radius = radius,
-                                style = Stroke(width = 14.dp.toPx())
-                            )
-                            // Inner Rim Line
-                            drawCircle(
-                                color = CasinoGoldLight.copy(alpha = 0.5f),
-                                radius = radius - 14.dp.toPx(),
-                                style = Stroke(width = 1.dp.toPx())
-                            )
-                            
-                            // LED Bulbs (20 bulbs)
-                            val ledCount = 20
-                            for (i in 0 until ledCount) {
-                                val angle = (i * (360f / ledCount)) * (PI / 180).toFloat()
-                                val lx = center.x + (radius - 7.dp.toPx()) * cos(angle).toFloat()
-                                val ly = center.y + (radius - 7.dp.toPx()) * sin(angle).toFloat()
-                                drawCircle(
-                                    color = if (i % 2 == 0) Color(0xFFFFF7C2).copy(alpha = ledAlpha) else CasinoGoldLight.copy(alpha = 1f - ledAlpha),
-                                    radius = 5.dp.toPx(),
-                                    center = Offset(lx, ly)
-                                )
-                            }
-                        }
-
-                        // Top Crown Ornament
-                        Canvas(modifier = Modifier.size(64.dp, 44.dp).align(Alignment.TopCenter).offset(y = (-28).dp)) {
-                            val path = Path().apply {
-                                moveTo(size.width / 2, 0f)
-                                quadraticBezierTo(size.width * 0.8f, size.height * 0.5f, size.width, size.height)
-                                lineTo(0f, size.height)
-                                quadraticBezierTo(size.width * 0.2f, size.height * 0.5f, size.width / 2, 0f)
-                            }
-                            drawPath(path, brush = Brush.verticalGradient(listOf(CasinoGoldLight, CasinoGold)))
-                            drawPath(path, color = Color.White.copy(alpha = 0.3f), style = Stroke(width = 1.dp.toPx()))
-                        }
-
-                        // Rotating Slices
-                        Canvas(
-                            modifier = Modifier
-                                .size(308.dp)
-                                .rotate(animatedRotation.value)
-                        ) {
-                            val sliceAngle = 360f / 24f
-                            wheelSlices.forEachIndexed { index, slice ->
-                                val startAngle = index * sliceAngle - 90f // Start from top
-                                drawArc(
-                                    color = RoyalPurple,
-                                    startAngle = startAngle,
-                                    sweepAngle = sliceAngle,
-                                    useCenter = true,
-                                    size = size
-                                )
-                                // Spoke lines
-                                val lineAngle = startAngle * (PI / 180).toFloat()
-                                val lx = center.x + (size.width / 2) * cos(lineAngle).toFloat()
-                                val ly = center.y + (size.width / 2) * sin(lineAngle).toFloat()
-                                drawLine(CasinoGold.copy(alpha = 0.4f), center, Offset(lx, ly), strokeWidth = 1.dp.toPx())
-                                
-                                // Text Multiplier Labels
-                                val textAngle = (startAngle + sliceAngle / 2) * (PI / 180).toFloat()
-                                val radius = size.width * 0.38f
-                                val tx = center.x + radius * cos(textAngle).toFloat()
-                                val ty = center.y + radius * sin(textAngle).toFloat()
-                                
-                                drawContext.canvas.nativeCanvas.save()
-                                drawContext.canvas.nativeCanvas.rotate(startAngle + sliceAngle / 2 + 90f, tx, ty)
-                                val multiplierText = if (slice.multiplier > 0) strings.digits(slice.multiplier.toString()) + "x" else strings.digits("0") + "x"
-                                drawContext.canvas.nativeCanvas.drawText(
-                                    multiplierText,
-                                    tx,
-                                    ty,
-                                    android.graphics.Paint().apply {
-                                        color = if (slice.multiplier > 0) android.graphics.Color.WHITE else android.graphics.Color.argb(128, 255, 255, 255)
-                                        textSize = 13.sp.toPx()
-                                        textAlign = android.graphics.Paint.Align.CENTER
-                                        typeface = android.graphics.Typeface.DEFAULT_BOLD
-                                        isAntiAlias = true
-                                    }
-                                )
-                                drawContext.canvas.nativeCanvas.restore()
-                            }
-                        }
-
-                        // Left Pointer Arrow (Pointing Right/Inward)
-                        Canvas(modifier = Modifier.size(44.dp, 34.dp).align(Alignment.CenterStart).offset(x = (-12).dp)) {
-                            val path = Path().apply {
-                                moveTo(size.width, size.height / 2) // Tip at right
-                                lineTo(0f, 0f)
-                                lineTo(0f, size.height)
-                                close()
-                            }
-                            drawPath(
-                                path = path,
-                                brush = Brush.horizontalGradient(listOf(CasinoGold, CasinoGoldLight))
-                            )
-                            drawPath(path, Color.Black.copy(alpha = 0.4f), style = Stroke(width = 1.dp.toPx()))
-                        }
-
-                        // Center Hub Medallion with Specular Reflection
-                        Surface(
-                            modifier = Modifier.size(56.dp),
-                            shape = CircleShape,
-                            color = CasinoGold,
-                            border = BorderStroke(2.dp, CasinoGoldLight),
-                            tonalElevation = 12.dp
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Canvas(modifier = Modifier.size(44.dp)) {
-                                    drawCircle(
-                                        brush = Brush.radialGradient(
-                                            0.0f to CasinoGoldLight,
-                                            0.6f to CasinoGold,
-                                            1.0f to CasinoGoldDark
-                                        ),
-                                        radius = size.width / 2
-                                    )
-                                    // Specular Reflection
-                                    drawCircle(
-                                        color = Color.White.copy(alpha = 0.4f),
-                                        radius = size.width / 4,
-                                        center = Offset(size.width * 0.35f, size.height * 0.35f)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Betting Console
-                CasinoBettingConsole(
-                    selectedBet = selectedBetAmount.toInt(),
-                    onBetSelected = { selectedBetAmount = it.toLong() },
-                    actionButtonText = when {
-                        !isGameActive -> strings.spinClosedBanner
-                        gameBalance < selectedBetAmount -> strings.spinNoBalance
-                        isSpinning -> strings.spinSpinning
-                        else -> strings.spinButton
-                    },
-                    isActionEnabled = !isSpinning && selectedBetAmount > 0 && gameBalance >= selectedBetAmount && isGameActive,
-                    onActionClick = { performBetAndSpin() }
+        if (showWinDialog) {
+            val isWin = lastWinMultiplier > 0
+            if (isWin) WhConfetti()
+            Box(Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(top = maxHeight * 0.27f)) {
+                WhResultCard(
+                    u = u,
+                    win = isWin,
+                    bigWin = lastWinMultiplier >= 10,
+                    title = if (isWin) strings.mgWinTitle else strings.mgLossTitle,
+                    amount = "+" + strings.taka(lastWinAmount),
+                    sub = if (isWin) strings.spinResultWin(strings.digits(lastWinMultiplier.toString())) else strings.mgLossMessage,
+                    onClose = { showWinDialog = false }
                 )
             }
         }
@@ -691,67 +463,6 @@ fun SpinWheelScreen(
                 }
             }
         )
-    }
-
-    // Win/Result Dialog
-    if (showWinDialog) {
-        Dialog(onDismissRequest = { showWinDialog = false }) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth(0.85f)
-                    .wrapContentHeight(),
-                shape = RoundedCornerShape(28.dp),
-                color = DeepVelvet,
-                border = BorderStroke(2.dp, CasinoGold)
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    val isWin = lastWinMultiplier > 0
-                    Text(
-                        text = if (isWin) strings.mgWinTitle else strings.mgLossTitle,
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Black,
-                            brush = if (isWin) Brush.verticalGradient(listOf(RadiantGold, CasinoGold)) else null
-                        ),
-                        color = if (isWin) Color.Unspecified else Color.White
-                    )
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    if (isWin) {
-                        Text(
-                            text = strings.spinResultWin(strings.digits(lastWinMultiplier.toString())),
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White
-                        )
-                        Text(
-                            text = strings.spinResultAdded(strings.taka(lastWinAmount)),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = CasinoGoldLight,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                    } else {
-                        Text(
-                            text = strings.mgLossMessage,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color.White.copy(alpha = 0.8f),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(28.dp))
-                    
-                    TournamentButton(
-                        text = strings.mgCloseButton,
-                        onClick = { showWinDialog = false },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        }
     }
 }
 
