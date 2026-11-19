@@ -186,8 +186,6 @@ fun HomeScreen(
   val guideBanners = rememberGuideBanners()
 
   val context = LocalContext.current
-  var carromTaps by remember { mutableStateOf(0) }
-  var carromTapStart by remember { mutableStateOf(0L) }
   val activeUserId = currentUser?.userId?.ifBlank { currentUser.uid } ?: currentUser?.uid ?: ""
 
   val liveBalance = wallet?.let { w ->
@@ -269,13 +267,7 @@ fun HomeScreen(
       item {
         LobbyBoardGamesSection(
             onLudoClick = onAutoLudoClick,
-            onCarromClick = {
-              val t = System.currentTimeMillis()
-              if (t - carromTapStart > 3000L) { carromTapStart = t; carromTaps = 0 }
-              carromTaps++
-              if (carromTaps >= 5) { carromTaps = 0; onCarromPracticeClick() }
-              else if (carromTaps == 1) android.widget.Toast.makeText(context, strings.homeCarromComingSoon, android.widget.Toast.LENGTH_SHORT).show()
-            }
+            onCarromClick = onCarromPracticeClick
         )
       }
 
@@ -1148,7 +1140,7 @@ private fun LobbyBoardGamesSection(
       ribbonText = strings.homeNewBadge,
       ribbonColors = listOf(Color(0xFFFFE98A), Color(0xFFE0A82A)),
       ribbonTextColor = Color(0xFF3A2200),
-      buttonText = if (bn) "শীঘ্রই আসছে" else "COMING SOON",
+      buttonText = if (bn) "এখনই খেলুন" else "PLAY NOW",
       goldButton = true,
       onClick = onCarromClick,
       tag = "home_carrom_card",

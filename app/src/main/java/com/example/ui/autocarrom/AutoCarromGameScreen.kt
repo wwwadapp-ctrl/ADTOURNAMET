@@ -52,8 +52,11 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
     var toast by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
     var toastAt by remember { mutableLongStateOf(0L) }
     var passTriedFor by remember { mutableIntStateOf(-1) }
+    var waitSince by remember { mutableLongStateOf(0L) }
+    val presence by CarromPresence.observe(matchId).collectAsState(initial = emptyMap())
     var showExit by remember { mutableStateOf(false) }
     val powder = remember { PowderLayer() }
+    var showSplash by remember { mutableStateOf(true) }
 
     val m = match
     val p1 = m?.player1Uid ?: ""; val p2 = m?.player2Uid ?: ""
@@ -62,7 +65,7 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
     val st = shown
     val myTurn = st != null && st.currentTurnUid == me && m?.status == "IN_GAME"
     fun baseY(uid: String) = if (uid == p1) S - CarromRules.BASE else CarromRules.BASE
-    fun show(t: Pair<String, Boolean>?) { if (t != null) { toast = t; toastAt = System.currentTimeMillis() } }
+    fun show(t: Pair<String, Boolean>?) { if (t != null) { toast = t; toastAt = CarromClock.now() } }
     val boardBodies = remember(st?.board) { CarromRules.decode(st?.board ?: "").map { CBody(it.c, it.x, it.y, CarromRules.RC, 1.0) } }
     fun blocked(): Boolean { val by = baseY(me); return boardBodies.any { val dx = it.x - strikerX; val dy = it.y - by; sqrt(dx * dx + dy * dy) < CarromRules.RC + CarromRules.RS + 1 } }
     fun sounds(s: CarromSim) {
@@ -75,6 +78,16 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
     }
 
     LaunchedEffect(st?.powder) { if (powder.sync(st?.powder ?: "")) CarromSfx.play(CarromSfx.S.SHH) }
+
+    // server clock + "I am online" every 5 s (Firebase writes 0 by itself if my connection drops)
+    LaunchedEffect(matchId) {
+        CarromClock.start()
+        while (true) { CarromPresence.beat(matchId, me); kotlinx.coroutines.delay(5000) }
+    }
+    DisposableEffect(matchId) { onDispose { CarromPresence.leave(matchId, me) } }
+    val oppSeen = presence[opp]
+    val oppOnline = oppSeen == null || (oppSeen > 0L && now - oppSeen < CarromPresence.ONLINE_MS)
+    val oppOnlineNow = rememberUpdatedState(oppOnline)
 
     // new state from the server
     LaunchedEffect(m?.gameState, m?.status) {
@@ -113,7 +126,7 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
         when {
             p != null && cur != null && p.shotNo > cur.shotNo -> adopt(p)
             submitFailed -> match?.gameState?.let { adopt(it) } ?: run { mode = 0; sim = null }
-            else -> mode = 3
+            else -> { mode = 3; waitSince = CarromClock.now() }
         }
     }
 
@@ -122,7 +135,7 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
         while (true) {
             withFrameNanos { t ->
                 val dt = if (last == 0L) 0.0 else ((t - last) / 1e9).coerceAtMost(0.05); last = t
-                now = System.currentTimeMillis()
+                now = CarromClock.now()
                 val s = sim
                 if (mode == 1 && s != null) {
                     acc += dt; var n = 0
@@ -136,11 +149,14 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
                 val cs = shown
                 if (cs != null && mode == 0 && match?.status == "IN_GAME" && passTriedFor != cs.shotNo) {
                     val el = now - cs.actionStartedAt
-                    if ((cs.currentTurnUid == me && el >= CarromRules.TURN_MS) || (cs.currentTurnUid != me && el >= CarromRules.TURN_MS + 8000)) {
+                    val oppWait = if (oppOnlineNow.value) 3000L else CarromPresence.OFFLINE_GRACE_MS
+                    if ((cs.currentTurnUid == me && connected && el >= CarromRules.TURN_MS) || (cs.currentTurnUid != me && el >= CarromRules.TURN_MS + oppWait)) {
                         passTriedFor = cs.shotNo
                         scope.launch { AutoCarromPlay.passTurnTimeout(matchId, me, cs.shotNo) }
                     }
                 }
+                // waited 8 s for my own shot to be saved and nothing came: show the latest saved board
+                if (mode == 3 && now - waitSince > 8000) match?.gameState?.let { adopt(it) }
                 tick++
             }
         }
@@ -163,6 +179,8 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
             Text("খেলা শুরু হচ্ছে…", color = Color(0xFFFFE7A0), fontSize = 18.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.Center))
         } else Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             CarromHeader(m.prizePool, st.suddenDeath, left, connected)
+            if (!oppOnline && m.status == "IN_GAME") Text("প্রতিপক্ষের নেট সমস্যা… একটু অপেক্ষা করুন", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 6.dp).background(Color(0xFFB3122F), RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 3.dp))
             CcPlayerCard(CcPlayerUi(oppName.ifBlank { "প্রতিপক্ষ" }, oppPhoto, false, st.currentTurnUid == opp && m.status == "IN_GAME", timer,
                 if (isP1) st.player2Pocketed else st.player1Pocketed, if (isP1) 'k' else 'w', st.queenOwnerUid == opp,
                 if (isP1) st.player2Strikes else st.player1Strikes, "প্রতিপক্ষের পালা"), Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
@@ -198,6 +216,7 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
                 color = Color(0xFFDCE4FF), fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 16.dp))
         }
         CarromToast(toast, now - toastAt < 1500, Modifier.align(Alignment.Center))
+        if (showSplash) AdCarromSplashScreen(onFinished = { showSplash = false })
         if (m != null && m.status == "COMPLETED" && mode == 0) {
             AdResultDialog(
                 isWin = m.winnerUid == me, prizePool = m.prizePool,

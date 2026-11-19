@@ -199,7 +199,7 @@ object AutoCarromManager {
                     currentData.child("player2Ready").value = p2Ready
                     currentData.child("updatedAt").value = ServerValue.TIMESTAMP
                     if (p1Ready && p2Ready && match.status != "IN_GAME" && match.status != "COMPLETED") {
-                        val now = System.currentTimeMillis()
+                        val now = CarromClock.now()
                         currentData.child("status").value = "IN_GAME"
                         currentData.child("gameStartedAt").value = now
                         currentData.child("gameState").value = CarromGameState(

@@ -38,7 +38,7 @@ object AutoCarromPlay {
                     val m = currentData.getValue(AutoCarromMatchEntity::class.java) ?: return Transaction.abort()
                     val st = m.gameState
                     if (m.status != "IN_GAME" || st.currentTurnUid != playerUid || st.shotNo != shotNo) return Transaction.abort()
-                    val now = System.currentTimeMillis()
+                    val now = CarromClock.now()
                     val ends = if (m.gameStartedAt > 0L) m.gameStartedAt + CarromRules.GAME_MS else 0L
                     val out = CarromRules.resolve(st, m.player1Uid, m.player2Uid, playerUid, finalBoard, pocketed, strikerIn, shotInput, ends, now)
                     currentData.child("gameState").value = out.state
@@ -75,7 +75,7 @@ object AutoCarromPlay {
                         powder = if (st.powder.isBlank()) patch else st.powder + ";" + patch,
                         player1Powder = if (isP1) left - 1 else st.player1Powder,
                         player2Powder = if (isP1) st.player2Powder else left - 1,
-                        lastMoveAt = System.currentTimeMillis(),
+                        lastMoveAt = CarromClock.now(),
                         lastActionLog = "Powder."
                     )
                     currentData.child("gameState").value = next
@@ -102,7 +102,7 @@ object AutoCarromPlay {
                     val st = m.gameState
                     if (m.status != "IN_GAME" || st.shotNo != shotNo) return Transaction.abort()
                     if (callerUid != m.player1Uid && callerUid != m.player2Uid) return Transaction.abort()
-                    val now = System.currentTimeMillis()
+                    val now = CarromClock.now()
                     if (now - st.actionStartedAt < CarromRules.TURN_MS - 1000L) return Transaction.abort()
                     val shooterIsP1 = st.currentTurnUid == m.player1Uid
                     var s1 = st.player1Strikes
