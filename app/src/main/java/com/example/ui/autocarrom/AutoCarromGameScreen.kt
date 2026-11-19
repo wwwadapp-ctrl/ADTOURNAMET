@@ -98,14 +98,22 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
         }
     }
 
-    fun submit() {
-        val s = sim ?: return; val cur = shown ?: return
-        mode = 3
+    var submitFailed by remember { mutableStateOf(false) }
+    // Own shot: the result is worked out at once and saved right away, while the shot is still being drawn,
+    // so the other phone starts its replay almost at the same moment.
+    fun submitNow(result: CarromSim, shotNo: Int) {
+        submitFailed = false
         scope.launch {
-            val r = AutoCarromPlay.submitShot(matchId, me, cur.shotNo, shotInput, s.finalBoard(), s.pocketed.toString(), s.strikerIn)
-            val latest = pending ?: match?.gameState
-            if (r.isFailure && latest != null) adopt(latest)
-            else if (latest != null && latest.shotNo > cur.shotNo) adopt(latest)
+            val r = AutoCarromPlay.submitShot(matchId, me, shotNo, shotInput, result.finalBoard(), result.pocketed.toString(), result.strikerIn)
+            if (r.isFailure) { submitFailed = true; if (mode == 3) match?.gameState?.let { adopt(it) } }
+        }
+    }
+    fun ownShotDrawn() {
+        val p = pending; val cur = shown
+        when {
+            p != null && cur != null && p.shotNo > cur.shotNo -> adopt(p)
+            submitFailed -> match?.gameState?.let { adopt(it) } ?: run { mode = 0; sim = null }
+            else -> mode = 3
         }
     }
 
@@ -122,7 +130,7 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
                     for (b in s.all) if (!b.inPocket && (abs(b.vx) > 5 || abs(b.vy) > 5)) powder.wipe(b.x, b.y, b.r * 0.92, true)
                     if (!s.moving()) { mode = 2; settleAt = now + 400 }
                 } else if (mode == 2 && now >= settleAt) {
-                    if (replaying) { val p = pending; if (p != null) adopt(p) else { mode = 0; replaying = false; sim = null } } else submit()
+                    if (replaying) { val p = pending; if (p != null) adopt(p) else { mode = 0; replaying = false; sim = null } } else ownShotDrawn()
                 }
                 sim?.all?.forEach { if (it.inPocket && it.fall > 0f) it.fall -= 0.06f }
                 val cs = shown
@@ -167,7 +175,9 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
                 onShoot = { a ->
                     val s = CarromSim(st.board, st.powder, strikerX, baseY(me)); sounds(s); s.shoot(a[0], a[1], a[2])
                     shotInput = "${st.shotNo}|$me|${Math.round(strikerX * 10)}|${Math.round(baseY(me) * 10)}|${a[0]}|${a[1]}|${a[2]}"
-                    CarromSfx.play(CarromSfx.S.FLICK, (0.4 + 0.6 * a[2]).toFloat()); aim = null; replaying = false; sim = s; mode = 1
+                    val r = CarromSim(st.board, st.powder, strikerX, baseY(me)); r.shoot(a[0], a[1], a[2]); r.runToEnd()
+                    CarromSfx.play(CarromSfx.S.FLICK, (0.4 + 0.6 * a[2]).toFloat()); aim = null; replaying = false; pending = null; sim = s; mode = 1
+                    submitNow(r, st.shotNo)
                 },
                 onPowder = { x, y -> powderMode = false; val n = st.shotNo; scope.launch { AutoCarromPlay.usePowder(matchId, me, n, x, y) } },
                 modifier = Modifier.padding(horizontal = 8.dp)

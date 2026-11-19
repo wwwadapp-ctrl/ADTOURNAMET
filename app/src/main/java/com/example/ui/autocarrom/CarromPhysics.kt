@@ -48,7 +48,7 @@ class CarromSim(board: String, powder: String, strikerX: Double, strikerY: Doubl
             if (o.inPocket) continue
             val sp = sqrt(o.vx * o.vx + o.vy * o.vy)
             if (sp > 0) {
-                val dec = (if (o === striker) 420.0 else 380.0) * (1 - 0.5 * powderAt(o.x, o.y)) * DT
+                val dec = ((if (o === striker) 560.0 else 520.0) + 0.35 * sp) * (1 - 0.5 * powderAt(o.x, o.y)) * DT
                 val k = Math.max(0.0, sp - dec) / sp
                 o.vx *= k; o.vy *= k
             }
