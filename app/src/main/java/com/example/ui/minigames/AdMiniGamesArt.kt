@@ -116,30 +116,8 @@ fun AdMiniGamesHeader(
                         )
                     )
                 }
-                // small game controller
-                Canvas(modifier = Modifier.size(26.dp)) {
-                    val s = size.width / 24f
-                    fun o(x: Float, y: Float) = Offset(x * s, y * s)
-                    drawLine(Color(0xFF94A3B8), o(12f, 9f), o(12f, 5f), 1.2f * s)
-                    drawCircle(Color(0xFF475569), 1.6f * s, o(12f, 4.5f))
-                    val body = Path().apply {
-                        moveTo(6f * s, 9f * s); lineTo(18f * s, 9f * s)
-                        cubicTo(20.5f * s, 9f * s, 22f * s, 10.8f * s, 22f * s, 13f * s)
-                        lineTo(22f * s, 15.5f * s)
-                        cubicTo(22f * s, 18f * s, 18.6f * s, 19f * s, 16.6f * s, 17.3f * s)
-                        lineTo(15f * s, 15.5f * s); lineTo(9f * s, 15.5f * s); lineTo(7.4f * s, 17.3f * s)
-                        cubicTo(5.4f * s, 19f * s, 2f * s, 18f * s, 2f * s, 15.5f * s)
-                        lineTo(2f * s, 13f * s)
-                        cubicTo(2f * s, 10.8f * s, 3.5f * s, 9f * s, 6f * s, 9f * s)
-                        close()
-                    }
-                    drawPath(body, Brush.verticalGradient(listOf(Color(0xFFF1F5F9), Color(0xFF64748B)), startY = 9f * s, endY = 18f * s))
-                    drawPath(body, Color(0xFF334155), style = Stroke(0.6f * s))
-                    drawLine(Color(0xFF1E293B), o(7.5f, 11f), o(7.5f, 14f), 1.2f * s)
-                    drawLine(Color(0xFF1E293B), o(6f, 12.5f), o(9f, 12.5f), 1.2f * s)
-                    drawCircle(Color(0xFFEF4444), 1f * s, o(16f, 12f))
-                    drawCircle(Color(0xFF22C55E), 1f * s, o(18f, 14f))
-                }
+                // game controller picture (same as the history page), inside the gold seal
+                com.example.ui.wallet.WlImage(com.example.R.drawable.wl_gamepad, 32.dp)
             }
             AdGoldText(text = title, fontSize = 25.sp)
         }

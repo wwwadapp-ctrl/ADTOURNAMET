@@ -140,7 +140,7 @@ fun HsFilterCard(label: String, selected: Boolean, iconKind: Int, onClick: () ->
 
 /** Empty message in a gold frame: trophy on turning rays, 3D title, gold subtitle. */
 @Composable
-fun HsEmptyState(title: String, subtitle: String, modifier: Modifier = Modifier) {
+fun HsEmptyState(title: String, subtitle: String, modifier: Modifier = Modifier, actionText: String? = null, onAction: (() -> Unit)? = null) {
     WlFrame(modifier = modifier, gold = true, pad = 16.dp) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(88.dp)) {
@@ -151,6 +151,20 @@ fun HsEmptyState(title: String, subtitle: String, modifier: Modifier = Modifier)
             WlText3D(title, if (title.length > 22) 16.sp else 19.sp, WlTone.CREAM)
             Spacer(Modifier.height(5.dp))
             Text(subtitle, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF2C94C), textAlign = TextAlign.Center)
+            // optional gold button (used by the home page "refresh")
+            if (actionText != null && onAction != null) {
+                Spacer(Modifier.height(12.dp))
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(Brush.verticalGradient(listOf(Color(0xFFFFF3B0), Color(0xFFFFC21E), Color(0xFFE8860A))))
+                        .clickable(onClick = onAction)
+                        .padding(horizontal = 24.dp, vertical = 9.dp)
+                ) {
+                    Text(actionText, fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color(0xFF3A1A00))
+                }
+            }
         }
     }
 }

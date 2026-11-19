@@ -15,6 +15,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
@@ -33,6 +35,7 @@ fun CarromBoardView(
     tick: Int, now: Long, bodies: List<CBody>, sim: CarromSim?,
     strikerX: Double, strikerY: Double, showStrikerRing: Boolean, aim: DoubleArray?, blocked: Boolean,
     canControl: Boolean, powderMode: Boolean, inputKey: Any, powder: PowderLayer, flip: Boolean = false,
+    oppAim: DoubleArray? = null, oppTag: String? = null,
     onSlide: (Double) -> Unit, onAim: (DoubleArray?) -> Unit, onShoot: (DoubleArray) -> Unit, onPowder: (Double, Double) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -93,6 +96,30 @@ fun CarromBoardView(
                 drawCircle(if (blocked) Color(0xE6FF3C50) else Color(0xD9FFE68C), (CarromRules.RS.toFloat() + 6f + 2f * tw) * k, Offset(px(sx), px(sy)), style = Stroke(3f * k))
                 aim?.let { drawCarromAim(k, list, sx, sy, it[0], it[1], it[2]) }
             }
+            // the other player's aim, sent live: same line but faint
+            if (!showStrikerRing && sim == null && oppAim != null) {
+                drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(Offset.Zero, size), androidx.compose.ui.graphics.Paint().apply { alpha = 0.6f })
+                drawCarromAim(k, list, sx, sy, oppAim[0], oppAim[1], oppAim[2])
+                drawContext.canvas.restore()
+            }
+            }
+            // small label above the other player's striker ("aiming…"), drawn upright
+            if (oppTag != null && sim == null) {
+                val S = CarromRules.S
+                val wx = if (flip) S - strikerX else strikerX; val wy = if (flip) S - strikerY else strikerY
+                val cx = (CB_F + wx.toFloat()) * k; val cy = (CB_F + wy.toFloat()) * k - (CarromRules.RS.toFloat() + 12f) * k
+                drawIntoCanvas { c ->
+                    val tp = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                        textSize = 11.dp.toPx(); color = 0xFFFFF3C4.toInt(); typeface = android.graphics.Typeface.DEFAULT_BOLD; textAlign = android.graphics.Paint.Align.CENTER
+                    }
+                    val w = tp.measureText(oppTag) + 16.dp.toPx(); val h = 20.dp.toPx()
+                    val l = (cx - w / 2).coerceIn(4f, Math.max(4f, size.width - w - 4f))
+                    val bg = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0xBF0A103C.toInt() }
+                    val bd = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0x99FFD45A.toInt(); style = android.graphics.Paint.Style.STROKE; strokeWidth = 1.dp.toPx() }
+                    c.nativeCanvas.drawRoundRect(l, cy - h, l + w, cy, h / 2, h / 2, bg)
+                    c.nativeCanvas.drawRoundRect(l, cy - h, l + w, cy, h / 2, h / 2, bd)
+                    c.nativeCanvas.drawText(oppTag, l + w / 2, cy - h / 2 + tp.textSize * 0.36f, tp)
+                }
             }
         }
     }

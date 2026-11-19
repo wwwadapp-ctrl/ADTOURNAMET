@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -148,8 +149,23 @@ private fun DrawScope.auSparkle(c: Offset, s: Float, color: Color) {
 
 @Composable
 fun AdAuthLogo(modifier: Modifier = Modifier) {
+    // the logo floats gently and soft gold rays turn behind it
+    val logoAnim = rememberInfiniteTransition(label = "auLogo")
+    val logoFloat by logoAnim.animateFloat(0f, 1f, infiniteRepeatable(tween(1800, easing = androidx.compose.animation.core.FastOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "auLogoFloat")
+    val logoRays by logoAnim.animateFloat(0f, 360f, infiniteRepeatable(tween(30000, easing = LinearEasing)), label = "auLogoRays")
     Box(modifier = modifier.size(width = 132.dp, height = 140.dp), contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.matchParentSize()) {
+            val len = size.width * 1.05f
+            val rayBrush = Brush.radialGradient(listOf(Color(0xFFFFD54F).copy(alpha = 0.32f), Color.Transparent), center = center, radius = len)
+            for (i in 0 until 24) {
+                val a1 = Math.toRadians((logoRays + i * 15f).toDouble()); val a2 = Math.toRadians((logoRays + i * 15f + 5f).toDouble())
+                drawPath(Path().apply {
+                    moveTo(center.x, center.y)
+                    lineTo(center.x + len * cos(a1).toFloat(), center.y + len * kotlin.math.sin(a1).toFloat())
+                    lineTo(center.x + len * cos(a2).toFloat(), center.y + len * kotlin.math.sin(a2).toFloat())
+                    close()
+                }, rayBrush)
+            }
             drawCircle(
                 Brush.radialGradient(
                     listOf(Color(0xFFFFC107).copy(alpha = 0.35f), Color.Transparent),
@@ -162,7 +178,7 @@ fun AdAuthLogo(modifier: Modifier = Modifier) {
             painter = painterResource(id = R.drawable.ad_logo_emblem),
             contentDescription = "AD Tournament Logo",
             contentScale = androidx.compose.ui.layout.ContentScale.Fit,
-            modifier = Modifier.size(132.dp)
+            modifier = Modifier.size(132.dp).graphicsLayer { translationY = -6.dp.toPx() * logoFloat }
         )
     }
 }
@@ -185,13 +201,15 @@ fun AdAuthTitle(tagline: String) {
 fun AdAuthCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val outer = RoundedCornerShape(22.dp)
     val inner = RoundedCornerShape(20.dp)
+    // glass shine: a soft light streak passes over the card every few seconds
+    val shine by rememberInfiniteTransition(label = "auShine").animateFloat(-0.6f, 1.6f, infiniteRepeatable(tween(4500, easing = LinearEasing)), label = "auShineX")
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .border(2.dp, Brush.verticalGradient(listOf(Color(0xFFFFF3C4), Color(0xFFC98A10), Color(0xFFFFE7A0))), outer)
-            .padding(2.dp)
+            .border(3.dp, Brush.verticalGradient(listOf(Color(0xFFFFF3C4), Color(0xFFC98A10), Color(0xFFFFE7A0))), outer)
+            .padding(3.dp)
             .clip(inner)
-            .background(Brush.verticalGradient(listOf(Color(0xFF1C2350), Color(0xFF121838), Color(0xFF0C1130))))
+            .background(Brush.verticalGradient(listOf(Color(0xFF26349F), Color(0xFF1E2B8E), Color(0xFF18227B))))
             .drawBehind {
                 drawRect(
                     Brush.radialGradient(
@@ -200,14 +218,23 @@ fun AdAuthCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.(
                     )
                 )
             }
-            .border(2.dp, Color(0xFF8A6414), inner)
+            .border(3.dp, Color(0xFF8A6414), inner)
     ) {
         Box(
             modifier = Modifier
                 .matchParentSize()
                 .padding(8.dp)
-                .border(1.dp, Color(0x8CF0BE50), RoundedCornerShape(14.dp))
+                .border(1.5.dp, Color(0x8CF0BE50), RoundedCornerShape(14.dp))
         )
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val x = size.width * shine
+            rotate(22f, pivot = Offset(x, size.height / 2f)) {
+                drawRect(
+                    Brush.horizontalGradient(listOf(Color(0x00FFFFFF), Color(0x24FFFFFF), Color(0x00FFFFFF)), startX = x - 40.dp.toPx(), endX = x + 40.dp.toPx()),
+                    topLeft = Offset(x - 40.dp.toPx(), -size.height), size = Size(80.dp.toPx(), size.height * 3f)
+                )
+            }
+        }
         Canvas(modifier = Modifier.matchParentSize()) {
             val y1 = 12.dp.toPx(); val y2 = size.height - 12.dp.toPx(); val x0 = 54.dp.toPx(); val x1 = size.width - 54.dp.toPx()
             val line = Brush.horizontalGradient(listOf(Color.Transparent, Color(0xFFE8B23A), Color.Transparent), startX = x0, endX = x1)
@@ -259,27 +286,49 @@ private fun AdAuthCorner(modifier: Modifier, flipX: Boolean, flipY: Boolean) {
 @Composable
 fun AdAuthCardHeader(title: String, subtitle: String) {
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = title,
-            style = TextStyle(
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                textAlign = TextAlign.Center,
-                shadow = Shadow(color = Color(0xFF8A6414), offset = Offset(0f, 4f), blurRadius = 0f)
-            )
-        )
+        AdAuth3DTitle(title, fontSize = 30.sp)
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = subtitle,
             style = TextStyle(
-                fontSize = 14.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFFFFD27A),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color(0xFFFFE9A8),
                 textAlign = TextAlign.Center,
-                lineHeight = 20.sp
+                lineHeight = 21.sp,
+                letterSpacing = 0.2.sp,
+                shadow = Shadow(color = Color(0xFF0A1040), offset = Offset(0f, 2f), blurRadius = 0f)
             )
         )
+    }
+}
+
+// ---------------------------------------------------------------- crisp 3D gold title with flowing gold (no blur anywhere)
+
+@Composable
+fun AdAuth3DTitle(text: String, fontSize: androidx.compose.ui.unit.TextUnit, lineHeight: androidx.compose.ui.unit.TextUnit = androidx.compose.ui.unit.TextUnit.Unspecified) {
+    val flow by rememberInfiniteTransition(label = "auTitle").animateFloat(0f, 1f, infiniteRepeatable(tween(3000, easing = LinearEasing)), label = "auTitleFlow")
+    val px = with(androidx.compose.ui.platform.LocalDensity.current) { fontSize.toPx() }
+    val base = TextStyle(fontSize = fontSize, fontWeight = FontWeight.Black, textAlign = TextAlign.Center, lineHeight = lineHeight)
+    val outline = Stroke(width = px * 0.09f, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+    val depth = listOf(Color(0xFFB07A00), Color(0xFF9A6400), Color(0xFF7A4E00), Color(0xFF5A3700), Color(0xFF3A2200))
+    val band = px * 6f
+    Box(contentAlignment = Alignment.Center) {
+        // 1. solid 3D depth: 5 sharp layers, deepest first
+        for (i in 5 downTo 1) {
+            val m = Modifier.offset { androidx.compose.ui.unit.IntOffset(0, Math.round(px * 0.032f * i)) }
+            Text(text, style = base.copy(color = depth[i - 1], drawStyle = outline), modifier = m)
+            Text(text, style = base.copy(color = depth[i - 1]), modifier = m)
+        }
+        // 2. thin dark brown outline
+        Text(text, style = base.copy(color = Color(0xFF4A2200), drawStyle = outline))
+        // 3. flowing gold fill
+        Text(text, style = base.copy(brush = Brush.linearGradient(
+            listOf(Color(0xFFE87A00), Color(0xFFFFD02A), Color(0xFFFFFDE8), Color(0xFFFFD02A), Color(0xFFE87A00)),
+            start = Offset(-flow * band, 0f), end = Offset(-flow * band + band, 0f), tileMode = androidx.compose.ui.graphics.TileMode.Repeated
+        )))
+        // 4. shine on the upper half of the letters
+        Text(text, style = base.copy(brush = Brush.verticalGradient(0f to Color(0xB3FFFFFF), 0.45f to Color(0x00FFFFFF))))
     }
 }
 
@@ -330,8 +379,9 @@ fun AdAuthTextField(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(shape)
-                    .background(Brush.verticalGradient(listOf(Color(0xFF2A3156), Color(0xFF151A33))))
-                    .border(1.5.dp, if (focused) Color(0xFFFFC107) else Color(0xFFC9A04A), shape)
+                    .background(Brush.verticalGradient(listOf(Color(0xFF0E1656), Color(0xFF16206F), Color(0xFF1C2884))))
+                    .drawBehind { drawRect(Brush.verticalGradient(listOf(Color(0x66000000), Color.Transparent), startY = 0f, endY = size.height * 0.45f)) }
+                    .border(3.dp, if (focused) Color(0xFFFFC107) else Color(0xFFD9AE52), shape)
                     .padding(start = 14.dp, end = if (trailing != null) 4.dp else 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {

@@ -53,10 +53,13 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
     var toastAt by remember { mutableLongStateOf(0L) }
     var passTriedFor by remember { mutableIntStateOf(-1) }
     var waitSince by remember { mutableLongStateOf(0L) }
-    val presence by CarromPresence.observe(matchId).collectAsState(initial = emptyMap())
+    val live by CarromLive.observe(matchId).collectAsState(initial = emptyMap())
     var showExit by remember { mutableStateOf(false) }
     val powder = remember { PowderLayer() }
     var showSplash by remember { mutableStateOf(true) }
+    var oppX by remember { mutableDoubleStateOf(S / 2) }
+    var oppAimShown by remember { mutableStateOf<DoubleArray?>(null) }
+    var submitting by remember { mutableStateOf(false) }
 
     val m = match
     val p1 = m?.player1Uid ?: ""; val p2 = m?.player2Uid ?: ""
@@ -74,20 +77,44 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
     fun adopt(ns: CarromGameState) {
         val newShot = shown?.shotNo != ns.shotNo
         shown = ns; pending = null; sim = null; mode = 0; replaying = false
-        if (newShot) { strikerX = S / 2; aim = null; powderMode = false; show(carromLogText(ns.lastActionLog)) }
+        if (newShot) { strikerX = S / 2; aim = null; powderMode = false; oppX = S / 2; oppAimShown = null; show(carromLogText(ns.lastActionLog)) }
     }
 
     LaunchedEffect(st?.powder) { if (powder.sync(st?.powder ?: "")) CarromSfx.play(CarromSfx.S.SHH) }
 
-    // server clock + "I am online" every 5 s (Firebase writes 0 by itself if my connection drops)
+    // server clock + "I am online" every 2 s (Firebase writes 0 by itself if my connection drops)
     LaunchedEffect(matchId) {
         CarromClock.start()
-        while (true) { CarromPresence.beat(matchId, me); kotlinx.coroutines.delay(5000) }
+        while (true) { CarromLive.beat(matchId, me); kotlinx.coroutines.delay(CarromLive.BEAT_MS) }
     }
-    DisposableEffect(matchId) { onDispose { CarromPresence.leave(matchId, me) } }
-    val oppSeen = presence[opp]
-    val oppOnline = oppSeen == null || (oppSeen > 0L && now - oppSeen < CarromPresence.ONLINE_MS)
+    DisposableEffect(matchId) { onDispose { CarromLive.leave(matchId, me) } }
+    val oppInfo = live[opp]
+    val oppSeen = oppInfo?.seen
+    val oppOnline = oppSeen == null || (oppSeen > 0L && now - oppSeen < CarromLive.ONLINE_MS)
     val oppOnlineNow = rememberUpdatedState(oppOnline)
+    // when a net comes back after the 20 s are over, that player still gets 5 s to shoot
+    var oppBackAt by remember { mutableLongStateOf(0L) }
+    var myBackAt by remember { mutableLongStateOf(0L) }
+    var oppWasOnline by remember { mutableStateOf(true) }
+    var meWasConnected by remember { mutableStateOf(true) }
+    LaunchedEffect(oppOnline) { if (oppOnline && !oppWasOnline) oppBackAt = CarromClock.now(); oppWasOnline = oppOnline }
+    LaunchedEffect(connected) { if (connected && !meWasConnected) myBackAt = CarromClock.now(); meWasConnected = connected }
+    // my striker and aim go to the other phone about 10 times a second (only when they change)
+    LaunchedEffect(matchId) {
+        var last = ""
+        while (true) {
+            kotlinx.coroutines.delay(100)
+            val cs = shown
+            if (cs != null && cs.currentTurnUid == me && mode == 0 && match?.status == "IN_GAME") {
+                val a = aim
+                val key = "${cs.shotNo}|${Math.round(strikerX)}|" + (a?.let { "${Math.round(it[0] * 100)},${Math.round(it[1] * 100)},${Math.round(it[2] * 100)}" } ?: "-")
+                if (key != last) { last = key; CarromLive.sendAim(matchId, me, cs.shotNo, strikerX, a) }
+            }
+        }
+    }
+    // the other player's striker and aim for this shot (null = nothing sent yet)
+    val oppLive = if (st != null && st.currentTurnUid == opp) oppInfo?.aim?.let { CarromLive.decode(it, st.shotNo) } else null
+    val oppLiveNow = rememberUpdatedState(oppLive)
 
     // new state from the server
     LaunchedEffect(m?.gameState, m?.status) {
@@ -115,9 +142,10 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
     // Own shot: the result is worked out at once and saved right away, while the shot is still being drawn,
     // so the other phone starts its replay almost at the same moment.
     fun submitNow(result: CarromSim, shotNo: Int) {
-        submitFailed = false
+        submitFailed = false; submitting = true
         scope.launch {
             val r = AutoCarromPlay.submitShot(matchId, me, shotNo, shotInput, result.finalBoard(), result.pocketed.toString(), result.strikerIn)
+            submitting = false
             if (r.isFailure) { submitFailed = true; if (mode == 3) match?.gameState?.let { adopt(it) } }
         }
     }
@@ -146,17 +174,26 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
                     if (replaying) { val p = pending; if (p != null) adopt(p) else { mode = 0; replaying = false; sim = null } } else ownShotDrawn()
                 }
                 sim?.all?.forEach { if (it.inPocket && it.fall > 0f) it.fall -= 0.06f }
+                val ol = oppLiveNow.value; val f = (dt * 12).coerceAtMost(1.0)
+                oppX += ((ol?.first ?: S / 2) - oppX) * f
+                val ta = ol?.second; val pa = oppAimShown
+                oppAimShown = if (ta == null) null else if (pa == null) ta else {
+                    val nx = pa[0] + (ta[0] - pa[0]) * f; val ny = pa[1] + (ta[1] - pa[1]) * f; val nl = sqrt(nx * nx + ny * ny)
+                    if (nl < 1e-6) ta else doubleArrayOf(nx / nl, ny / nl, pa[2] + (ta[2] - pa[2]) * f)
+                }
                 val cs = shown
                 if (cs != null && mode == 0 && match?.status == "IN_GAME" && passTriedFor != cs.shotNo) {
                     val el = now - cs.actionStartedAt
-                    val oppWait = if (oppOnlineNow.value) 3000L else CarromPresence.OFFLINE_GRACE_MS
-                    if ((cs.currentTurnUid == me && connected && el >= CarromRules.TURN_MS) || (cs.currentTurnUid != me && el >= CarromRules.TURN_MS + oppWait)) {
+                    val pass = if (cs.currentTurnUid == me) connected && el >= CarromRules.TURN_MS && now - myBackAt >= CarromLive.BACK_GRACE_MS
+                    else el >= CarromRules.TURN_MS + CarromLive.OFFLINE_GRACE_MS ||
+                        (oppOnlineNow.value && el >= CarromRules.TURN_MS + 3000L && now - oppBackAt >= CarromLive.BACK_GRACE_MS)
+                    if (pass) {
                         passTriedFor = cs.shotNo
                         scope.launch { AutoCarromPlay.passTurnTimeout(matchId, me, cs.shotNo) }
                     }
                 }
                 // waited 8 s for my own shot to be saved and nothing came: show the latest saved board
-                if (mode == 3 && now - waitSince > 8000) match?.gameState?.let { adopt(it) }
+                if (mode == 3 && !submitting && now - waitSince > 8000) match?.gameState?.let { adopt(it) }
                 tick++
             }
         }
@@ -178,15 +215,16 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
         if (st == null || m == null) {
             Text("খেলা শুরু হচ্ছে…", color = Color(0xFFFFE7A0), fontSize = 18.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.Center))
         } else Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-            CarromHeader(m.prizePool, st.suddenDeath, left, connected)
-            if (!oppOnline && m.status == "IN_GAME") Text("প্রতিপক্ষের নেট সমস্যা… একটু অপেক্ষা করুন", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 6.dp).background(Color(0xFFB3122F), RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 3.dp))
+            CarromHeader(m.prizePool, st.suddenDeath, left, connected, onBack = { if (m.status == "IN_GAME") showExit = true else onBackClick() })
             CcPlayerCard(CcPlayerUi(oppName.ifBlank { "প্রতিপক্ষ" }, oppPhoto, false, st.currentTurnUid == opp && m.status == "IN_GAME", timer,
                 if (isP1) st.player2Pocketed else st.player1Pocketed, if (isP1) 'k' else 'w', st.queenOwnerUid == opp,
                 if (isP1) st.player2Strikes else st.player1Strikes, "প্রতিপক্ষের পালা"), Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+            Box(contentAlignment = Alignment.TopCenter) {
             CarromBoardView(
                 tick = tick, now = now, bodies = boardBodies, sim = sim,
-                strikerX = if (myTurn) strikerX else S / 2, strikerY = baseY(st.currentTurnUid),
+                strikerX = if (myTurn) strikerX else oppX, strikerY = baseY(st.currentTurnUid),
+                oppAim = if (!myTurn && mode == 0) oppAimShown else null,
+                oppTag = if (!myTurn && mode == 0 && oppLive != null && m.status == "IN_GAME") "প্রতিপক্ষ নিশানা করছে…" else null,
                 showStrikerRing = myTurn && mode == 0, aim = aim, blocked = myTurn && blocked(),
                 canControl = myTurn && mode == 0, powderMode = powderMode, inputKey = st.shotNo, powder = powder, flip = !isP1,
                 onSlide = { strikerX = it }, onAim = { aim = it },
@@ -200,6 +238,21 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
                 onPowder = { x, y -> powderMode = false; val n = st.shotNo; scope.launch { AutoCarromPlay.usePowder(matchId, me, n, x, y) } },
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
+            if (!oppOnline && m.status == "IN_GAME") {
+                val rest = (st.actionStartedAt + CarromRules.TURN_MS + CarromLive.OFFLINE_GRACE_MS - now) / 1000
+                val n = if (st.currentTurnUid == opp && rest in 0L..30L) " " + CarromRules.bn(rest.toString()) else ""
+                Text("প্রতিপক্ষের নেট সমস্যা… অপেক্ষা করুন$n", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 12.dp).shadow(8.dp, RoundedCornerShape(50))
+                        .background(Brush.verticalGradient(listOf(Color(0xFFE8384E), Color(0xFF9A0E26))), RoundedCornerShape(50))
+                        .border(1.5.dp, Color(0xB3FFD278), RoundedCornerShape(50)).padding(horizontal = 14.dp, vertical = 5.dp))
+            }
+            if (mode == 3 && submitting && now - waitSince > 1500) {
+                Text("নেট ধীর… শট পাঠানো হচ্ছে", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp).shadow(8.dp, RoundedCornerShape(50))
+                        .background(Brush.verticalGradient(listOf(Color(0xFF3E64E8), Color(0xFF1A2C9A))), RoundedCornerShape(50))
+                        .border(1.5.dp, Color(0xB3FFD278), RoundedCornerShape(50)).padding(horizontal = 14.dp, vertical = 5.dp))
+            }
+            }
             CcPlayerCard(CcPlayerUi(myName.ifBlank { "আপনি" }, myPhoto, true, myTurn, timer,
                 if (isP1) st.player1Pocketed else st.player2Pocketed, if (isP1) 'w' else 'k', st.queenOwnerUid == me,
                 if (isP1) st.player1Strikes else st.player2Strikes, "আপনার পালা"), Modifier.padding(horizontal = 14.dp, vertical = 8.dp))

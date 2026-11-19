@@ -96,11 +96,11 @@ fun WhBalance(u: Dp, icon: Int, label: String, amount: String, game: Boolean, on
         Column {
             Text(label, fontSize = (u * 2.5f).sp(), fontWeight = FontWeight.Black, color = if (game) Color(0xFF04210F) else Color(0xFF3A1A00),
                 modifier = Modifier.clip(RoundedCornerShape(u * 2)).background(Brush.verticalGradient(if (game) listOf(Color(0xFFC8FFE0), Color(0xFF22C55E)) else listOf(Color(0xFFFFF3B0), Color(0xFFE0A82A)))).padding(horizontal = u * 1.6f))
-            Text(amount, maxLines = 1, softWrap = false, style = TextStyle(
-                fontSize = (u * 4.2f).sp(), fontWeight = FontWeight.Black,
-                brush = Brush.verticalGradient(if (game) listOf(Color.White, Color(0xFFB8FFD0), Color(0xFF22C55E)) else listOf(Color.White, Color(0xFFFFF0A0), Color(0xFFFFC21E), Color(0xFFF08A00))),
-                shadow = Shadow(if (game) Color(0xFF04210F) else Color(0xFF3A1A00), Offset(0f, 3f), 2f)
-            ))
+            // crisp amount, same 3-layer style as the home titles (no blur)
+            if (game) com.example.ui.components.AdGoldText(amount, fontSize = (u * 4.2f).sp(),
+                fill = Brush.verticalGradient(listOf(Color.White, Color(0xFFD8FFE6), Color(0xFF7CF0A8), Color(0xFF22C55E))),
+                outline = Color(0xFF04381A), depth = Color(0xFF021A0C))
+            else com.example.ui.components.AdGoldText(amount, fontSize = (u * 4.2f).sp())
         }
         if (game) {
             Spacer(Modifier.width(u * 1.2f))

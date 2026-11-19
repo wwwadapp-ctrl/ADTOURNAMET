@@ -152,9 +152,7 @@ fun CarromPracticeScreen(myName: String, myPhoto: String, onBack: () -> Unit) {
                 Text("প্র্যাকটিস", color = Color(0xFF3A1A00), fontSize = 12.sp, fontWeight = FontWeight.Black,
                     modifier = Modifier.background(Brush.verticalGradient(listOf(Color(0xFFFFF3B0), Color(0xFFFFC21E))), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 3.dp))
             }
-            Text(if (st.suddenDeath) "⚡ সাডেন ডেথ" else "⏱ " + CarromRules.bn(String.format("%02d:%02d", left / 60, left % 60)),
-                color = Color(0xFFFFE7A0), fontSize = 13.sp, fontWeight = FontWeight.Black,
-                modifier = Modifier.background(Color(0x8C0A1040), RoundedCornerShape(50)).border(1.dp, Color(0x73FFE7A0), RoundedCornerShape(50)).padding(horizontal = 14.dp, vertical = 3.dp))
+            CarromClockPill(if (st.suddenDeath) "সাডেন ডেথ" else CarromRules.bn(String.format("%02d:%02d", left / 60, left % 60)), st.suddenDeath || left < 60)
             CcPlayerCard(CcPlayerUi("কম্পিউটার", "", false, st.currentTurnUid == BOT && !over, timer, st.player2Pocketed, 'k',
                 st.queenOwnerUid == BOT, st.player2Strikes, "প্রতিপক্ষের পালা"), Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
             CarromBoardView(

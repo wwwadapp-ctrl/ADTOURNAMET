@@ -93,14 +93,10 @@ fun ScStage(geo: WhGeo, title: String, subtitle: String, u: Dp) {
         Image(painterResource(R.drawable.sc_stage), null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
     }
     Column(
-        Modifier.offset(x = geo.x(138f), y = geo.y(336f)).size(geo.k * 492f, geo.k * 179f),
+        Modifier.offset(x = geo.x(138f), y = geo.y(316f)).size(geo.k * 492f, geo.k * 179f),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
     ) {
-        Text(title, maxLines = 1, softWrap = false, style = TextStyle(
-            fontSize = (u * 6.4f).sp(), fontWeight = FontWeight.Black,
-            brush = Brush.verticalGradient(listOf(Color.White, Color(0xFFFFF0A0), Color(0xFFFFC21E), Color(0xFFF08A00))),
-            shadow = Shadow(Color(0xFF5A3200), Offset(0f, 5f), 2f)
-        ))
+        com.example.ui.components.AdGoldText(title, fontSize = (u * 6.4f).sp())
         Spacer(Modifier.height(u * 0.6f))
         Text(subtitle, fontSize = (u * 3f).sp(), fontWeight = FontWeight.Black, color = Color(0xFF3A1A00), maxLines = 1,
             modifier = Modifier.clip(RoundedCornerShape(u * 3)).background(Brush.verticalGradient(listOf(Color(0xFFFFF3B0), Color(0xFFE0A82A)))).padding(horizontal = u * 2.6f))

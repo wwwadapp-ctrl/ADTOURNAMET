@@ -333,11 +333,12 @@ fun HomeScreen(
                 .fillMaxWidth()
                 .padding(vertical = 24.dp, horizontal = 16.dp),
             ) {
-              EmptyState(
+              // same gold-framed empty card as the history page (trophy on turning rays); same texts as before
+              com.example.ui.history.HsEmptyState(
                 title = strings.homeEmptyMatchesTitle,
-                description = strings.noAvailableMatchesSubtext,
-                actionButtonText = strings.refreshMatches,
-                onActionClick = { viewModel.refresh() },
+                subtitle = strings.noAvailableMatchesSubtext,
+                actionText = strings.refreshMatches,
+                onAction = { viewModel.refresh() },
               )
             }
           }
@@ -472,7 +473,8 @@ fun HomeQuickActions(
       isDeposit = true,
       onClick = onDepositClick,
       tag = "home_quick_deposit_btn",
-      modifier = Modifier.weight(1f)
+      modifier = Modifier.weight(1f),
+      picture = R.drawable.wl_moneybag
     )
     AdQuickActionCardArt(
       title = strings.withdrawAction.uppercase(),
@@ -480,7 +482,8 @@ fun HomeQuickActions(
       isDeposit = false,
       onClick = onWithdrawClick,
       tag = "home_quick_withdraw_btn",
-      modifier = Modifier.weight(1f)
+      modifier = Modifier.weight(1f),
+      picture = R.drawable.wl_withdraw
     )
   }
 }

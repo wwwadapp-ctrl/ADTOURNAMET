@@ -247,23 +247,10 @@ fun AutoCarromScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
+                        com.example.ui.components.AdGoldText(
                             strings.autoLudoHeaderTitle,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Black,
-                                fontSize = 22.sp,
-                                brush = Brush.verticalGradient(
-                                    listOf(Color(0xFFFFFDE8), Color(0xFFFFE66A), Color(0xFFFFC21E), Color(0xFFF08A00))
-                                ),
-                                shadow = androidx.compose.ui.graphics.Shadow(
-                                    color = Color(0xFF3A1A00),
-                                    offset = Offset(0f, 4f),
-                                    blurRadius = 0f
-                                )
-                            ),
-                            modifier = Modifier.padding(start = 6.dp),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            fontSize = 22.sp,
+                            modifier = Modifier.padding(start = 6.dp)
                         )
                         
                         Spacer(modifier = Modifier.weight(1f))
@@ -317,7 +304,7 @@ fun AutoCarromScreen(
                 onCreateClick = { showCreateMatchDialog = true }
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             // 2. FILTER TABS
             Row(
@@ -363,7 +350,7 @@ fun AutoCarromScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // 3. MATCH LIST
             LazyColumn(
@@ -609,24 +596,16 @@ private fun CreateMatchBanner(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 18.dp),
+                .padding(horizontal = 18.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = strings.autoLudoCreateBannerTitle.replace("🎲", "🎯"),
-                style = MaterialTheme.typography.titleMedium.copy(
-                    brush = Brush.verticalGradient(
-                        listOf(Color.White, Color(0xFFFFF0A0), Color(0xFFFFC21E), Color(0xFFF08A00))
-                    ),
-                    fontSize = 21.sp,
-                    fontWeight = FontWeight.Black,
-                    textAlign = TextAlign.Center,
-                    shadow = androidx.compose.ui.graphics.Shadow(color = Color(0xFF4A2800), offset = Offset(0f, 4f), blurRadius = 0f)
-                ),
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
+            // crisp gold title (same 3-layer style as the home titles); the emoji is drawn on its own
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 2.dp)) {
+                com.example.ui.components.AdGoldText(strings.autoLudoCreateBannerTitle.replace("🎲", "").trim(), fontSize = 21.sp)
+                Text(" 🎯", fontSize = 19.sp)
+            }
             Row(
-                modifier = Modifier.fillMaxWidth(0.6f).padding(bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth(0.6f).padding(bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(Modifier.weight(1f).height(1.5.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, Color(0xFFFFD45A)))))
@@ -640,16 +619,16 @@ private fun CreateMatchBanner(
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFFF2F5FF),
                     textAlign = TextAlign.Center,
-                    lineHeight = 23.sp,
+                    lineHeight = 20.sp,
                     shadow = androidx.compose.ui.graphics.Shadow(color = Color(0xFF0A1040), offset = Offset(0f, 2f), blurRadius = 0f)
                 ),
-                modifier = Modifier.padding(bottom = 14.dp)
+                modifier = Modifier.padding(bottom = 8.dp)
             )
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.86f)
-                    .height(52.dp)
+                    .height(46.dp)
                     .clip(hexShape)
                     .background(Brush.verticalGradient(listOf(Color(0xFFFFF3C4), Color(0xFFC98A10))))
                     .clickable { onCreateClick() }
@@ -864,7 +843,7 @@ private fun AutoCarromMatchCard(
         BannerCornerOrnament(Modifier.align(Alignment.BottomStart).padding(8.dp), flipX = false, flipY = true)
         BannerCornerOrnament(Modifier.align(Alignment.BottomEnd).padding(8.dp), flipX = true, flipY = true)
 
-        Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 16.dp)) {
+        Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp)) {
             // Top Row: Title & Time
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -921,7 +900,7 @@ private fun AutoCarromMatchCard(
                 }
             }
             
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             
             // Badge
             Row(
@@ -993,7 +972,7 @@ private fun AutoCarromMatchCard(
                 }
             }
             
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             
             // Prize & Entry Pills
             Row(
@@ -1011,7 +990,7 @@ private fun AutoCarromMatchCard(
                             )
                         )
                         .border(1.5.dp, Color(0xFFFFE7A0), RoundedCornerShape(12.dp))
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = 5.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
@@ -1043,7 +1022,7 @@ private fun AutoCarromMatchCard(
                         .clip(RoundedCornerShape(12.dp))
                         .background(Brush.verticalGradient(listOf(Color(0xFF1E2E7E), Color(0xFF0F1A52))))
                         .border(1.5.dp, Color(0xFFB9861C), RoundedCornerShape(12.dp))
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = 5.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
@@ -1064,7 +1043,7 @@ private fun AutoCarromMatchCard(
                 }
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             
             // Progress Bar
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -1182,7 +1161,7 @@ private fun AutoCarromMatchCard(
                 }
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             
             // Action Buttons
             val hasRefund = match.refundClaimed[currentUid] == true
@@ -1294,7 +1273,7 @@ private fun AutoCarromMatchCard(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(50.dp)
+                        .height(46.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(Brush.verticalGradient(listOf(Color(0xFF1E2E7E), Color(0xFF0F1A52))))
                         .border(1.5.dp, Color(0xFFB9861C), RoundedCornerShape(12.dp))
@@ -1448,7 +1427,7 @@ private fun LobbyCardButton(
 
     Box(
         modifier = modifier
-            .height(50.dp)
+            .height(46.dp)
             .clip(shape)
             .background(bg)
             .border(if (style == "enter") 2.dp else 1.5.dp, borderColor, shape)

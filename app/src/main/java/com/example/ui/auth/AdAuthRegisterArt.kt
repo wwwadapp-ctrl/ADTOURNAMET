@@ -79,7 +79,7 @@ fun AdAuthRegisterHeader(title: String, subtitle: String) {
                     .clip(RoundedCornerShape(18.dp))
                     .background(
                         Brush.radialGradient(
-                            listOf(Color(0xFF3A4270), Color(0xFF141838)),
+                            listOf(Color(0xFF3A4CC8), Color(0xFF1A2585)),
                             center = Offset(30f * 2.5f, 23f * 2.5f)
                         )
                     ),
@@ -103,26 +103,18 @@ fun AdAuthRegisterHeader(title: String, subtitle: String) {
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = title,
-            style = TextStyle(
-                fontSize = 29.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                textAlign = TextAlign.Center,
-                lineHeight = 36.sp,
-                shadow = Shadow(color = Color(0xFF8A6414), offset = Offset(0f, 5f), blurRadius = 0f)
-            )
-        )
+        AdAuth3DTitle(title, fontSize = 29.sp, lineHeight = 36.sp)
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = subtitle,
             style = TextStyle(
-                fontSize = 14.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFFFFD27A),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color(0xFFFFE9A8),
                 textAlign = TextAlign.Center,
-                lineHeight = 20.sp
+                lineHeight = 21.sp,
+                letterSpacing = 0.2.sp,
+                shadow = Shadow(color = Color(0xFF0A1040), offset = Offset(0f, 2f), blurRadius = 0f)
             )
         )
     }
@@ -167,8 +159,8 @@ fun AdAuthTermsCheck(
                 modifier = Modifier
                     .size(26.dp)
                     .clip(RoundedCornerShape(7.dp))
-                    .background(Brush.verticalGradient(listOf(Color(0xFF2A3156), Color(0xFF151A33))))
-                    .border(1.8.dp, if (checked) Color(0xFFE8B23A) else Color(0xFF8C7A55), RoundedCornerShape(7.dp)),
+                    .background(Brush.verticalGradient(listOf(Color(0xFF2E3DAE), Color(0xFF1F2C8F))))
+                    .border(2.2.dp, if (checked) Color(0xFFE8B23A) else Color(0xFF8C7A55), RoundedCornerShape(7.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 if (checked) {

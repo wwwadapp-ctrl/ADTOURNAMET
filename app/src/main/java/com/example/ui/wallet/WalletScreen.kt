@@ -152,25 +152,24 @@ fun WalletScreen(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
       ) {
-        WlActionButton(
-          primary = true,
+        // the glass cards that were on the home page (cyan add money, gold withdraw), keeping the wallet pictures
+        com.example.ui.home.AdQuickActionCardArt(
           title = strings.addMoneyTitle,
           subtitle = strings.depositAction,
-          picture = R.drawable.wl_moneybag,
-          symbol = Icons.Default.Add,
+          isDeposit = true,
           onClick = onNavigateToDeposit,
           tag = "wallet_deposit_button",
           modifier = Modifier.weight(1f),
+          picture = R.drawable.wl_moneybag,
         )
-        WlActionButton(
-          primary = false,
+        com.example.ui.home.AdQuickActionCardArt(
           title = strings.withdrawAction.uppercase(),
           subtitle = strings.withdrawAction,
-          picture = R.drawable.wl_withdraw,
-          symbol = Icons.Default.ArrowUpward,
+          isDeposit = false,
           onClick = onNavigateToWithdraw,
           tag = "wallet_withdraw_button",
           modifier = Modifier.weight(1f),
+          picture = R.drawable.wl_withdraw,
         )
       }
 

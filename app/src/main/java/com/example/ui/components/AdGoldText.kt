@@ -36,6 +36,9 @@ fun AdGoldText(
     maxLines: Int = 1,
     overflow: TextOverflow = TextOverflow.Clip,
     softWrap: Boolean = false,
+    fill: Brush = AdGoldFill,
+    outline: Color = Color(0xFF5A2A00),
+    depth: Color = Color(0xFF2A1200),
 ) {
     val px = with(LocalDensity.current) { fontSize.toPx() }
     val base = TextStyle(fontSize = fontSize, fontWeight = fontWeight, letterSpacing = letterSpacing, textAlign = textAlign)
@@ -43,20 +46,20 @@ fun AdGoldText(
         // 1. dark depth, pushed a little down
         Text(
             text = text,
-            style = base.copy(color = Color(0xFF2A1200), drawStyle = Stroke(width = px * 0.16f, join = StrokeJoin.Round)),
+            style = base.copy(color = depth, drawStyle = Stroke(width = px * 0.16f, join = StrokeJoin.Round)),
             maxLines = maxLines, overflow = overflow, softWrap = softWrap,
             modifier = Modifier.offset { IntOffset(0, (px * 0.09f).roundToInt()) }
         )
         // 2. sharp brown outline
         Text(
             text = text,
-            style = base.copy(color = Color(0xFF5A2A00), drawStyle = Stroke(width = px * 0.12f, join = StrokeJoin.Round)),
+            style = base.copy(color = outline, drawStyle = Stroke(width = px * 0.12f, join = StrokeJoin.Round)),
             maxLines = maxLines, overflow = overflow, softWrap = softWrap
         )
         // 3. bright gold fill
         Text(
             text = text,
-            style = base.copy(brush = AdGoldFill),
+            style = base.copy(brush = fill),
             maxLines = maxLines, overflow = overflow, softWrap = softWrap
         )
     }

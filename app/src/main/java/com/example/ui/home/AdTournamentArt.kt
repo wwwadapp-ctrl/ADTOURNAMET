@@ -145,24 +145,8 @@ fun AdAllMatchesCard(
             Canvas(modifier = Modifier.matchParentSize()) {
                 mgScallopMedal(Brush.radialGradient(listOf(Color(0xFF2C3CB8), Color(0xFF0B1040)), center = Offset(center.x, center.y * 0.7f)))
             }
-            Canvas(modifier = Modifier.size(40.dp)) {
-                val k = size.width / 24f
-                fun o(x: Float, y: Float) = Offset(x * k, y * k)
-                val gold = Brush.verticalGradient(listOf(Color(0xFFFFF8D8), Color(0xFFFFC94A), Color(0xFFB9780C)))
-                val cup = Path().apply {
-                    moveTo(o(7f, 3f).x, o(7f, 3f).y); lineTo(o(17f, 3f).x, o(17f, 3f).y); lineTo(o(17f, 9f).x, o(17f, 9f).y)
-                    cubicTo(o(17f, 12f).x, o(17f, 12f).y, o(15f, 15f).x, o(15f, 15f).y, o(13f, 15.5f).x, o(13f, 15.5f).y)
-                    lineTo(o(13f, 18f).x, o(13f, 18f).y); lineTo(o(16f, 18f).x, o(16f, 18f).y); lineTo(o(16f, 21f).x, o(16f, 21f).y)
-                    lineTo(o(8f, 21f).x, o(8f, 21f).y); lineTo(o(8f, 18f).x, o(8f, 18f).y); lineTo(o(11f, 18f).x, o(11f, 18f).y)
-                    lineTo(o(11f, 15.5f).x, o(11f, 15.5f).y)
-                    cubicTo(o(9f, 15f).x, o(9f, 15f).y, o(7f, 12f).x, o(7f, 12f).y, o(7f, 9f).x, o(7f, 9f).y)
-                    close()
-                }
-                drawPath(cup, gold)
-                drawPath(cup, Color(0xFF7A4E00), style = Stroke(0.4f * k))
-                drawArc(gold, 90f, 180f, false, topLeft = o(3.5f, 5f), size = Size(5f * k, 6f * k), style = Stroke(1.6f * k))
-                drawArc(gold, 270f, 180f, false, topLeft = o(15.5f, 5f), size = Size(5f * k, 6f * k), style = Stroke(1.6f * k))
-            }
+            // trophy picture (same as the history page), inside the gold seal
+            com.example.ui.wallet.WlImage(R.drawable.wl_trophy, 46.dp)
             Text("✦", style = TextStyle(fontSize = 12.sp, color = Color(0xFFFFF8D8).copy(alpha = glow)), modifier = Modifier.align(Alignment.TopStart))
         }
 

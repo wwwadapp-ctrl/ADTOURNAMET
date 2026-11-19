@@ -95,11 +95,17 @@ fun CcPlayerCard(p: CcPlayerUi, modifier: Modifier = Modifier) {
 private fun CcAvatar(p: CcPlayerUi) {
     Box(Modifier.size(60.dp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
-            val sw = 3.5.dp.toPx(); val r = size.minDimension / 2 - sw / 2
+            val sw = 4.5.dp.toPx(); val r = size.minDimension / 2 - sw / 2
             drawCircle(Color.White.copy(alpha = 0.18f), r, style = Stroke(sw))
-            if (p.active) drawArc(if (p.timer < 0.25f) SolidColor(Color(0xFFFF5A6A)) else CcGold, -90f, 360f * p.timer.coerceIn(0f, 1f), false,
-                Offset(center.x - r, center.y - r), Size(r * 2, r * 2), style = Stroke(sw, cap = StrokeCap.Round))
-            drawCircle(CcGold, r - sw * 1.15f, style = Stroke(2.6.dp.toPx()))
+            if (p.active) {
+                // bright blue turn timer with a soft glow (red in the last quarter)
+                val low = p.timer < 0.25f; val sweep = 360f * p.timer.coerceIn(0f, 1f)
+                val tl = Offset(center.x - r, center.y - r); val sz = Size(r * 2, r * 2)
+                drawArc(if (low) Color(0x66FF5A6A) else Color(0x6629C8FF), -90f, sweep, false, tl, sz, style = Stroke(sw * 2.4f, cap = StrokeCap.Round))
+                drawArc(if (low) SolidColor(Color(0xFFFF5A6A)) else Brush.linearGradient(listOf(Color(0xFFB8F6FF), Color(0xFF29C8FF), Color(0xFF2E5BFF))),
+                    -90f, sweep, false, tl, sz, style = Stroke(sw, cap = StrokeCap.Round))
+            }
+            drawCircle(CcGold, size.minDimension / 2 - 6.dp.toPx(), style = Stroke(2.6.dp.toPx()))
         }
         Box(Modifier.size(44.dp).clip(CircleShape).background(Brush.radialGradient(listOf(Color(0xFF5A6BE8), Color(0xFF1A2685)))), contentAlignment = Alignment.Center) {
             EsportsAvatar(photoUrl = p.photo.ifBlank { null }, name = p.name, size = 44.dp, borderWidth = 0.dp)
@@ -189,15 +195,30 @@ fun CcSlider(value: Float, enabled: Boolean, onChange: (Float) -> Unit, modifier
         contentAlignment = Alignment.CenterStart
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            val y = size.height / 2; val th = 12.dp.toPx()
-            drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF0B1040), Color(0xFF26369A)), y - th / 2, y + th / 2), Offset(0f, y - th / 2), Size(size.width, th), CornerRadius(th / 2))
-            drawRoundRect(Color(0xB3FFE7A0), Offset(0f, y - th / 2), Size(size.width, th), CornerRadius(th / 2), style = Stroke(1.5.dp.toPx()))
-            val kx = 22.dp.toPx() + value * (size.width - 44.dp.toPx()); val kr = 21.dp.toPx()
-            drawCircle(Color(0xFF8A4A06), kr, Offset(kx, y + 3.dp.toPx()))
-            drawCircle(Brush.radialGradient(listOf(Color(0xFFFFF6C8), Color(0xFFFFC21E), Color(0xFFC98A10)), Offset(kx - kr * 0.25f, y - kr * 0.35f), kr * 1.2f), kr, Offset(kx, y))
-            val a = Path().apply { moveTo(kx - 3.dp.toPx(), y - 6.dp.toPx()); lineTo(kx - 10.dp.toPx(), y); lineTo(kx - 3.dp.toPx(), y + 6.dp.toPx()); close()
-                moveTo(kx + 3.dp.toPx(), y - 6.dp.toPx()); lineTo(kx + 10.dp.toPx(), y); lineTo(kx + 3.dp.toPx(), y + 6.dp.toPx()); close() }
-            drawPath(a, Color(0xFF3A1A00))
+            // premium rail: gold frame, dark glass groove, ruler marks, gold end studs
+            val y = size.height / 2; val d = 1.dp.toPx(); val th = 18 * d; val ih = th - 6 * d
+            drawRoundRect(Color(0x8C000000), Offset(0f, y - th / 2 + 4 * d), Size(size.width, th), CornerRadius(th / 2))
+            drawRoundRect(Brush.linearGradient(listOf(Color(0xFFFFF3C4), Color(0xFFE0A82A), Color(0xFF8A5A08), Color(0xFFE0A82A), Color(0xFFFFF3C4)), Offset.Zero, Offset(size.width, 0f)),
+                Offset(0f, y - th / 2), Size(size.width, th), CornerRadius(th / 2))
+            drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF040820), Color(0xFF13206A), Color(0xFF0A1250)), y - ih / 2, y + ih / 2),
+                Offset(3 * d, y - ih / 2), Size(size.width - 6 * d, ih), CornerRadius(ih / 2))
+            val x0 = 18 * d; val x1 = size.width - 18 * d
+            for (i in 0..24) {
+                val tx = x0 + (x1 - x0) * i / 24f; val h = if (i % 4 == 0) 4f * d else 2.5f * d
+                drawLine(Color(0x99FFD778), Offset(tx, y - h), Offset(tx, y + h), 1.2f * d)
+            }
+            for (sx in listOf(9 * d, size.width - 9 * d))
+                drawCircle(Brush.radialGradient(listOf(Color(0xFFFFF6C8), Color(0xFFE0A82A), Color(0xFF7A5208)), Offset(sx - 2 * d, y - 2 * d), 8 * d), 6.5f * d, Offset(sx, y))
+            // knob: a small striker (gold rim, glossy blue centre, arrows)
+            val kr = 21.dp.toPx(); val kx = 22.dp.toPx() + value * (size.width - 44.dp.toPx())
+            drawCircle(Brush.radialGradient(listOf(Color(0x99FFC85A), Color(0x00FFC85A)), Offset(kx, y), kr * 1.6f), kr * 1.6f, Offset(kx, y))
+            drawCircle(Color(0xFF5A3A04), kr, Offset(kx, y + 3 * d))
+            drawCircle(Brush.sweepGradient(listOf(Color(0xFFFFF6C8), Color(0xFFE0A82A), Color(0xFF8A5A08), Color(0xFFE0A82A), Color(0xFFFFF6C8)), Offset(kx, y)), kr, Offset(kx, y))
+            drawCircle(Brush.radialGradient(listOf(Color(0xFFBFD0FF), Color(0xFF4A6BFF), Color(0xFF1A2AB0), Color(0xFF0A1050)), Offset(kx - kr * 0.3f, y - kr * 0.35f), kr), kr * 0.78f, Offset(kx, y))
+            val a = Path().apply { moveTo(kx - 3 * d, y - 6 * d); lineTo(kx - 10 * d, y); lineTo(kx - 3 * d, y + 6 * d); close()
+                moveTo(kx + 3 * d, y - 6 * d); lineTo(kx + 10 * d, y); lineTo(kx + 3 * d, y + 6 * d); close() }
+            drawPath(a, Color(0xFFFFF3C4))
+            drawOval(Color(0x59FFFFFF), Offset(kx - kr * 0.55f, y - kr * 0.68f), Size(kr * 0.9f, kr * 0.34f))
         }
     }
 }

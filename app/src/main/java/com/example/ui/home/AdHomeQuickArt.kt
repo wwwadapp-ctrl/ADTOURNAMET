@@ -92,15 +92,18 @@ fun AdQuickActionCardArt(
     isDeposit: Boolean,
     onClick: () -> Unit,
     tag: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    picture: Int? = null
 ) {
     val p = if (isDeposit) HaCyanPalette else HaGoldPalette
     val outer = RoundedCornerShape(16.dp)
     val press = remember { MutableInteractionSource() }
+    // the round + / arrow icon gently pulses (plus turns, arrow lifts)
+    val orbPulse by rememberInfiniteTransition(label = "haOrb").animateFloat(0f, 1f, infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "haOrbPulse")
     Box(
         modifier = modifier
             .adPressScale(press)
-            .height(92.dp)
+            .height(if (picture != null) 98.dp else 92.dp)
             .shadow(10.dp, outer, ambientColor = Color(0xFF050A3C), spotColor = Color(0xFF050A3C))
             .clip(outer)
             .background(Brush.linearGradient(p.edge))
@@ -116,7 +119,8 @@ fun AdQuickActionCardArt(
                 )
                 haGlassTop(0.42f, 0.18f, 14.dp.toPx())
                 haStreak(size.width * 0.55f, 22.dp.toPx(), 0.16f)
-                // big faint watermark icon in the corner
+                // big faint watermark icon in the corner (not when a picture is shown)
+                if (picture == null) {
                 val wc = Offset(size.width - 25.dp.toPx(), size.height - 23.dp.toPx())
                 val wr = 33.dp.toPx()
                 val wm = p.orb.first().copy(alpha = 0.14f)
@@ -132,6 +136,7 @@ fun AdQuickActionCardArt(
                         }, wm, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
                     )
                 }
+                }
             }
             .padding(10.dp)
     ) {
@@ -140,7 +145,8 @@ fun AdQuickActionCardArt(
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .drawBehind { drawCircle(p.glow.copy(alpha = 0.55f), radius = size.minDimension * 0.68f) }
+                        .graphicsLayer { scaleX = 1f + 0.08f * orbPulse; scaleY = 1f + 0.08f * orbPulse }
+                        .drawBehind { drawCircle(p.glow.copy(alpha = 0.3f + 0.45f * orbPulse), radius = size.minDimension * 0.68f) }
                         .clip(CircleShape)
                         .background(Brush.linearGradient(p.orbEdge))
                         .padding(2.dp)
@@ -152,7 +158,7 @@ fun AdQuickActionCardArt(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Canvas(modifier = Modifier.size(18.dp)) {
+                    Canvas(modifier = Modifier.size(18.dp).graphicsLayer { if (isDeposit) rotationZ = 90f * orbPulse else translationY = -2.5f * density * orbPulse }) {
                         val s = size.width / 24f
                         val st = 3.4f * s
                         if (isDeposit) {
@@ -167,7 +173,13 @@ fun AdQuickActionCardArt(
                         }
                     }
                 }
-                Box(
+                if (picture != null) {
+                    // wallet picture with its own animation (gold rays + bobbing), same as the old wallet buttons
+                    Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+                        if (!isDeposit) com.example.ui.wallet.WlRays(76.dp)
+                        com.example.ui.wallet.WlImage(picture, 44.dp)
+                    }
+                } else Box(
                     modifier = Modifier
                         .size(22.dp)
                         .clip(CircleShape)
