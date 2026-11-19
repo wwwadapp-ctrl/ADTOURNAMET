@@ -97,3 +97,9 @@
 -keepclassmembers class * { @androidx.annotation.Keep *; }
 -keep class kotlin.Metadata { *; }
 -dontwarn com.google.firebase.**
+# --- Rules merged from new AI Studio export ---
+# --- Auto Carrom Firebase data models (same protection as Auto Ludo) ---
+-keep class com.example.ui.autocarrom.AutoCarromMatchEntity {
+-keepclassmembers class com.example.ui.autocarrom.AutoCarromMatchEntity { *; }
+-keep class com.example.ui.autocarrom.CarromGameState {
+-keepclassmembers class com.example.ui.autocarrom.CarromGameState { *; }
