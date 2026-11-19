@@ -169,6 +169,8 @@ fun HomeScreen(
   onHeadTailClick: () -> Unit = {},
   onScratchCardClick: () -> Unit = {},
   onAutoLudoClick: () -> Unit = {},
+  onAutoCarromClick: () -> Unit = {},
+  onCarromPracticeClick: () -> Unit = {},
   unreadNotificationsCount: Int = 0,
   notificationRepository: NotificationRepository = remember { FirebaseNotificationRepository() },
   modifier: Modifier = Modifier,
@@ -184,6 +186,8 @@ fun HomeScreen(
   val guideBanners = rememberGuideBanners()
 
   val context = LocalContext.current
+  var carromTaps by remember { mutableStateOf(0) }
+  var carromTapStart by remember { mutableStateOf(0L) }
   val activeUserId = currentUser?.userId?.ifBlank { currentUser.uid } ?: currentUser?.uid ?: ""
 
   val liveBalance = wallet?.let { w ->
@@ -265,7 +269,13 @@ fun HomeScreen(
       item {
         LobbyBoardGamesSection(
             onLudoClick = onAutoLudoClick,
-            onCarromClick = { android.widget.Toast.makeText(context, strings.homeCarromComingSoon, android.widget.Toast.LENGTH_SHORT).show() }
+            onCarromClick = {
+              val t = System.currentTimeMillis()
+              if (t - carromTapStart > 3000L) { carromTapStart = t; carromTaps = 0 }
+              carromTaps++
+              if (carromTaps >= 5) { carromTaps = 0; onCarromPracticeClick() }
+              else if (carromTaps == 1) android.widget.Toast.makeText(context, strings.homeCarromComingSoon, android.widget.Toast.LENGTH_SHORT).show()
+            }
         )
       }
 

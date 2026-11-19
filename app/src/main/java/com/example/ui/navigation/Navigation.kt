@@ -80,6 +80,9 @@ import com.example.ui.theme.*
 import com.example.ui.wallet.*
 import com.example.ui.autoludo.AutoLudoScreen
 import com.example.ui.autoludo.AutoLudoGameScreen
+import com.example.ui.autocarrom.CarromPracticeScreen
+import com.example.ui.autocarrom.AutoCarromScreen
+import com.example.ui.autocarrom.AutoCarromGameScreen
 
 object Destinations {
   const val SPLASH = "splash"
@@ -111,6 +114,10 @@ object Destinations {
   const val SCRATCH_CARD = "scratch_card"
   const val AUTO_LUDO = "auto_ludo"
   const val AUTO_LUDO_GAME = "auto_ludo_game/{matchId}"
+  const val AUTO_CARROM = "auto_carrom"
+  const val CARROM_PRACTICE = "carrom_practice"
+  const val AUTO_CARROM_GAME = "auto_carrom_game/{matchId}"
+  fun autoCarromGame(matchId: String) = "auto_carrom_game/$matchId"
 
   fun otp(phone: String) = "otp/$phone"
   fun resetPassword(phone: String, otp: String) = "reset_password/$phone/$otp"
@@ -530,6 +537,7 @@ fun AppNavigation(
           onHeadTailClick = { navController.navigate(Destinations.HEAD_TAIL) },
           onScratchCardClick = { navController.navigate(Destinations.SCRATCH_CARD) },
           onAutoLudoClick = { navController.navigate(Destinations.AUTO_LUDO) },
+          onCarromPracticeClick = { navController.navigate(Destinations.AUTO_CARROM) },
           unreadNotificationsCount = unreadNotificationsCount,
           notificationRepository = container.notificationRepository,
         )
@@ -669,6 +677,46 @@ fun AppNavigation(
       ) { backStackEntry ->
         val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
         AutoLudoGameScreen(
+          matchId = matchId,
+          onBackClick = { navController.popBackStack() }
+        )
+      }
+
+      // AUTO CARROM MATCH LIST (same as Auto Ludo lobby)
+      composable(Destinations.AUTO_CARROM) { backStackEntry ->
+        val walletViewModel: WalletViewModel = viewModel(
+          viewModelStoreOwner = backStackEntry,
+          key = "WalletViewModel_AutoCarrom_$activeUserId",
+          factory = remember(activeUserId) {
+            WalletViewModel.Factory(container.walletRepository, activeUserId, authRepository = container.authRepository)
+          }
+        )
+        val walletUiState by walletViewModel.uiState.collectAsStateWithLifecycle()
+        AutoCarromScreen(
+          user = currentUser,
+          wallet = walletUiState.wallet,
+          onNavigateBack = { navController.popBackStack() },
+          onPlayMatch = { matchId -> navController.navigate(Destinations.autoCarromGame(matchId)) },
+          onPractice = { navController.navigate(Destinations.CARROM_PRACTICE) }
+        )
+      }
+
+      // AUTO CARROM PRACTICE (test only: opened by tapping the carrom card 5 times quickly)
+      composable(Destinations.CARROM_PRACTICE) {
+        CarromPracticeScreen(
+          myName = currentUser?.effectiveName ?: "",
+          myPhoto = currentUser?.effectivePhoto ?: "",
+          onBack = { navController.popBackStack() }
+        )
+      }
+
+      // AUTO CARROM ONLINE GAME
+      composable(
+        route = Destinations.AUTO_CARROM_GAME,
+        arguments = listOf(navArgument("matchId") { type = NavType.StringType })
+      ) { backStackEntry ->
+        val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
+        AutoCarromGameScreen(
           matchId = matchId,
           onBackClick = { navController.popBackStack() }
         )
