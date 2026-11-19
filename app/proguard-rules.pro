@@ -57,6 +57,20 @@
 }
 -keepclassmembers class com.example.ui.autoludo.LudoGameState { *; }
 
+# --- Auto Carrom Firebase data models (same protection as Auto Ludo) ---
+-keep class com.example.ui.autocarrom.AutoCarromMatchEntity {
+    <init>(...);
+    public <methods>;
+    public <fields>;
+}
+-keepclassmembers class com.example.ui.autocarrom.AutoCarromMatchEntity { *; }
+-keep class com.example.ui.autocarrom.CarromGameState {
+    <init>(...);
+    public <methods>;
+    public <fields>;
+}
+-keepclassmembers class com.example.ui.autocarrom.CarromGameState { *; }
+
 # Keep any nested or helper state data classes in AutoLudo / MiniGames
 -keep class com.example.ui.autoludo.**State { *; }
 -keep class com.example.ui.autoludo.**Model { *; }
@@ -81,10 +95,9 @@
 -keep class retrofit2.** { *; }
 -keep class com.squareup.moshi.** { *; }
 
-# Ktor & Google AI SDK rules
+# --- Added by DevOps: Firebase RTDB / models R8 safety ---
 -dontwarn io.ktor.**
 -dontwarn com.google.ai.client.generativeai.**
-# --- Added by DevOps: Firebase RTDB / models R8 safety ---
 -keepattributes Signature
 -keepattributes *Annotation*
 -keepattributes EnclosingMethod
@@ -97,9 +110,3 @@
 -keepclassmembers class * { @androidx.annotation.Keep *; }
 -keep class kotlin.Metadata { *; }
 -dontwarn com.google.firebase.**
-# --- Rules merged from new AI Studio export ---
-# --- Auto Carrom Firebase data models (same protection as Auto Ludo) ---
--keep class com.example.ui.autocarrom.AutoCarromMatchEntity {
--keepclassmembers class com.example.ui.autocarrom.AutoCarromMatchEntity { *; }
--keep class com.example.ui.autocarrom.CarromGameState {
--keepclassmembers class com.example.ui.autocarrom.CarromGameState { *; }
