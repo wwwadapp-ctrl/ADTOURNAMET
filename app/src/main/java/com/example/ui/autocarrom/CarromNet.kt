@@ -15,13 +15,16 @@ import kotlinx.coroutines.flow.callbackFlow
 object CarromClock {
     @Volatile private var offset = 0L
     @Volatile private var started = false
+    /** true once the server time offset has been received. */
+    @Volatile var ready = false
+        private set
 
     fun start() {
         if (started) return
         started = true
         try {
             AutoCarromManager.getDb()?.getReference(".info/serverTimeOffset")?.addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) { offset = (snapshot.value as? Number)?.toLong() ?: 0L }
+                override fun onDataChange(snapshot: DataSnapshot) { offset = (snapshot.value as? Number)?.toLong() ?: 0L; ready = true }
                 override fun onCancelled(error: DatabaseError) {}
             })
         } catch (_: Exception) { started = false }
@@ -34,8 +37,8 @@ object CarromClock {
 data class CarromLiveInfo(val seen: Long? = null, val aim: String? = null)
 
 object CarromLive {
-    const val BEAT_MS = 2_000L
-    const val ONLINE_MS = 8_000L          // seen within 8 s = online
+    const val BEAT_MS = 3_000L
+    const val ONLINE_MS = 12_000L         // seen within 12 s = online
     const val OFFLINE_GRACE_MS = 30_000L  // up to 30 s extra when opponent is offline
     const val BACK_GRACE_MS = 5_000L      // 5 s grace when connection returns after turn timer
     private const val NODE_LIVE = "miniGames/autoCarrom/live"
@@ -48,9 +51,14 @@ object CarromLive {
         if (matchId.isBlank() || uid.isBlank()) return
         try {
             val r = ref(matchId, uid)?.child("seen") ?: return
-            r.onDisconnect().setValue(0L)
             r.setValue(ServerValue.TIMESTAMP)
         } catch (_: Exception) { }
+    }
+
+    /** Sets the automatic "offline" (0) write. Call once each time the connection comes up (not on every beat). */
+    fun armDisconnect(matchId: String, uid: String) {
+        if (matchId.isBlank() || uid.isBlank()) return
+        try { ref(matchId, uid)?.child("seen")?.onDisconnect()?.setValue(0L) } catch (_: Exception) { }
     }
 
     fun leave(matchId: String, uid: String) {

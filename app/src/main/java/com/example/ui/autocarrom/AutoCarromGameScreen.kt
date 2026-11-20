@@ -90,7 +90,8 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
     DisposableEffect(matchId) { onDispose { CarromLive.leave(matchId, me) } }
     val oppInfo = live[opp]
     val oppSeen = oppInfo?.seen
-    val oppOnline = oppSeen == null || (oppSeen > 0L && now - oppSeen < CarromLive.ONLINE_MS)
+    // before the server clock offset is known, a running phone clock difference must not look like "offline"
+    val oppOnline = oppSeen == null || (oppSeen > 0L && (!CarromClock.ready || now - oppSeen < CarromLive.ONLINE_MS))
     val oppOnlineNow = rememberUpdatedState(oppOnline)
     // when a net comes back after the 20 s are over, that player still gets 5 s to shoot
     var oppBackAt by remember { mutableLongStateOf(0L) }
@@ -98,12 +99,15 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
     var oppWasOnline by remember { mutableStateOf(true) }
     var meWasConnected by remember { mutableStateOf(true) }
     LaunchedEffect(oppOnline) { if (oppOnline && !oppWasOnline) oppBackAt = CarromClock.now(); oppWasOnline = oppOnline }
-    LaunchedEffect(connected) { if (connected && !meWasConnected) myBackAt = CarromClock.now(); meWasConnected = connected }
+    LaunchedEffect(connected) {
+        if (connected) CarromLive.armDisconnect(matchId, me)   // the automatic "offline" write is set once per connection
+        if (connected && !meWasConnected) myBackAt = CarromClock.now(); meWasConnected = connected
+    }
     // my striker and aim go to the other phone about 10 times a second (only when they change)
     LaunchedEffect(matchId) {
         var last = ""
         while (true) {
-            kotlinx.coroutines.delay(100)
+            kotlinx.coroutines.delay(200)
             val cs = shown
             if (cs != null && cs.currentTurnUid == me && mode == 0 && match?.status == "IN_GAME") {
                 val a = aim
@@ -126,7 +130,7 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
         when {
             cur == null -> shown = ns
             mode == 1 || mode == 2 -> pending = ns
-            mode == 3 -> if (ns.shotNo > cur.shotNo) adopt(ns)
+            mode == 3 -> if (ns.shotNo > cur.shotNo || mm.status == "COMPLETED") adopt(ns)
             ns.shotNo == cur.shotNo + 1 && parts.size == 7 && parts[0] == cur.shotNo.toString() && parts[1] != me -> {
                 val s = CarromSim(cur.board, cur.powder, (parts[2].toDoubleOrNull() ?: 0.0) / 10, (parts[3].toDoubleOrNull() ?: 0.0) / 10)
                 sounds(s)
@@ -158,43 +162,58 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
         }
     }
 
+    // Main loop. IMPORTANT for speed: the whole screen is redrawn every frame ONLY while pieces are moving
+    // (mode 1/2). When nothing moves it runs 20 times a second and updates the clock only 4 times a second.
+    // Redrawing everything 60 times a second kept the phone's main thread busy, so Firebase updates
+    // (new board, opponent online, "shot saved") were delivered very late.
     LaunchedEffect(Unit) {
-        var last = 0L; var acc = 0.0; var settleAt = 0L
+        var last = 0L; var acc = 0.0; var settleAt = 0L; var lastClock = 0L
         while (true) {
-            withFrameNanos { t ->
-                val dt = if (last == 0L) 0.0 else ((t - last) / 1e9).coerceAtMost(0.05); last = t
-                now = CarromClock.now()
-                val s = sim
-                if (mode == 1 && s != null) {
-                    acc += dt; var n = 0
-                    while (acc >= CarromSim.DT && n < 40) { s.step(); acc -= CarromSim.DT; n++ }
-                    for (b in s.all) if (!b.inPocket && (abs(b.vx) > 5 || abs(b.vy) > 5)) powder.wipe(b.x, b.y, b.r * 0.92, true)
-                    if (!s.moving()) { mode = 2; settleAt = now + 400 }
-                } else if (mode == 2 && now >= settleAt) {
-                    if (replaying) { val p = pending; if (p != null) adopt(p) else { mode = 0; replaying = false; sim = null } } else ownShotDrawn()
+            if (mode == 1 || mode == 2) {
+                withFrameNanos { t ->
+                    val dt = if (last == 0L) 0.0 else ((t - last) / 1e9).coerceAtMost(0.05); last = t
+                    now = CarromClock.now()
+                    val s = sim
+                    if (mode == 1 && s != null) {
+                        acc += dt; var n = 0
+                        while (acc >= CarromSim.DT && n < 40) { s.step(); acc -= CarromSim.DT; n++ }
+                        for (b in s.all) if (!b.inPocket && (abs(b.vx) > 5 || abs(b.vy) > 5)) powder.wipe(b.x, b.y, b.r * 0.92, true)
+                        if (!s.moving()) { mode = 2; settleAt = now + 400 }
+                    } else if (mode == 2 && now >= settleAt) {
+                        if (replaying) { val p = pending; if (p != null) adopt(p) else { mode = 0; replaying = false; sim = null } } else ownShotDrawn()
+                    }
+                    sim?.all?.forEach { if (it.inPocket && it.fall > 0f) it.fall -= 0.06f }
+                    tick++
                 }
-                sim?.all?.forEach { if (it.inPocket && it.fall > 0f) it.fall -= 0.06f }
-                val ol = oppLiveNow.value; val f = (dt * 12).coerceAtMost(1.0)
-                oppX += ((ol?.first ?: S / 2) - oppX) * f
+            } else {
+                kotlinx.coroutines.delay(50)
+                last = 0L; acc = 0.0
+                val t = CarromClock.now()
+                if (t - lastClock >= 250) { now = t; lastClock = t }
+                if (sim != null) { sim?.all?.forEach { if (it.inPocket && it.fall > 0f) it.fall -= 0.06f } }
+                // the other player's striker glides to its live position; aim is shown as received
+                val ol = oppLiveNow.value
+                val tx = ol?.first ?: S / 2
+                if (abs(tx - oppX) > 0.3) oppX += (tx - oppX) * 0.45
                 val ta = ol?.second; val pa = oppAimShown
-                oppAimShown = if (ta == null) null else if (pa == null) ta else {
-                    val nx = pa[0] + (ta[0] - pa[0]) * f; val ny = pa[1] + (ta[1] - pa[1]) * f; val nl = sqrt(nx * nx + ny * ny)
-                    if (nl < 1e-6) ta else doubleArrayOf(nx / nl, ny / nl, pa[2] + (ta[2] - pa[2]) * f)
-                }
+                if (ta == null) { if (pa != null) oppAimShown = null } else if (pa == null || !ta.contentEquals(pa)) oppAimShown = ta
                 val cs = shown
                 if (cs != null && mode == 0 && match?.status == "IN_GAME" && passTriedFor != cs.shotNo) {
-                    val el = now - cs.actionStartedAt
-                    val pass = if (cs.currentTurnUid == me) connected && el >= CarromRules.TURN_MS && now - myBackAt >= CarromLive.BACK_GRACE_MS
+                    val el = t - cs.actionStartedAt
+                    val pass = if (cs.currentTurnUid == me) connected && el >= CarromRules.TURN_MS && t - myBackAt >= CarromLive.BACK_GRACE_MS
                     else el >= CarromRules.TURN_MS + CarromLive.OFFLINE_GRACE_MS ||
-                        (oppOnlineNow.value && el >= CarromRules.TURN_MS + 3000L && now - oppBackAt >= CarromLive.BACK_GRACE_MS)
+                        (oppOnlineNow.value && el >= CarromRules.TURN_MS + 3000L && t - oppBackAt >= CarromLive.BACK_GRACE_MS)
                     if (pass) {
                         passTriedFor = cs.shotNo
-                        scope.launch { AutoCarromPlay.passTurnTimeout(matchId, me, cs.shotNo) }
+                        val n0 = cs.shotNo
+                        scope.launch {
+                            val r = AutoCarromPlay.passTurnTimeout(matchId, me, n0)
+                            if (r.isFailure) { kotlinx.coroutines.delay(2000); if (passTriedFor == n0) passTriedFor = -1 }   // try again later
+                        }
                     }
                 }
                 // waited 8 s for my own shot to be saved and nothing came: show the latest saved board
-                if (mode == 3 && !submitting && now - waitSince > 8000) match?.gameState?.let { adopt(it) }
-                tick++
+                if (mode == 3 && !submitting && t - waitSince > 8000) match?.gameState?.let { adopt(it) }
             }
         }
     }
@@ -231,9 +250,15 @@ fun AutoCarromGameScreen(matchId: String, onBackClick: () -> Unit) {
                 onShoot = { a ->
                     val s = CarromSim(st.board, st.powder, strikerX, baseY(me)); sounds(s); s.shoot(a[0], a[1], a[2])
                     shotInput = "${st.shotNo}|$me|${Math.round(strikerX * 10)}|${Math.round(baseY(me) * 10)}|${a[0]}|${a[1]}|${a[2]}"
-                    val r = CarromSim(st.board, st.powder, strikerX, baseY(me)); r.shoot(a[0], a[1], a[2]); r.runToEnd()
+                    val b0 = st.board; val p0 = st.powder; val x0 = strikerX; val y0 = baseY(me); val n0 = st.shotNo
                     CarromSfx.play(CarromSfx.S.FLICK, (0.4 + 0.6 * a[2]).toFloat()); aim = null; replaying = false; pending = null; sim = s; mode = 1
-                    submitNow(r, st.shotNo)
+                    // the full result (thousands of physics steps) is worked out off the main thread, then saved
+                    scope.launch {
+                        val r = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                            CarromSim(b0, p0, x0, y0).also { it.shoot(a[0], a[1], a[2]); it.runToEnd() }
+                        }
+                        submitNow(r, n0)
+                    }
                 },
                 onPowder = { x, y -> powderMode = false; val n = st.shotNo; scope.launch { AutoCarromPlay.usePowder(matchId, me, n, x, y) } },
                 modifier = Modifier.padding(horizontal = 8.dp)
